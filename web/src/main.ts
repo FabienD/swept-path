@@ -5,9 +5,22 @@ import {
   metres,
   moves,
 } from "./domain/labels";
-import type { ErrorDto, SolveRequest } from "./domain/types";
+import type { ErrorDto, SceneDto, SolveRequest } from "./domain/types";
+import { boundsFor, sceneToPrimitives } from "./render/scene";
+import { projectionFor } from "./render/projection";
+import { renderSvg } from "./render/svg";
 import { createStore } from "./state/store";
 import { SolverClient } from "./worker/client";
+
+const VIEWPORT = { width: 1000, height: 600 };
+
+/** Redraws the plan from scratch. Cheap enough to do on every change. */
+function draw(scene: SceneDto): void {
+  const svg = document.getElementById("plan");
+  if (!(svg instanceof SVGSVGElement)) return;
+  const projection = projectionFor(boundsFor(scene), VIEWPORT, false);
+  renderSvg(sceneToPrimitives(scene), svg, projection);
+}
 
 const client = new SolverClient();
 const store = createStore({ busy: false, verdict: "" });
@@ -51,7 +64,13 @@ store.subscribe(() => {
   if (verdict) verdict.textContent = store.get().verdict;
 });
 
-document.getElementById("params")?.addEventListener("submit", async (event) => {
+const form = document.getElementById("params");
+form?.addEventListener("input", () => {
+  draw(readRequest().scene);
+});
+draw(readRequest().scene);
+
+form?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (store.get().busy) return;
   store.set({ busy: true, verdict: "Calcul en cours…" });
