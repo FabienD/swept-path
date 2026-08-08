@@ -7,6 +7,7 @@
 //! Unlike the prototype, the two posts are placed independently: nothing here
 //! assumes the opening is centred on `x = 0`.
 
+pub mod gate;
 pub mod obstacles;
 
 use crate::geometry::Obb;
@@ -94,6 +95,14 @@ impl Scene {
     pub fn obstacles(&self) -> Vec<Obb> {
         obstacles::build(self)
     }
+
+    /// The widest angle these leaves can open to without fouling their posts.
+    ///
+    /// A sliding gate is unconstrained, so it reports the maximum.
+    #[must_use]
+    pub fn max_open_angle(&self) -> Radians {
+        gate::max_open_angle(self)
+    }
 }
 
 #[cfg(test)]
@@ -141,6 +150,20 @@ mod tests {
         // Two wall stretches, two pillars, the far kerb, and the pavement
         // split either side of the dropped kerb: seven rectangles.
         assert_eq!(symmetric().obstacles().len(), 7);
+    }
+
+    #[test]
+    fn adds_two_leaves_for_a_swinging_gate() {
+        let mut scene = symmetric();
+        scene.gate = GateKind::Swinging {
+            leaf_length: 1.15,
+            leaf_thickness: 0.10,
+            hinge_offset: 0.05,
+            hinge_depth_ratio: 0.5,
+            open_angle: Radians::from_degrees(90.0),
+        };
+        // Seven for a sliding gate, plus the two leaves.
+        assert_eq!(scene.obstacles().len(), 9);
     }
 
     #[test]

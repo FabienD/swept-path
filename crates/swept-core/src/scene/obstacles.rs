@@ -1,6 +1,6 @@
 //! Turns a scene into the list of rectangles a vehicle can hit.
 
-use super::Scene;
+use super::{GateKind, Scene};
 use crate::geometry::Obb;
 
 /// How far the scene extends either side of the opening, in metres.
@@ -60,6 +60,10 @@ pub(super) fn build(scene: &Scene) -> Vec<Obb> {
             -scene.pavement_width,
             0.0,
         ));
+    }
+
+    if matches!(scene.gate, GateKind::Swinging { .. }) {
+        obstacles.extend(super::gate::leaves(scene));
     }
 
     obstacles
