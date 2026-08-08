@@ -16,6 +16,7 @@
 
 pub mod budget;
 pub mod exact;
+pub mod landing;
 pub mod min_road;
 pub mod path;
 pub mod result;
