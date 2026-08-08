@@ -14,6 +14,7 @@
 pub mod geometry;
 pub mod kinematics;
 pub mod units;
+pub mod vehicle;
 
 /// Crate version, exposed so that callers can report which core produced a
 /// result.
