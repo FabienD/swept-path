@@ -28,3 +28,15 @@ jobs:
         run: cargo doc --workspace --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
+
+  fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Regenerate golden vectors
+        run: node tools/extract-golden/extract.js
+      - name: Fail if they differ from what is committed
+        run: git diff --exit-code crates/swept-core/tests/fixtures/

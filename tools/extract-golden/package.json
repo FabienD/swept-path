@@ -1,0 +1,10 @@
+{
+  "name": "extract-golden",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Harnais jetable : extrait du prototype gelé les vecteurs de référence du noyau Rust.",
+  "scripts": {
+    "extract": "node extract.js"
+  }
+}
