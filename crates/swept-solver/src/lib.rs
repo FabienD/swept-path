@@ -21,3 +21,4 @@ pub mod min_road;
 pub mod multi;
 pub mod path;
 pub mod result;
+pub mod solve;
