@@ -11,6 +11,7 @@
 //! the wall, `y > 0` points into the yard, and `x` runs along the road.
 //! Lengths are metres, angles are [`units::Radians`].
 
+pub mod clearance;
 pub mod geometry;
 pub mod kinematics;
 pub mod scene;
