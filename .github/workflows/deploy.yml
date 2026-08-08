@@ -1,0 +1,62 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  # Vercel never compiles Rust: CI already carries the toolchain, so it builds
+  # the wasm and the bundle and ships a finished artefact.
+  IS_PRODUCTION: ${{ github.ref == 'refs/heads/main' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Without the secrets there is nothing to deploy to; skip rather than fail
+    # every pull request with a red cross that means nothing.
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build wasm
+        run: wasm-pack build --target web --out-dir ../../web/src/generated crates/swept-wasm
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: web
+      - name: Build site
+        run: npm run build
+        working-directory: web
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+      - name: Pull Vercel environment
+        run: >
+          vercel pull --yes --token=${{ secrets.VERCEL_TOKEN }}
+          --environment=${{ env.IS_PRODUCTION == 'true' && 'production' || 'preview' }}
+      - name: Prepare the prebuilt artefact
+        run: >
+          vercel build --token=${{ secrets.VERCEL_TOKEN }}
+          ${{ env.IS_PRODUCTION == 'true' && '--prod' || '' }}
+      - name: Deploy
+        run: >
+          vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+          ${{ env.IS_PRODUCTION == 'true' && '--prod' || '' }}
