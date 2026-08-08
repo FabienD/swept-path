@@ -5,7 +5,14 @@ import {
   metres,
   moves,
 } from "./domain/labels";
-import type { ErrorDto, SceneDto, SolveRequest } from "./domain/types";
+import type {
+  ErrorDto,
+  ManeuverDto,
+  SceneDto,
+  SolveRequest,
+  VehicleDto,
+} from "./domain/types";
+import { pathToPrimitives } from "./render/path";
 import { boundsFor, sceneToPrimitives } from "./render/scene";
 import { projectionFor } from "./render/projection";
 import { renderSvg } from "./render/svg";
@@ -15,11 +22,20 @@ import { SolverClient } from "./worker/client";
 const VIEWPORT = { width: 1000, height: 600 };
 
 /** Redraws the plan from scratch. Cheap enough to do on every change. */
-function draw(scene: SceneDto): void {
+function draw(
+  scene: SceneDto,
+  vehicle?: VehicleDto,
+  maneuver?: ManeuverDto,
+  position = 1,
+): void {
   const svg = document.getElementById("plan");
   if (!(svg instanceof SVGSVGElement)) return;
   const projection = projectionFor(boundsFor(scene), VIEWPORT, false);
-  renderSvg(sceneToPrimitives(scene), svg, projection);
+  const primitives = [...sceneToPrimitives(scene)];
+  if (maneuver && vehicle) {
+    primitives.push(...pathToPrimitives(maneuver, vehicle, position));
+  }
+  renderSvg(primitives, svg, projection);
 }
 
 const client = new SolverClient();
@@ -99,6 +115,9 @@ form?.addEventListener("submit", async (event) => {
       best.min_clearance < best.min_clearance_in_gateway - 1e-9
         ? ` Ailleurs sur le trajet, la marge descend à ${overall}.`
         : "";
+
+    const request = readRequest();
+    draw(request.scene, request.vehicle, best);
 
     store.set({
       verdict:
