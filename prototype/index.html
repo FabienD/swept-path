@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulateur d'entrée de cour</title>
+<style>
+:root{
+  --paper:#FCFCFD; --ink:#16181D; --ink-2:#5A6068; --ink-3:#98A0A9;
+  --rule:#D9DDE2; --grid:#EDF0F3; --stone:#E4E8EC; --walk:#F2F4F6; --leaf:#D6DEE4;
+  --bp:#2C6E8F; --bp-soft:#E2EEF5;
+  --alert:#B4432B; --alert-soft:#F8E8E3;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:15px;line-height:1.6;padding:32px 20px 64px}
+.wrap{max-width:1040px;margin:0 auto}
+h1{font-size:20px;font-weight:500;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--ink-2);font-size:14px;margin:0 0 26px}
+h2{font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);margin:26px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--rule)}
+.grid{display:grid;gap:12px 18px;grid-template-columns:repeat(auto-fit,minmax(122px,1fr))}
+label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:4px}
+input,select{width:100%;height:34px;padding:0 9px;border:1px solid var(--rule);
+  border-radius:3px;background:#fff;color:var(--ink);font-family:var(--mono);font-size:13px}
+select{font-family:inherit}
+input:focus,select:focus{outline:none;border-color:var(--bp);box-shadow:0 0 0 3px var(--bp-soft)}
+input[type=range]{height:auto;padding:0;border:none;background:none;box-shadow:none}
+.hint{font-size:11px;color:var(--ink-3);margin-top:3px;font-family:var(--mono)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 0}
+button{height:36px;padding:0 16px;border:1px solid var(--ink);border-radius:3px;
+  background:var(--ink);color:#fff;font:inherit;font-size:13px;cursor:pointer}
+button.ghost{background:#fff;color:var(--ink)}
+button:hover{opacity:.85}
+button:focus-visible{outline:2px solid var(--bp);outline-offset:2px}
+.verdict{margin:18px 0 0;padding:13px 16px;border-radius:3px;
+  border-left:3px solid var(--rule);background:#fff;font-size:14px}
+.verdict.ok{border-left-color:var(--bp);background:var(--bp-soft)}
+.verdict.no{border-left-color:var(--alert);background:var(--alert-soft)}
+.verdict b{font-weight:500}
+.warn{margin-top:10px;padding:10px 14px;border-radius:3px;background:var(--alert-soft);
+  border-left:3px solid var(--alert);font-size:13px}
+.warn:empty{display:none}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:1px;
+  background:var(--rule);border:1px solid var(--rule);border-radius:3px;margin-top:14px;overflow:hidden}
+.stats:empty{display:none}
+.alts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.alts:empty{display:none}
+.alt{height:auto;padding:8px 14px;display:flex;flex-direction:column;align-items:flex-start;
+  gap:2px;background:#fff;color:var(--ink);border:1px solid var(--rule);border-radius:3px;
+  cursor:pointer;text-align:left}
+.alt .am{font-size:13px}
+.alt .ac{font-size:12px;color:var(--ink-3);font-family:var(--mono)}
+.alt.sel{border-color:var(--bp);background:var(--bp-soft)}
+.alt.sel .ac{color:var(--bp)}
+.stat{background:#fff;padding:10px 12px}
+.stat .k{font-size:11px;color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}
+.stat .v{font-family:var(--mono);font-size:17px;margin-top:2px}
+figure{margin:18px 0 0;border:1px solid var(--rule);border-radius:3px;background:#fff}
+svg{display:block;width:100%;height:auto}
+.scrub{display:flex;align-items:center;gap:12px;margin-top:12px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--ink-2)}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:16px;height:3px;border-radius:2px;display:inline-block}
+.scrub input[type=range]{flex:1}
+.scrub span{font-family:var(--mono);font-size:12px;color:var(--ink-2);min-width:96px}
+.note{font-size:13px;color:var(--ink-2);margin-top:24px;padding-top:14px;border-top:1px solid var(--rule)}
+.leafonly{display:contents}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Simulateur d'entrée de cour</h1>
+<p class="sub">Modèle cinématique bicyclette, vue en plan. Dimensions en mètres.</p>
+
+<h2>Portail et maçonnerie</h2>
+<div class="grid">
+  <div><label>Type</label><select id="type">
+    <option value="battant">Battant, 2 vantaux</option>
+    <option value="coulissant">Coulissant</option></select></div>
+  <div><label>Passage entre piliers</label><input type="number" id="gate" value="2.40" step="0.05"></div>
+  <div><label>Profondeur des piliers</label><input type="number" id="pd" value="0.55" step="0.05"></div>
+  <div><label>Largeur des piliers</label><input type="number" id="pw" value="0.55" step="0.05"></div>
+  <div><label>Épaisseur des murets</label><input type="number" id="wt" value="0.30" step="0.05"></div>
+</div>
+<div class="grid" id="leafbox" style="margin-top:12px">
+  <div><label>Longueur d'un vantail</label><input type="number" id="lf" value="1.15" step="0.05"></div>
+  <div><label>Épaisseur du vantail</label><input type="number" id="lt" value="0.10" step="0.01"></div>
+  <div><label>Écartement de l'axe</label><input type="number" id="le" value="0.05" step="0.01">
+    <div class="hint">du nu intérieur du pilier</div></div>
+  <div><label>Position de l'axe</label><input type="number" id="ax" value="50" step="5" min="0" max="140">
+    <div class="hint">% de la profondeur du pilier</div></div>
+  <div><label>Angle d'ouverture</label><input type="range" id="ang" min="70" max="180" step="1" value="90">
+    <div class="hint" style="display:flex;align-items:center;gap:6px;margin-top:6px">
+      <input type="number" id="angn" min="70" max="180" step="1" value="90"
+             style="height:28px;width:70px;font-size:12px">°
+      <span id="angmax" style="margin-left:auto"></span></div></div>
+</div>
+
+<h2>Trottoir et chaussée</h2>
+<div class="grid">
+  <div><label>Largeur du trottoir</label><input type="number" id="walk" value="1.20" step="0.05"></div>
+  <div><label>Largeur du bateau</label><input type="number" id="drop" value="3.20" step="0.10"></div>
+  <div><label>Largeur de chaussée</label><input type="number" id="road" value="4.50" step="0.10"></div>
+  <div><label>Sens d'arrivée</label><select id="side">
+    <option value="1">Par la gauche</option><option value="-1">Par la droite</option></select></div>
+</div>
+
+<h2>Véhicule</h2>
+<div class="grid">
+  <div style="grid-column:span 2"><label>Modèle</label><select id="preset"></select></div>
+  <div><label>Empattement</label><input type="number" id="wb" step="0.01"></div>
+  <div><label>Longueur totale</label><input type="number" id="len" step="0.01"></div>
+  <div><label>Porte-à-faux avant</label><input type="number" id="fo" step="0.01"></div>
+</div>
+<div class="grid" style="margin-top:12px">
+  <div><label>Largeur caisse</label><input type="number" id="wid" step="0.005"></div>
+  <div><label>Largeur rétros</label><input type="number" id="mir" step="0.005"></div>
+  <div><label>Rétros rabattus</label><input type="number" id="mirf" step="0.005"></div>
+  <div><label>Position des rétros</label><select id="retros">
+    <option value="out">Déployés</option><option value="fold">Rabattus</option></select></div>
+  <div><label>Rayon de braquage</label><input type="number" id="rmin" step="0.1"></div>
+</div>
+
+<div class="row">
+  <button id="go-find">Rechercher l'entrée</button>
+  <button class="ghost" id="go-min">Chaussée minimale</button>
+  <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-2);cursor:pointer">
+    <input type="checkbox" id="multi" style="width:16px;height:16px;padding:0;flex:none">
+    Autoriser plusieurs manœuvres</label>
+  <select id="dirmode" style="width:auto;min-width:190px">
+    <option value="0">Entrée : peu importe le sens</option>
+    <option value="1">Entrée en marche avant</option>
+    <option value="-1">Entrée en marche arrière</option>
+  </select>
+</div>
+
+<div id="verdict" class="verdict">Renseigne tes mesures, puis lance une recherche.</div>
+<div id="warn" class="warn"></div>
+<div class="alts" id="alts"></div>
+<div class="stats" id="stats"></div>
+
+<figure><svg id="plan" viewBox="0 0 1000 600" role="img" aria-label="Vue en plan de la manœuvre"></svg></figure>
+
+<div class="legend" id="legend"></div>
+
+<div class="scrub">
+  <span id="tlabel">—</span>
+  <input type="range" id="t" min="0" max="100" value="100" step="1" disabled aria-label="Position sur le trajet">
+</div>
+
+<p class="note">L'axe des vantaux est positionné par son écartement au nu intérieur du pilier et par sa profondeur dans celui-ci ; au-delà d'un certain angle le vantail vient buter contre l'arête intérieure du pilier, ce que le calcul signale. Le trottoir n'est franchissable qu'au droit du bateau. Les couleurs du trajet reprennent la logique d’un radar de recul : elles donnent la distance du point le plus proche du véhicule à un obstacle, à cet instant de la manœuvre. Le solveur cherche une trajectoire à courbure constante, soit un seul coup de volant maintenu : les largeurs annoncées sont donc des majorants, un conducteur qui module son braquage fera un peu mieux.</p>
+</div>
+
+<script>
+const PRESETS = {
+  "Lexus LBX":          {wb:2.580, len:4.190, wid:1.825, mir:2.029, rmin:5.2, fo:0.85},
+  "Kia EV3":            {wb:2.680, len:4.300, wid:1.850, mir:2.060, rmin:5.2, fo:0.83},
+  "Renault Scénic IV":  {wb:2.734, len:4.406, wid:1.866, mir:2.128, rmin:5.6, fo:0.90},
+  "Lexus NX 450h+":     {wb:2.690, len:4.660, wid:1.865, mir:2.150, rmin:5.7, fo:0.99},
+  "Tesla Model Y":      {wb:2.890, len:4.790, wid:1.982, mir:2.129, rmin:5.8, fo:0.94},
+  "Skoda Superb Combi": {wb:2.841, len:4.902, wid:1.849, mir:2.120, rmin:5.7, fo:0.94}
+};
+const $ = id => document.getElementById(id);
+const on = (id,ev,fn) => { const e=$(id); if (e) e.addEventListener(ev,fn); else console.warn("élément absent :", id); };
+const num = id => parseFloat($(id).value);
+const HALFPI = Math.PI/2, RAD = Math.PI/180;
+
+const sel = $("preset");
+for (const k in PRESETS){ const o=document.createElement("option"); o.value=k; o.textContent=k; sel.appendChild(o); }
+sel.value = "Lexus LBX";
+function loadPreset(){
+  const p = PRESETS[sel.value];
+  $("wb").value=p.wb; $("len").value=p.len; $("wid").value=p.wid;
+  $("mir").value=p.mir; $("rmin").value=p.rmin; $("fo").value=p.fo;
+  $("mirf").value=(p.wid+0.04).toFixed(3);
+}
+loadPreset();
+
+function scene(){
+  return {G:num("gate"), Pd:num("pd"), Pw:num("pw"), Wt:num("wt"),
+          type:$("type").value, Lf:num("lf"), Lt:num("lt"), Le:num("le"),
+          ax:num("ax")/100, ang:num("ang")*RAD,
+          T:Math.max(0,num("walk")), BW:num("drop"), RW:num("road"), s:+$("side").value};
+}
+function vehicle(){
+  const wb=num("wb"), len=num("len"), fo=num("fo");
+  const folded = $("retros").value === "fold";
+  const mir = folded ? num("mirf") : num("mir");
+  return {wb, len, fo, ro:len-wb-fo, wid:num("wid"), mir, folded, rmin:num("rmin")};
+}
+function badInputs(v, sc){
+  const req = {"empattement":v.wb, "longueur":v.len, "porte-à-faux":v.fo,
+    "largeur caisse":v.wid, "largeur rétros":v.mir, "rayon de braquage":v.rmin,
+    "passage entre piliers":sc.G, "profondeur des piliers":sc.Pd,
+    "largeur des piliers":sc.Pw, "largeur de chaussée":sc.RW, "largeur du bateau":sc.BW};
+  for (const k in req) if (!isFinite(req[k]) || req[k] <= 0) return k;
+  if (!isFinite(sc.T) || sc.T < 0) return "largeur du trottoir";
+  if (!isFinite(sc.Wt) || sc.Wt < 0) return "épaisseur des murets";
+  if (sc.type === "battant"){
+    if (!isFinite(sc.Lf) || sc.Lf <= 0) return "longueur d'un vantail";
+    if (!isFinite(sc.Lt) || sc.Lt <= 0) return "épaisseur du vantail";
+    if (!isFinite(sc.Le) || sc.Le < 0) return "écartement de l'axe";
+    if (!isFinite(sc.ang)) return "angle d'ouverture";
+  }
+  if (v.ro <= 0) return "porte-à-faux avant (supérieur à longueur moins empattement)";
+  if (v.mir < v.wid) return v.folded ? "largeur rétros rabattus (inférieure à la largeur caisse)"
+                                    : "largeur rétros (inférieure à la largeur caisse)";
+  return null;
+}
+
+function ob(cx,cy,ang,hw,hh){ return {cx,cy,ang,hw,hh,c:Math.cos(ang),s:Math.sin(ang)}; }
+function box(x0,x1,y0,y1){ return ob((x0+x1)/2,(y0+y1)/2,0,(x1-x0)/2,(y1-y0)/2); }
+function corners(o){
+  const p=[];
+  for (const [a,b] of [[-1,-1],[1,-1],[1,1],[-1,1]])
+    p.push([o.cx + a*o.hw*o.c - b*o.hh*o.s, o.cy + a*o.hw*o.s + b*o.hh*o.c]);
+  return p;
+}
+function distOB(px,py,o){
+  const dx=px-o.cx, dy=py-o.cy;
+  const lx=dx*o.c+dy*o.s, ly=-dx*o.s+dy*o.c;
+  const ax=Math.max(Math.abs(lx)-o.hw,0), ay=Math.max(Math.abs(ly)-o.hh,0);
+  return (ax===0 && ay===0) ? -1 : Math.hypot(ax,ay);
+}
+
+function leafOB(sc, side){
+  const hg = sc.G/2;
+  const hx = side*(hg - sc.Le), hy = sc.ax*sc.Pd;
+  const a = sc.ang;
+  const dx = -side*Math.cos(a), dy = Math.sin(a);
+  const cx = hx + dx*sc.Lf/2, cy = hy + dy*sc.Lf/2;
+  return ob(cx, cy, Math.atan2(dy,dx), sc.Lf/2, sc.Lt/2);
+}
+
+function obstacles(sc){
+  const B=18, hg=sc.G/2, o=[];
+  o.push(box(-B, -(hg+sc.Pw), 0, sc.Wt), box(hg+sc.Pw, B, 0, sc.Wt));
+  o.push(box(-(hg+sc.Pw), -hg, 0, sc.Pd), box(hg, hg+sc.Pw, 0, sc.Pd));
+  o.push(box(-B, B, -1000, -(sc.T+sc.RW)));
+  if (sc.T > 0.001){
+    const hb=sc.BW/2;
+    o.push(box(-B, -hb, -sc.T, 0), box(hb, B, -sc.T, 0));
+  }
+  if (sc.type === "battant"){ o.push(leafOB(sc,1), leafOB(sc,-1)); }
+  return o;
+}
+
+function overlapOBB(a,b){
+  const axes=[[a.c,a.s],[-a.s,a.c],[b.c,b.s],[-b.s,b.c]];
+  const ca=corners(a), cb=corners(b);
+  for (const [ux,uy] of axes){
+    let a0=Infinity,a1=-Infinity,b0=Infinity,b1=-Infinity;
+    for (const p of ca){ const v=p[0]*ux+p[1]*uy; if(v<a0)a0=v; if(v>a1)a1=v; }
+    for (const p of cb){ const v=p[0]*ux+p[1]*uy; if(v<b0)b0=v; if(v>b1)b1=v; }
+    if (a1 < b0 + 0.006 || b1 < a0 + 0.006) return false;
+  }
+  return true;
+}
+function leafHitsPillar(sc){
+  if (sc.type !== "battant") return false;
+  const hg=sc.G/2;
+  const pr = box(hg, hg+sc.Pw, 0, sc.Pd), pl = box(-(hg+sc.Pw), -hg, 0, sc.Pd);
+  return overlapOBB(leafOB(sc,1), pr) || overlapOBB(leafOB(sc,-1), pl);
+}
+function maxAngle(sc){
+  let best = 70;
+  for (let d=70; d<=180; d+=1){
+    if (!leafHitsPillar({...sc, ang:d*RAD})) best = d; else if (d > 85) break;
+  }
+  return best;
+}
+
+function samplePoints(v){
+  const pts=[], hw=v.wid/2, xr=-v.ro, xf=v.wb+v.fo;
+  for (let i=0;i<=4;i++){ const x=xr+(xf-xr)*i/4; pts.push([x,hw],[x,-hw]); }
+  pts.push([xr,0],[xf,0],[v.wb, v.mir/2],[v.wb,-v.mir/2]);
+  return pts;
+}
+function obCorners(obs){
+  const c=[];
+  for (const o of obs){
+    if (o.hw > 12 || o.hh > 12) continue;
+    for (const p of corners(o)) c.push(p);
+  }
+  return c;
+}
+
+function clearance(p, v, pts, obs, oc){
+  const c=Math.cos(p.th), s=Math.sin(p.th);
+  let m=Infinity;
+  for (let i=0;i<pts.length;i++){
+    const lx=pts[i][0], ly=pts[i][1];
+    const px=p.x+lx*c-ly*s, py=p.y+lx*s+ly*c;
+    for (let j=0;j<obs.length;j++){
+      const d=distOB(px,py,obs[j]);
+      if (d<0) return -1;
+      if (d<m) m=d;
+    }
+  }
+  const hw=v.wid/2;
+  for (let i=0;i<oc.length;i++){
+    const dx=oc[i][0]-p.x, dy=oc[i][1]-p.y;
+    const lx=dx*c+dy*s, ly=-dx*s+dy*c;
+    if (lx>-v.ro && lx<v.wb+v.fo && ly>-hw && ly<hw) return -1;
+  }
+  return m;
+}
+
+function arc(x,y,th0,th1,R,out,step){
+  const n=Math.max(2,Math.ceil(Math.abs(th1-th0)/step));
+  for (let i=1;i<=n;i++){
+    const th=th0+(th1-th0)*i/n;
+    out.push({x:x+R*(Math.sin(th)-Math.sin(th0)), y:y-R*(Math.cos(th)-Math.cos(th0)), th});
+  }
+  return {x:x+R*(Math.sin(th1)-Math.sin(th0)), y:y-R*(Math.cos(th1)-Math.cos(th0)), th:th1};
+}
+function line(x,y,th,dist,out,step){
+  const n=Math.min(400, Math.max(1,Math.ceil(Math.abs(dist)/step)));
+  const c=Math.cos(th), s=Math.sin(th);
+  for (let i=1;i<=n;i++){ const d=dist*i/n; out.push({x:x+c*d, y:y+s*d, th}); }
+  return {x:x+c*dist, y:y+s*dist, th};
+}
+function deep(sc,v){ return sc.Pd + Math.max(0, sc.type==="battant" ? sc.Lf : 0) + v.wb + v.fo + 0.6; }
+
+function pathForward(v,sc,R,yRoad,xEnd){
+  const poses=[]; let p={x:xEnd-R-5, y:yRoad, th:0};
+  poses.push(p);
+  p = line(p.x,p.y,0,5,poses,0.5);
+  p = arc(p.x,p.y,0,HALFPI,R,poses,0.06);
+  const need = deep(sc,v);
+  if (p.y < need) line(p.x,p.y,HALFPI,need-p.y,poses,0.2);
+  return poses;
+}
+function pathReverse(v,sc,R,xEnd,dS,aEnd){
+  const poses=[]; const yTop=deep(sc,v);
+  let p={x:xEnd, y:yTop, th:-HALFPI};
+  poses.push(p);
+  if (dS>0) p=line(p.x,p.y,-HALFPI,dS,poses,0.2);
+  p = arc(p.x,p.y,-HALFPI,-aEnd,R,poses,0.06);
+  if (p.y > -sc.T-0.2) return null;
+  line(p.x,p.y,-aEnd,5,poses,0.5);
+  poses.reverse();
+  return poses;
+}
+function evaluate(poses,v,pts,obs,oc){
+  if (!poses) return null;
+  let m=Infinity;
+  for (let i=0;i<poses.length;i++){
+    const c=clearance(poses[i],v,pts,obs,oc);
+    if (c<0) return null;
+    if (c<m) m=c;
+  }
+  return {poses, minc:m};
+}
+
+function search(v,sc,mode,coarse){
+  const pts=samplePoints(v), obs=obstacles(sc), oc=obCorners(obs);
+  const hm=v.mir/2;
+  const yLo=-sc.T-sc.RW+hm+0.02, yHi=-hm-0.02;
+  if (yLo>yHi) return null;
+  let best=null;
+  const nR=coarse?8:12, nX=coarse?17:29, nY=coarse?12:18;
+  if (mode==="fwd"){
+    for (let i=0;i<=nR;i++){
+      const R=v.rmin+i*0.5;
+      for (let j=0;j<=nY;j++){
+        const yRoad=yLo+(yHi-yLo)*j/nY;
+        for (let k=0;k<=nX;k++){
+          const xEnd=-0.9+1.8*k/nX;
+          const r=evaluate(pathForward(v,sc,R,yRoad,xEnd),v,pts,obs,oc);
+          if (r && (!best||r.minc>best.minc)){ best=r; best.R=R; best.y0=yRoad; best.a=0; }
+        }
+      }
+    }
+  } else {
+    for (let i=0;i<=nR;i++){
+      const R=v.rmin+i*0.5;
+      for (let a=0;a<=5;a++){
+        const aEnd=a*8*RAD;
+        for (let d=0;d<=4;d++){
+          const dS=d*0.5;
+          for (let k=0;k<=nX;k++){
+            const xEnd=-0.9+1.8*k/nX;
+            const r=evaluate(pathReverse(v,sc,R,xEnd,dS,aEnd),v,pts,obs,oc);
+            if (r && (!best||r.minc>best.minc)){ best=r; best.R=R; best.a=aEnd; best.y0=r.poses[0].y; }
+          }
+        }
+      }
+    }
+  }
+  return best;
+}
+
+
+function move(p, kap, dist, out, step){
+  if (!isFinite(dist) || !isFinite(kap)) return {x:p.x, y:p.y, th:p.th};
+  const n = Math.min(400, Math.max(1, Math.ceil(Math.abs(dist)/step)));
+  let x=p.x, y=p.y, th=p.th;
+  const ds = dist/n;
+  for (let i=0;i<n;i++){
+    const th1 = th + kap*ds;
+    if (Math.abs(kap) < 1e-9){ x += Math.cos(th)*ds; y += Math.sin(th)*ds; }
+    else { const R=1/kap; x += R*(Math.sin(th1)-Math.sin(th)); y -= R*(Math.cos(th1)-Math.cos(th)); }
+    th = th1;
+    if (out) out.push({x,y,th,d:Math.sign(dist)});
+  }
+  return {x,y,th};
+}
+
+function goalDepth(sc,v){ return sc.Pd + (sc.type==="battant" ? sc.Lf : 0) + 0.45; }
+
+function finalPush(p, v, sc, pts, obs, oc, kaps, allow){
+  const need = deep(sc,v);
+  let best = null;
+  for (const dir of [1,-1]){
+    if (allow && dir !== allow) continue;
+    const tgt = dir>0 ? HALFPI : -HALFPI;
+    let dth = tgt - p.th;
+    while (dth > Math.PI) dth -= 2*Math.PI;
+    while (dth < -Math.PI) dth += 2*Math.PI;
+    for (const km of kaps){
+      for (const sg of [1,-1]){
+        let poses=[], q=p;
+        if (Math.abs(dth) > 1e-4){
+          const kap = sg*km;
+          const arclen = dth/kap;
+          if (dir>0 && arclen <= 0) continue;
+          if (dir<0 && arclen >= 0) continue;
+          if (Math.abs(arclen) > 22) continue;
+          q = move(p, kap, arclen, poses, 0.14);
+        } else if (dir<0) continue;
+        if (q.y >= need) continue;
+        q = move(q, 0, dir>0 ? (need-q.y) : -(need-q.y), poses, 0.22);
+        let m=Infinity, bad=false;
+        for (const z of poses){ const c=clearance(z,v,pts,obs,oc); if (c<0){bad=true;break;} if(c<m)m=c; }
+        if (!bad) return {poses, minc:m, dir};
+      }
+    }
+  }
+  return best;
+}
+
+function heapPush(h,n){ h.push(n); let i=h.length-1;
+  while(i>0){ const j=(i-1)>>1; if(h[j].f<=h[i].f) break; const t=h[i];h[i]=h[j];h[j]=t; i=j; } }
+function heapPop(h){ const top=h[0], last=h.pop();
+  if(h.length){ h[0]=last; let i=0;
+    for(;;){ const l=2*i+1,r=l+1; let m=i;
+      if(l<h.length&&h[l].f<h[m].f)m=l; if(r<h.length&&h[r].f<h[m].f)m=r;
+      if(m===i)break; const t=h[i];h[i]=h[m];h[m]=t; i=m; } }
+  return top; }
+
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+let cancelSearch=false;
+async function planMulti(v, sc, maxMoves, budget, deadline, prog, allow, minMoves){
+  const pts=samplePoints(v), obs=obstacles(sc), oc=obCorners(obs);
+  const kaps=[]; for(let i=5;i>=0;i--) kaps.push(1/(v.rmin+i*1.1));
+  const prims=[]; 
+  for (const k of [-1,-1/1.6,0,1/1.6,1]) for (const d of [1,-1]) prims.push({k:k/v.rmin, d});
+  const hm=v.mir/2;
+  const yLo=-sc.T-sc.RW+hm+0.03, yHi=-hm-0.05;
+  if (yLo>yHi) return null;
+  const gd = goalDepth(sc,v);
+  const key = q => (Math.round(q.x/0.18)+400) + "," + (Math.round(q.y/0.18)+400) + "," +
+                   ((Math.round(q.th/(6*RAD))%60+60)%60) + "," + q.dir;
+  const seen = new Set();
+  const heap = [];
+  const t0 = Date.now();
+  const H = q => Math.hypot(q.x, Math.max(0, gd-q.y)) + 2.2*Math.abs(HALFPI-q.th);
+  for (let j=0;j<=10;j++){
+    const y = yLo + (yHi-yLo)*j/10;
+    const st = {x:-6.5, y, th:0, dir:1, mv:1, g:0, par:null, seg:null};
+    if (clearance(st, v, pts, obs, oc) < 0) continue;
+    st.f = st.mv*5 + H(st);
+    heapPush(heap, st); seen.add(key(st));
+  }
+  let expanded=0, goal=null, found=0, lastY=Date.now();
+  while (heap.length && expanded < budget){
+    const now = Date.now();
+    if (now > deadline || cancelSearch) break;
+    if (now - lastY > 35){
+      if (prog) prog(maxMoves, expanded);
+      await sleep(0); lastY = Date.now();
+    }
+    const cur = heapPop(heap);
+    expanded++;
+    const dth0 = Math.min(Math.abs(HALFPI-cur.th), Math.abs(-HALFPI-cur.th));
+    if (Math.abs(cur.x) < 2.4 && dth0 < 1.0){
+      const fp = finalPush(cur, v, sc, pts, obs, oc, kaps, allow);
+      if (fp){
+        const total = cur.mv + (fp.dir !== cur.dir ? 1 : 0);
+        if (total >= (minMoves || 1)){
+          if (!goal || fp.minc > goal.fp.minc){ goal = {node:cur, fp}; }
+          if (++found >= 14) break;
+        }
+      }
+    }
+    if (cur.mv > maxMoves) continue;
+    for (const pr of prims){
+      const mv = cur.mv + (pr.d !== cur.dir ? 1 : 0);
+      if (mv > maxMoves) continue;
+      const seg=[];
+      const q = move(cur, pr.k, pr.d*0.9, seg, 0.18);
+      let ok=true;
+      for (const z of seg){ if (clearance(z,v,pts,obs,oc) < 0){ ok=false; break; } }
+      if (!ok) continue;
+      const nx = {x:q.x, y:q.y, th:q.th, dir:pr.d, mv, g:cur.g+0.9, par:cur, seg};
+      const kk = key(nx);
+      if (seen.has(kk)) continue;
+      seen.add(kk);
+      nx.f = mv*5 + nx.g*0.18 + H(nx);
+      heapPush(heap, nx);
+    }
+  }
+  if (!goal) return null;
+  const chain=[]; let n=goal.node;
+  while (n){ if (n.seg) chain.push(n.seg); n = n.par; }
+  chain.reverse();
+  const poses=[{x:-6.5, y:0, th:0, d:1}];
+  poses.length=0;
+  for (const seg of chain) for (const z of seg) poses.push(z);
+  const fd = goal.fp.dir;
+  const lastDir = goal.node.dir;
+  const extra = (fd !== lastDir) ? 1 : 0;
+  for (const z of goal.fp.poses) poses.push({...z, d:fd});
+  let mAll = Infinity;
+  for (const z of poses){ const cc = clearance(z, v, pts, obs, oc); if (cc >= 0 && cc < mAll) mAll = cc; }
+  if (!isFinite(mAll)) mAll = goal.fp.minc;
+  return {poses, minc:mAll, moves:goal.node.mv + extra, dir:fd,
+          R:v.rmin, y0:poses.length?poses[0].y:0, a:0, expanded};
+}
+
+let current=null;
+const card=(k,v)=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+
+function checkGeom(){
+  const sc=scene();
+  const w=$("warn");
+  if (sc.type==="battant" && leafHitsPillar(sc)){
+    w.innerHTML = `À ${Math.round(sc.ang/RAD)}°, le vantail bute contre l'arête intérieure du pilier. `
+      + `Avec l'axe à ${Math.round(sc.ax*100)} % de la profondeur, l'ouverture maximale est d'environ `
+      + `<b>${maxAngle(sc)}°</b>. Déporte l'axe vers la face côté cour pour ouvrir davantage.`;
+  } else w.innerHTML = "";
+}
+
+function clearResult(){
+  current=null; $("t").disabled=true; $("t").value=100;
+  $("tlabel").textContent="—"; $("stats").innerHTML="";
+  alts = []; altSel = 0; renderAlts(); renderLegend(false);
+  $("leafbox").style.display = $("type").value==="battant" ? "" : "none";
+  if (document.activeElement !== $("angn")) $("angn").value = Math.round(num("ang"));
+  const sc0 = scene();
+  $("angmax").textContent = sc0.type==="battant" ? "max " + maxAngle(sc0) + "°" : "";
+  checkGeom(); draw(null);
+}
+
+function report(res,mode){
+  const vd=$("verdict");
+  if (!res){
+    vd.className="verdict no";
+    vd.innerHTML = mode==="rev"
+      ? "<b>Aucune entrée en marche arrière d'un seul mouvement.</b> Il faudrait des reprises, ou modifier la géométrie."
+      : "<b>Aucune entrée en marche avant d'un seul mouvement.</b> Essaie la marche arrière, ou élargis le passage.";
+    $("stats").innerHTML=""; current=null; $("t").disabled=true; draw(null); return;
+  }
+  vd.className="verdict ok";
+  vd.innerHTML = mode==="rev"
+    ? "<b>Entrée en marche arrière possible d'un seul mouvement.</b>"
+    : "<b>Entrée en marche avant possible d'un seul mouvement.</b> Aucune reprise nécessaire.";
+  $("stats").innerHTML =
+    card("Marge minimale",(res.minc*100).toFixed(1)+" cm") +
+    card("Rayon utilisé",res.R.toFixed(2)+" m") +
+    card("Écart au bord",Math.abs(res.y0).toFixed(2)+" m") +
+    card("Angle final",Math.round(res.a/RAD)+"°");
+  annotate(res, vehicle(), scene());
+  $("stats").innerHTML += card("Sous 25 cm",(res.orgM+res.redM).toFixed(1)+" m")
+                        + card("Sous 10 cm", res.redM.toFixed(1)+" m");
+  renderLegend(true);
+  current=res; $("t").disabled=false; $("t").value=100;
+  $("tlabel").textContent="100 % du trajet";
+  draw(res,1);
+}
+
+function minRoad(){
+  const v=vehicle(), base=scene();
+  let lo=0.1, hi=16, f=null;
+  for (let i=0;i<12;i++){
+    const m=(lo+hi)/2;
+    if (search(v,{...base,RW:m},"fwd",true)){ f=m; hi=m; } else lo=m;
+  }
+  const vd=$("verdict");
+  if (f===null){
+    vd.className="verdict no";
+    vd.innerHTML="<b>Aucune chaussée jusqu'à 16 m ne permet l'entrée en marche avant.</b> Le passage lui-même est bloquant.";
+  } else {
+    vd.className="verdict ok";
+    vd.innerHTML=`Il faut au minimum <b>${f.toFixed(2)} m</b> de chaussée pour entrer en marche avant d'un seul mouvement. Tu as saisi ${base.RW.toFixed(2)} m.`;
+  }
+  clearResult();
+}
+
+const BANDS=[0.50,0.25,0.10];
+const BANDC=["#2C6E8F","#D9A400","#DD6B1F","#C42B1C"];
+const BANDN=["au large","vigilance","proche","très proche"];
+function bandOf(c){ return c>=BANDS[0]?0 : c>=BANDS[1]?1 : c>=BANDS[2]?2 : 3; }
+function annotate(res, v, sc){
+  if (res._ann) return;
+  const pts=samplePoints(v), obs=obstacles(sc), oc=obCorners(obs);
+  for (const z of res.poses){ const c=clearance(z,v,pts,obs,oc); z.c = c<0 ? 0 : c; }
+  res._ann = true;
+  res.redM = res.poses.filter(z=>bandOf(z.c)===3).length*0.18;
+  res.orgM = res.poses.filter(z=>bandOf(z.c)===2).length*0.18;
+}
+
+const NS="http://www.w3.org/2000/svg";
+function el(n,a){ const e=document.createElementNS(NS,n); for(const k in a) e.setAttribute(k,a[k]); return e; }
+
+function draw(res,frac){
+  const svg=$("plan"); svg.innerHTML="";
+  const sc=scene(), v=vehicle();
+  const xmin=-11, xmax=11, ymin=-sc.T-sc.RW-1.2;
+  const ymax=Math.max(sc.Pd+(sc.type==="battant"?sc.Lf:0), sc.Wt)+6.0;
+  const W=1000,H=600;
+  const k=Math.min(W/(xmax-xmin), H/(ymax-ymin));
+  const ox=W/2, oy=H-28, S=sc.s;
+  const X=m=>ox+S*m*k, Y=m=>oy-(m-ymin)*k;
+  const g=el("g",{}); svg.appendChild(g);
+
+  for (let m=Math.ceil(xmin);m<=xmax;m++)
+    g.appendChild(el("line",{x1:X(m),y1:Y(ymin),x2:X(m),y2:Y(ymax),stroke:"var(--grid)","stroke-width":1}));
+  for (let m=Math.ceil(ymin);m<=ymax;m++)
+    g.appendChild(el("line",{x1:X(xmin),y1:Y(m),x2:X(xmax),y2:Y(m),stroke:"var(--grid)","stroke-width":1}));
+
+  const poly=(pts,fill,stroke,sw)=>g.appendChild(el("polygon",
+    {points:pts.map(p=>X(p[0]).toFixed(1)+","+Y(p[1]).toFixed(1)).join(" "),
+     fill,stroke,"stroke-width":sw||1}));
+  const clampBox=(x0,x1,y0,y1,fill)=>poly(
+    [[Math.max(x0,xmin),y0],[Math.min(x1,xmax),y0],[Math.min(x1,xmax),y1],[Math.max(x0,xmin),y1]],
+    fill,"var(--ink-3)");
+
+  const hg=sc.G/2;
+  if (sc.T>0.001){
+    const hb=sc.BW/2;
+    clampBox(xmin,-hb,-sc.T,0,"var(--walk)");
+    clampBox(hb,xmax,-sc.T,0,"var(--walk)");
+  }
+  clampBox(xmin,-(hg+sc.Pw),0,sc.Wt,"var(--stone)");
+  clampBox(hg+sc.Pw,xmax,0,sc.Wt,"var(--stone)");
+  clampBox(-(hg+sc.Pw),-hg,0,sc.Pd,"var(--stone)");
+  clampBox(hg,hg+sc.Pw,0,sc.Pd,"var(--stone)");
+  if (sc.type==="battant"){
+    poly(corners(leafOB(sc,1)),"var(--leaf)","var(--ink-3)",1);
+    poly(corners(leafOB(sc,-1)),"var(--leaf)","var(--ink-3)",1);
+  }
+
+  const ry=Y(-sc.T-sc.RW);
+  g.appendChild(el("line",{x1:X(xmin),y1:ry,x2:X(xmax),y2:ry,stroke:"var(--ink)","stroke-width":2}));
+  if (sc.RW>0.5)
+    g.appendChild(el("line",{x1:X(xmin),y1:Y(-sc.T-sc.RW/2),x2:X(xmax),y2:Y(-sc.T-sc.RW/2),
+      stroke:"var(--ink-3)","stroke-width":1.5,"stroke-dasharray":"16 14","stroke-linecap":"round"}));
+
+  const txt=(x,y,s,size)=>{const t=el("text",{x,y,fill:"var(--ink-3)","font-size":size||13,
+    "font-family":"var(--mono)"}); t.textContent=s; g.appendChild(t);};
+  txt(12, ry+17, "chaussée "+sc.RW.toFixed(2)+" m");
+  if (sc.T>0.001) txt(12, Y(-sc.T)+14, "trottoir "+sc.T.toFixed(2)+"  ·  bateau "+sc.BW.toFixed(2), 12);
+  const clear = sc.type==="battant" ? sc.G - 2*sc.Le - sc.Lt*Math.abs(Math.sin(sc.ang)) : sc.G;
+  const t2=el("text",{x:ox,y:Y(Math.max(sc.Pd,sc.Wt))-8,fill:"var(--ink-3)","font-size":13,
+    "font-family":"var(--mono)","text-anchor":"middle"});
+  t2.textContent="passage libre "+clear.toFixed(2)+" m";
+  g.appendChild(t2);
+
+  if (!res) return;
+  const P=res.poses;
+  const kOf = i => (P[i].d ?? 1) + "|" + (P[i].c === undefined ? 0 : bandOf(P[i].c));
+  let i0=0, guard=0;
+  while (i0 < P.length-1 && guard++ < 5000){
+    const k = kOf(i0+1);
+    let i1 = i0+1;
+    while (i1 < P.length-1 && kOf(i1+1) === k) i1++;
+    const dir = P[i1].d ?? 1;
+    const bd = P[i1].c === undefined ? 0 : bandOf(P[i1].c);
+    let d="";
+    for (let i=i0;i<=i1;i++) d+=(i===i0?"M":"L")+X(P[i].x).toFixed(1)+" "+Y(P[i].y).toFixed(1)+" ";
+    g.appendChild(el("path",{d,fill:"none",stroke:BANDC[bd],
+      "stroke-width": bd===0 ? 1.8 : 3,
+      "stroke-dasharray": dir<0 ? "4 4" : "none",
+      "stroke-linecap":"round", opacity: bd===0 ? .8 : .95}));
+    if (i1 < P.length-1 && (P[i1].d ?? 1) !== (P[i1+1].d ?? 1))
+      g.appendChild(el("circle",{cx:X(P[i1].x),cy:Y(P[i1].y),r:4.5,fill:"var(--paper)",
+        stroke:"var(--ink)","stroke-width":1.4}));
+    i0 = i1;
+  }
+  [0,.34,.67,1].forEach(f=>car(g,P[Math.round(f*(P.length-1))],v,X,Y,.16));
+  car(g,P[Math.round((frac??1)*(P.length-1))],v,X,Y,1);
+}
+
+function car(g,p,v,X,Y,op){
+  if (!p) return;
+  const c=Math.cos(p.th), s=Math.sin(p.th), hw=v.wid/2, hm=v.mir/2;
+  const pts=[[-v.ro,-hw],[v.wb+v.fo,-hw],[v.wb+v.fo,hw],[-v.ro,hw]].map(([lx,ly])=>{
+    const px=p.x+lx*c-ly*s, py=p.y+lx*s+ly*c;
+    return X(px).toFixed(1)+","+Y(py).toFixed(1);
+  }).join(" ");
+  g.appendChild(el("polygon",{points:pts,fill:"var(--bp-soft)",stroke:"var(--bp)",
+    "stroke-width":op>.5?1.6:1,opacity:op}));
+  [[v.wb,-hm],[v.wb,hm]].forEach(([lx,ly])=>{
+    const px=p.x+lx*c-ly*s, py=p.y+lx*s+ly*c;
+    g.appendChild(el("circle",{cx:X(px),cy:Y(py),r:3,fill:"var(--alert)",opacity:op}));
+  });
+  const nx=p.x+(v.wb+v.fo)*c, ny=p.y+(v.wb+v.fo)*s;
+  g.appendChild(el("circle",{cx:X(nx),cy:Y(ny),r:2.5,fill:"var(--bp)",opacity:op}));
+}
+
+sel.addEventListener("change",()=>{ loadPreset(); clearResult(); });
+let busy = false;
+let alts = [], altSel = 0;
+
+function renderAlts(){
+  const box = $("alts");
+  if (!box) return;
+  if (!alts.length){ box.innerHTML = ""; return; }
+  box.innerHTML = alts.map((a,i) =>
+    '<button class="alt' + (i===altSel ? ' sel' : '') + '" data-i="' + i + '">'
+    + '<span class="am">' + a.moves + ' manœuvre' + (a.moves>1?'s':'') + '</span>'
+    + '<span class="ac">' + (a.minc*100).toFixed(1) + ' cm · '
+    + (a.dir>0 ? 'entrée avant' : 'entrée arrière') + '</span></button>').join("");
+  box.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    altSel = parseInt(b.dataset.i, 10); renderAlts(); showAlt();
+  }));
+}
+
+function renderLegend(show){
+  const L=$("legend"); if(!L) return;
+  if (!show){ L.innerHTML=""; return; }
+  L.innerHTML = BANDC.map(function(c,i){
+    var r = i===0 ? "plus de "+(BANDS[0]*100)+" cm"
+          : i===3 ? "moins de "+(BANDS[2]*100)+" cm"
+          : (BANDS[i]*100)+" a "+(BANDS[i-1]*100)+" cm";
+    return '<span><i style="background:'+c+'"></i>'+BANDN[i]+" ("+r+")</span>";
+  }).join("") + '<span style="margin-left:auto">trait plein : marche avant, pointille : marche arriere</span>';
+}
+
+function showAlt(){
+  const a = alts[altSel];
+  if (!a) return;
+  annotate(a, vehicle(), scene());
+  $("stats").innerHTML =
+    card("Manœuvres", a.moves) +
+    card("Marge minimale",(a.minc*100).toFixed(1)+" cm") +
+    card("Distance parcourue",(a.poses.length*0.18).toFixed(1)+" m") +
+    card("Recherche", a.expanded === null ? "exacte" : a.expanded.toLocaleString("fr-FR")+" nœuds") +
+    card("Sous 25 cm", (a.orgM + a.redM).toFixed(1)+" m") +
+    card("Sous 10 cm", a.redM.toFixed(1)+" m");
+  renderLegend(true);
+  current = a; $("t").disabled = false; $("t").value = 100;
+  $("tlabel").textContent = "100 % du trajet";
+  draw(a, 1);
+}
+
+async function findEntry(){
+  if (busy){ cancelSearch = true; return; }
+  cancelSearch = false;
+  const v=vehicle(), sc=scene(), vd=$("verdict");
+  const multi = $("multi").checked;
+  alts = []; altSel = 0; renderAlts();
+  const bad = badInputs(v, sc);
+  if (bad){
+    vd.className="verdict no";
+    vd.innerHTML = "Valeur manquante ou incohérente : <b>" + bad + "</b>. Corrige-la puis relance.";
+    $("stats").innerHTML=""; return;
+  }
+  $("go-find").textContent = "Arrêter"; busy = true;
+  try {
+    const allow = parseInt($("dirmode").value, 10) || 0;
+    const label = allow===1 ? " en marche avant" : allow===-1 ? " en marche arrière" : "";
+    if (!multi){
+      if (allow >= 0){ const f = search(v,sc,"fwd",false); if (f){ report(f,"fwd"); return; } }
+      if (allow <= 0){ const r = search(v,sc,"rev",false); if (r){ report(r,"rev"); return; } }
+      vd.className="verdict no";
+      vd.innerHTML="<b>Aucune entrée d'un seul mouvement" + label + ".</b> "
+        + "Coche « autoriser plusieurs manœuvres » pour chercher avec des reprises.";
+      $("stats").innerHTML=""; current=null; $("t").disabled=true; draw(null);
+      return;
+    }
+    vd.className="verdict"; vd.textContent="Recherche en cours…";
+    $("stats").innerHTML=""; current=null; $("t").disabled=true;
+    await sleep(20);
+    const prog=(m,e)=>{ vd.textContent = "Recherche jusqu'à "+m+" manœuvre"+(m>1?"s":"")
+      +" — "+e.toLocaleString("fr-FR")+" nœuds… (cliquer sur Arrêter pour interrompre)"; };
+    alts = []; altSel = 0; renderAlts();
+    const stopAt = Date.now() + 11000;
+    vd.textContent = "Recherche exacte d'une entrée d'un seul mouvement…";
+    await sleep(0);
+    let one = null;
+    if (allow >= 0){
+      const f = search(v,sc,"fwd",false);
+      if (f) one = {poses:f.poses.map(z=>({...z,d:1})), minc:f.minc, moves:1, dir:1, expanded:null};
+    }
+    if (!one && allow <= 0){
+      const r = search(v,sc,"rev",false);
+      if (r) one = {poses:r.poses.map(z=>({...z,d:-1})), minc:r.minc, moves:1, dir:-1, expanded:null};
+    }
+    if (one){ alts.push(one); renderAlts(); }
+    for (let m=2; m<=4 && !cancelSearch; m++){
+      if (Date.now() >= stopAt) break;
+      prog(m,0); await sleep(0);
+      const r = await planMulti(v, sc, m, 18000,
+                  Math.min(Date.now()+2200, stopAt), prog, allow, 1);
+      if (r){
+        const dup = alts.findIndex(a => a.moves === r.moves);
+        if (dup < 0){ alts.push(r); alts.sort((a,b)=>a.moves-b.moves); renderAlts(); }
+        else if (r.minc > alts[dup].minc){ alts[dup] = r; renderAlts(); }
+      }
+    }
+    alts.sort((a,b)=>a.moves-b.moves);
+    if (!alts.length){
+      vd.className="verdict no";
+      vd.innerHTML="<b>Aucune entrée trouvée</b>" + label + ", jusqu'à 4 manœuvres et dans le temps imparti. "
+        + "La recherche est heuristique au-delà d'un mouvement : elle ne prouve pas l'impossibilité.";
+      current=null; $("t").disabled=true; $("stats").innerHTML=""; draw(null); return;
+    }
+    vd.className="verdict ok";
+    vd.innerHTML = alts.length===1
+      ? "<b>Une seule solution trouvée.</b> Sélectionne-la ci-dessous pour voir le trajet."
+      : `<b>${alts.length} solutions trouvées</b>, de ${alts[0].moves} à ${alts[alts.length-1].moves} manœuvres. `
+        + "Plus il y a de reprises, plus la marge est confortable.";
+    altSel = 0; renderAlts(); showAlt();
+  } catch (err){
+    vd.className="verdict no";
+    vd.innerHTML = "Le calcul a échoué : <b>" + (err && err.message ? err.message : err) + "</b>";
+    $("stats").innerHTML=""; current=null; $("t").disabled=true; draw(null);
+  } finally { busy=false; $("go-find").textContent="Rechercher l\u2019entrée"; }
+}
+on("go-find","click", findEntry);
+on("multi","change", clearResult);
+on("go-min","click", minRoad);
+
+on("t","input", e=>{
+  if (!current) return;
+  const f=e.target.value/100;
+  draw(current,f);
+  $("tlabel").textContent=Math.round(f*100)+" % du trajet";
+});
+["dirmode","retros","mirf","gate","pd","pw","wt","lf","lt","le","ax","ang","walk","drop","road",
+ "wb","len","wid","mir","rmin","fo","side","type"]
+  .forEach(id=>$(id).addEventListener("input",clearResult));
+on("type","change", clearResult);
+on("ang","input", ()=>{ $("angn").value = $("ang").value; });
+on("angn","input", ()=>{
+  const val = Math.min(180, Math.max(70, Math.round(parseFloat($("angn").value)||90)));
+  $("ang").value = val; clearResult();
+});
+
+clearResult();
+</script>
+</body>
+</html>
