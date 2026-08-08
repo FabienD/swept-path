@@ -57,10 +57,17 @@ impl Discretisation {
 
 /// Node ceiling for one planning depth.
 ///
-/// ARBITRARY — carried over from the prototype (`index.html:809`), which
-/// allowed 18 000 nodes per depth alongside a 2.2 second deadline. Only the
-/// node count survives.
-pub const DEFAULT_MAX_NODES: u32 = 18_000;
+/// MEASURED, unlike most constants here. The prototype allowed 18 000 nodes
+/// per depth on a 90 cm / 6° grid, where it settled after about 1 000. On the
+/// 20 cm / 1° grid this crate defaults to, the same scene needs roughly
+/// **55 000** — refining the grid costs some fifty times more nodes — and
+/// 18 000 returns nothing at all. This ceiling is twice the measured need.
+///
+/// Reproduce with `cargo run -p swept-solver --release --example grid_cost`.
+///
+/// The honest fix is progressive refinement: plan coarse, then refine locally
+/// around the solution. Until that exists, this pays the full price up front.
+pub const DEFAULT_MAX_NODES: u32 = 120_000;
 
 /// How many landing solutions are collected before a depth stops early.
 ///
