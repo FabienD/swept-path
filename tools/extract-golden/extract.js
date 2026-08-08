@@ -48,7 +48,64 @@ for (let i = 0; i < 400; i++) {
   kinematics.push({ start, curvature, distance, end: move(start, curvature, distance) });
 }
 
-mkdirSync("crates/swept-core/tests/fixtures", { recursive: true });
-writeFileSync("crates/swept-core/tests/fixtures/geometry.json", `${JSON.stringify(geometry, null, 1)}\n`);
-writeFileSync("crates/swept-core/tests/fixtures/kinematics.json", `${JSON.stringify(kinematics, null, 1)}\n`);
-console.log(`${geometry.length} cas de géométrie et ${kinematics.length} cas de cinématique écrits.`);
+const DIR = "crates/swept-core/tests/fixtures";
+const OUTPUTS = [
+  [`${DIR}/geometry.json`, geometry],
+  [`${DIR}/kinematics.json`, kinematics],
+];
+
+// Écart toléré entre deux exécutions, en valeur absolue.
+//
+// Math.sin et Math.cos ne sont pas correctement arrondies au sens d'IEEE 754 :
+// les implémentations libm diffèrent d'un ULP entre macOS/arm64 et
+// Linux/x86-64, soit environ 1e-15. Une comparaison octet à octet échouerait
+// donc selon la machine. Ce seuil est mille fois plus fin que la tolérance de
+// 1e-9 des tests Rust : une fixture retouchée pour faire passer un test reste
+// détectée.
+const TOLERANCE = 1e-12;
+
+/** Compare deux valeurs, en tolérant l'écart d'arrondi entre plateformes. */
+function diff(expected, actual, path, out) {
+  if (typeof expected === "number") {
+    if (typeof actual !== "number" || Math.abs(expected - actual) > TOLERANCE) {
+      out.push(`${path} : commité ${expected}, régénéré ${actual}`);
+    }
+  } else if (Array.isArray(expected)) {
+    if (!Array.isArray(actual) || expected.length !== actual.length) {
+      out.push(`${path} : ${expected.length} éléments commités, ${actual?.length} régénérés`);
+    } else {
+      expected.forEach((v, i) => diff(v, actual[i], `${path}[${i}]`, out));
+    }
+  } else if (expected !== null && typeof expected === "object") {
+    for (const k of Object.keys(expected)) diff(expected[k], actual?.[k], `${path}.${k}`, out);
+  } else if (expected !== actual) {
+    out.push(`${path} : commité ${expected}, régénéré ${actual}`);
+  }
+}
+
+if (process.argv.includes("--check")) {
+  const problems = [];
+  for (const [file, produced] of OUTPUTS) {
+    let committed;
+    try {
+      committed = JSON.parse(readFileSync(file, "utf8"));
+    } catch {
+      problems.push(`${file} : illisible ou absent`);
+      continue;
+    }
+    diff(committed, produced, file, problems);
+  }
+  if (problems.length) {
+    console.error("Les fixtures commitées ne correspondent plus au prototype :");
+    for (const p of problems.slice(0, 20)) console.error(`  ${p}`);
+    if (problems.length > 20) console.error(`  … et ${problems.length - 20} autres écarts.`);
+    process.exit(1);
+  }
+  console.log(`Fixtures conformes au prototype (tolérance ${TOLERANCE}).`);
+} else {
+  mkdirSync(DIR, { recursive: true });
+  for (const [file, produced] of OUTPUTS) {
+    writeFileSync(file, `${JSON.stringify(produced, null, 1)}\n`);
+  }
+  console.log(`${geometry.length} cas de géométrie et ${kinematics.length} cas de cinématique écrits.`);
+}

@@ -36,7 +36,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Regenerate golden vectors
-        run: node tools/extract-golden/extract.js
-      - name: Fail if they differ from what is committed
-        run: git diff --exit-code crates/swept-core/tests/fixtures/
+      # Comparaison numérique et non octet à octet : Math.sin/Math.cos ne sont
+      # pas correctement arrondies au sens d'IEEE 754, et diffèrent d'un ULP
+      # entre macOS et Linux.
+      - name: Check committed fixtures still match the prototype
+        run: node tools/extract-golden/extract.js --check
