@@ -9,7 +9,9 @@
 //!
 //! The origin sits at the middle of the opening. `y = 0` is the outer face of
 //! the wall, `y > 0` points into the yard, and `x` runs along the road.
-//! Lengths are metres, angles are radians.
+//! Lengths are metres, angles are [`units::Radians`].
+
+pub mod units;
 
 /// Crate version, exposed so that callers can report which core produced a
 /// result.
