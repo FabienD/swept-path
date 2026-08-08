@@ -374,18 +374,8 @@ pub fn plan(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::budget::{Discretisation, Silent};
+    use crate::budget::Silent;
     use swept_core::scene::Post;
-
-    /// The prototype grid, for tests checking mechanics rather than
-    /// resolution: it settles in about a thousand nodes instead of fifty
-    /// thousand, which keeps the suite quick in a debug build.
-    fn quick() -> SearchBudget {
-        SearchBudget {
-            discretisation: Discretisation::prototype(),
-            ..SearchBudget::default()
-        }
-    }
 
     fn scene(opening: f64) -> Scene {
         Scene {
@@ -413,7 +403,14 @@ mod tests {
 
     #[test]
     fn a_generous_opening_is_planned_within_a_few_moves() {
-        let outcome = plan(&lbx(), &scene(4.0), 3, quick(), &mut Silent, None);
+        let outcome = plan(
+            &lbx(),
+            &scene(4.0),
+            3,
+            SearchBudget::default(),
+            &mut Silent,
+            None,
+        );
         let best = outcome.best().expect("4 m should be plannable");
         assert!(
             best.moves >= 1 && best.moves <= 3,
@@ -424,14 +421,21 @@ mod tests {
 
     #[test]
     fn planner_results_never_claim_to_be_exact() {
-        let outcome = plan(&lbx(), &scene(4.0), 3, quick(), &mut Silent, None);
+        let outcome = plan(
+            &lbx(),
+            &scene(4.0),
+            3,
+            SearchBudget::default(),
+            &mut Silent,
+            None,
+        );
         assert!(!outcome.best().expect("a plan").is_exact());
     }
 
     #[test]
     fn the_planned_path_is_actually_collision_free() {
         let (vehicle, sc) = (lbx(), scene(3.5));
-        let outcome = plan(&vehicle, &sc, 3, quick(), &mut Silent, None);
+        let outcome = plan(&vehicle, &sc, 3, SearchBudget::default(), &mut Silent, None);
         if let Some(best) = outcome.best() {
             let field = ClearanceField::new(&sc, &vehicle);
             for step in &best.poses {
@@ -444,8 +448,8 @@ mod tests {
     fn the_same_inputs_always_give_the_same_result() {
         // The whole point of counting nodes instead of milliseconds.
         let (vehicle, sc) = (lbx(), scene(3.5));
-        let once = plan(&vehicle, &sc, 3, quick(), &mut Silent, None);
-        let twice = plan(&vehicle, &sc, 3, quick(), &mut Silent, None);
+        let once = plan(&vehicle, &sc, 3, SearchBudget::default(), &mut Silent, None);
+        let twice = plan(&vehicle, &sc, 3, SearchBudget::default(), &mut Silent, None);
         assert_eq!(once, twice);
     }
 
@@ -453,7 +457,7 @@ mod tests {
     fn a_starved_budget_reports_that_it_ran_out() {
         let budget = SearchBudget {
             max_nodes: 5,
-            ..quick()
+            ..SearchBudget::default()
         };
         let outcome = plan(&lbx(), &scene(2.2), 4, budget, &mut Silent, None);
         match outcome {
@@ -493,7 +497,14 @@ mod tests {
             }
         }
         let mut spy = Spy::default();
-        let _ = plan(&lbx(), &scene(2.6), 3, quick(), &mut spy, None);
+        let _ = plan(
+            &lbx(),
+            &scene(2.6),
+            3,
+            SearchBudget::default(),
+            &mut spy,
+            None,
+        );
         assert!(spy.0 > 0, "the planner never reported progress");
     }
 }

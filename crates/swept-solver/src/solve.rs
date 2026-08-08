@@ -90,17 +90,8 @@ pub fn alternatives(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::budget::{Discretisation, Silent};
+    use crate::budget::Silent;
     use swept_core::scene::{GateKind, Post};
-
-    /// The prototype grid keeps these tests quick; what they check is the
-    /// seeding logic, not the resolution.
-    fn quick() -> SearchBudget {
-        SearchBudget {
-            discretisation: Discretisation::prototype(),
-            ..SearchBudget::default()
-        }
-    }
 
     fn scene(opening: f64) -> Scene {
         Scene {
@@ -128,7 +119,13 @@ mod tests {
 
     #[test]
     fn a_one_move_entry_is_returned_exactly() {
-        let outcome = alternatives(&lbx(), &scene(5.0), quick(), &mut Silent, None);
+        let outcome = alternatives(
+            &lbx(),
+            &scene(5.0),
+            SearchBudget::default(),
+            &mut Silent,
+            None,
+        );
         let best = outcome.best().expect("5 m admits a one-move entry");
         assert_eq!(best.moves, 1);
         assert!(
@@ -139,7 +136,13 @@ mod tests {
 
     #[test]
     fn alternatives_are_ordered_by_move_count_without_duplicates() {
-        let outcome = alternatives(&lbx(), &scene(3.0), quick(), &mut Silent, None);
+        let outcome = alternatives(
+            &lbx(),
+            &scene(3.0),
+            SearchBudget::default(),
+            &mut Silent,
+            None,
+        );
         if let Outcome::Found(list) = outcome {
             let moves: Vec<u8> = list.iter().map(|m| m.moves).collect();
             let mut sorted = moves.clone();
@@ -153,7 +156,7 @@ mod tests {
     fn more_moves_never_yield_less_room_than_the_one_move_answer() {
         // The invariant CLAUDE.md calls out as acquired and not to be lost.
         let (vehicle, sc) = (lbx(), scene(3.2));
-        let outcome = alternatives(&vehicle, &sc, quick(), &mut Silent, None);
+        let outcome = alternatives(&vehicle, &sc, SearchBudget::default(), &mut Silent, None);
         if let Outcome::Found(list) = outcome
             && let Some(one) = list.iter().find(|m| m.moves == 1)
         {
@@ -171,7 +174,13 @@ mod tests {
 
     #[test]
     fn a_blocked_opening_yields_nothing_at_any_depth() {
-        let outcome = alternatives(&lbx(), &scene(1.6), quick(), &mut Silent, None);
+        let outcome = alternatives(
+            &lbx(),
+            &scene(1.6),
+            SearchBudget::default(),
+            &mut Silent,
+            None,
+        );
         assert!(outcome.best().is_none());
     }
 }

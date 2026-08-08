@@ -8,7 +8,7 @@ use proptest::prelude::*;
 use swept_core::clearance::{Clearance, ClearanceField};
 use swept_core::scene::{GateKind, Post, Scene};
 use swept_core::vehicle::Vehicle;
-use swept_solver::budget::{Discretisation, SearchBudget, Silent};
+use swept_solver::budget::{SearchBudget, Silent};
 use swept_solver::exact::{Approach, Grid, search};
 use swept_solver::solve::alternatives;
 
@@ -34,14 +34,6 @@ fn scene(opening: f64, post_depth: f64, road: f64) -> Scene {
 
 fn lbx() -> Vehicle {
     Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 5.2).expect("valid vehicle")
-}
-
-/// The prototype grid, so that property runs stay affordable.
-fn quick() -> SearchBudget {
-    SearchBudget {
-        discretisation: Discretisation::prototype(),
-        ..SearchBudget::default()
-    }
 }
 
 proptest! {
@@ -89,7 +81,7 @@ proptest! {
         let vehicle = lbx();
         let sc = scene(opening, 0.55, 4.5);
         let ceiling = (opening - vehicle.mirror_width) / 2.0;
-        if let Some(best) = alternatives(&vehicle, &sc, quick(), &mut Silent, None).best() {
+        if let Some(best) = alternatives(&vehicle, &sc, SearchBudget::default(), &mut Silent, None).best() {
             prop_assert!(best.min_clearance <= ceiling + 1e-6);
         }
     }
@@ -110,7 +102,7 @@ proptest! {
     fn multi_is_never_worse_than_simple(opening in 2.4_f64..5.0, road in 3.5_f64..7.0) {
         let (vehicle, sc) = (lbx(), scene(opening, 0.55, road));
         if let swept_solver::result::Outcome::Found(list) =
-            alternatives(&vehicle, &sc, quick(), &mut Silent, None)
+            alternatives(&vehicle, &sc, SearchBudget::default(), &mut Silent, None)
             && let Some(one) = list.iter().find(|m| m.moves == 1)
         {
             for other in list.iter().filter(|m| m.moves > 1) {
