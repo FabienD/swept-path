@@ -407,6 +407,11 @@ observable.
   comment le vérifier à la main — plus le lien vers la ligne du prototype ou du
   `CLAUDE.md` qui sert de référence. C'est ce qui rend relisable la revue d'un
   calcul géométrique sans refaire les mathématiques.
+- **Langue** : tout ce qui vit dans le dépôt est en anglais — identifiants,
+  documentation du code, noms de tests, noms de branches, messages de commit.
+  Le `CLAUDE.md` posait la règle pour le code ; elle s'étend à l'historique,
+  qui accompagne `swept-core` partout où cette crate sera publiée. Seule la
+  documentation projet, sous `docs/`, reste en français.
 
 ## 12. Découpage prévisionnel en PR
 
