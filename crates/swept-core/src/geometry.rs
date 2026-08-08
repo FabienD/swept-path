@@ -87,6 +87,52 @@ impl Obb {
     }
 }
 
+/// How far a point lies from a rectangle.
+///
+/// The prototype folded both cases into a single number, returning `-1` for a
+/// point inside the rectangle. That sentinel is easy to forget to check, and
+/// forgetting it turns a collision into a very small clearance.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PointDistance {
+    /// The point lies within the rectangle.
+    Inside,
+    /// The point lies outside, at this distance from the nearest edge, in
+    /// metres.
+    Outside(f64),
+}
+
+impl Obb {
+    /// Distance from `point` to this rectangle.
+    ///
+    /// The point is taken into the rectangle's local frame, where the distance
+    /// reduces to the length of the componentwise overshoot beyond the
+    /// half-sizes.
+    ///
+    /// ```
+    /// use swept_core::geometry::{Obb, Point, PointDistance};
+    ///
+    /// let pillar = Obb::from_bounds(0.0, 1.0, 0.0, 1.0);
+    /// assert_eq!(pillar.distance_to(Point::new(0.5, 0.5)), PointDistance::Inside);
+    /// assert_eq!(pillar.distance_to(Point::new(3.0, 0.5)), PointDistance::Outside(2.0));
+    /// ```
+    #[must_use]
+    pub fn distance_to(&self, point: Point) -> PointDistance {
+        let (sin, cos) = self.angle.sin_cos();
+        let (dx, dy) = (point.x - self.center.x, point.y - self.center.y);
+        let local_x = dx * cos + dy * sin;
+        let local_y = -dx * sin + dy * cos;
+
+        let overshoot_x = (local_x.abs() - self.half_width).max(0.0);
+        let overshoot_y = (local_y.abs() - self.half_height).max(0.0);
+
+        if overshoot_x == 0.0 && overshoot_y == 0.0 {
+            PointDistance::Inside
+        } else {
+            PointDistance::Outside(overshoot_x.hypot(overshoot_y))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -121,6 +167,40 @@ mod tests {
         assert_point_near(corners[1], 2.0, 0.0);
         assert_point_near(corners[2], 2.0, 4.0);
         assert_point_near(corners[3], 0.0, 4.0);
+    }
+
+    #[test]
+    fn reports_a_point_inside_the_rectangle() {
+        let obb = Obb::from_bounds(0.0, 2.0, 0.0, 2.0);
+        assert_eq!(obb.distance_to(Point::new(1.0, 1.0)), PointDistance::Inside);
+    }
+
+    #[test]
+    fn measures_perpendicular_distance_to_an_edge() {
+        let obb = Obb::from_bounds(0.0, 2.0, 0.0, 2.0);
+        match obb.distance_to(Point::new(3.5, 1.0)) {
+            PointDistance::Outside(d) => assert!((d - 1.5).abs() < EPS),
+            PointDistance::Inside => panic!("point is outside the rectangle"),
+        }
+    }
+
+    #[test]
+    fn measures_diagonal_distance_to_a_corner() {
+        let obb = Obb::from_bounds(0.0, 2.0, 0.0, 2.0);
+        match obb.distance_to(Point::new(5.0, 6.0)) {
+            PointDistance::Outside(d) => assert!((d - 5.0).abs() < EPS), // 3-4-5
+            PointDistance::Inside => panic!("point is outside the rectangle"),
+        }
+    }
+
+    #[test]
+    fn accounts_for_rotation() {
+        // A 2x1 rectangle turned a quarter turn is 1 wide and 2 tall.
+        let obb = Obb::new(Point::new(0.0, 0.0), Radians::from_degrees(90.0), 1.0, 0.5);
+        match obb.distance_to(Point::new(2.0, 0.0)) {
+            PointDistance::Outside(d) => assert!((d - 1.5).abs() < EPS),
+            PointDistance::Inside => panic!("point is outside the rectangle"),
+        }
     }
 
     #[test]
