@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "units": "metres",
+  "note": "Provenance par champ. source: manufacturer | measured | derived | estimated. Valeurs reprises du prototype : a revalider sur documents constructeurs avant toute publication.",
+  "vehicles": [
+    {
+      "id": "lexus-lbx",
+      "make": "Lexus",
+      "model": "LBX",
+      "body": "suv",
+      "wheelbase": { "v": 2.580, "source": "manufacturer" },
+      "length": { "v": 4.190, "source": "manufacturer" },
+      "front_overhang": { "v": 0.850, "source": "estimated" },
+      "width": { "v": 1.825, "source": "manufacturer" },
+      "width_mirrors": { "v": 2.029, "source": "derived" },
+      "width_mirrors_folded": { "v": null, "source": null },
+      "turning_radius": { "v": 5.20, "source": "manufacturer", "kind": "kerb" }
+    },
+    {
+      "id": "kia-ev3",
+      "make": "Kia",
+      "model": "EV3",
+      "body": "suv",
+      "wheelbase": { "v": 2.680, "source": "manufacturer" },
+      "length": { "v": 4.300, "source": "manufacturer" },
+      "front_overhang": { "v": 0.830, "source": "estimated" },
+      "width": { "v": 1.850, "source": "manufacturer" },
+      "width_mirrors": { "v": 2.060, "source": "estimated" },
+      "width_mirrors_folded": { "v": null, "source": null },
+      "turning_radius": { "v": 5.20, "source": "manufacturer", "kind": "kerb" }
+    },
+    {
+      "id": "lexus-nx-450h-plus",
+      "make": "Lexus",
+      "model": "NX 450h+",
+      "body": "suv",
+      "wheelbase": { "v": 2.690, "source": "manufacturer" },
+      "length": { "v": 4.660, "source": "manufacturer" },
+      "front_overhang": { "v": 0.990, "source": "estimated" },
+      "width": { "v": 1.865, "source": "manufacturer" },
+      "width_mirrors": { "v": 2.150, "source": "manufacturer" },
+      "width_mirrors_folded": { "v": null, "source": null },
+      "turning_radius": { "v": 5.70, "source": "estimated", "kind": "unknown" }
+    },
+    {
+      "id": "renault-scenic-4",
+      "make": "Renault",
+      "model": "Scenic IV",
+      "body": "mpv",
+      "wheelbase": { "v": 2.734, "source": "manufacturer" },
+      "length": { "v": 4.406, "source": "manufacturer" },
+      "front_overhang": { "v": 0.900, "source": "estimated" },
+      "width": { "v": 1.866, "source": "manufacturer" },
+      "width_mirrors": { "v": 2.128, "source": "manufacturer" },
+      "width_mirrors_folded": { "v": null, "source": null },
+      "turning_radius": { "v": 5.60, "source": "estimated", "kind": "unknown" }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# Rust
+/target
+**/*.rs.bk
+
+# Node
+node_modules/
+dist/
+
+# Wasm généré
+crates/swept-wasm/pkg/
+
+# Environnements locaux
+.env
+.env.local
+.vercel
