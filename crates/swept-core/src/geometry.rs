@@ -133,6 +133,52 @@ impl Obb {
     }
 }
 
+/// Overlap below which two rectangles are still considered disjoint, in metres.
+///
+/// ARBITRARY — carried over from the prototype (`index.html:258`), where it
+/// absorbs the floating-point noise of gate leaves that come to rest exactly
+/// against a pillar. No measurement backs the specific value; it should be
+/// revalidated against real tolerances.
+pub const OVERLAP_TOLERANCE_M: f64 = 0.006;
+
+impl Obb {
+    /// Whether two rectangles overlap, by the separating axis theorem.
+    ///
+    /// Two convex shapes are disjoint if and only if some axis exists on which
+    /// their projections do not meet. For rectangles it is enough to test the
+    /// four edge normals — two per rectangle.
+    #[must_use]
+    pub fn overlaps(&self, other: &Obb) -> bool {
+        let (a_sin, a_cos) = self.angle.sin_cos();
+        let (b_sin, b_cos) = other.angle.sin_cos();
+        let axes = [
+            (a_cos, a_sin),
+            (-a_sin, a_cos),
+            (b_cos, b_sin),
+            (-b_sin, b_cos),
+        ];
+
+        let mine = self.corners();
+        let theirs = other.corners();
+
+        for (ux, uy) in axes {
+            let project = |corners: &[Point; 4]| {
+                corners.iter().fold((f64::MAX, f64::MIN), |(lo, hi), p| {
+                    let v = p.x * ux + p.y * uy;
+                    (lo.min(v), hi.max(v))
+                })
+            };
+            let (a_lo, a_hi) = project(&mine);
+            let (b_lo, b_hi) = project(&theirs);
+
+            if a_hi < b_lo + OVERLAP_TOLERANCE_M || b_hi < a_lo + OVERLAP_TOLERANCE_M {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,6 +247,44 @@ mod tests {
             PointDistance::Outside(d) => assert!((d - 1.5).abs() < EPS),
             PointDistance::Inside => panic!("point is outside the rectangle"),
         }
+    }
+
+    #[test]
+    fn detects_plainly_overlapping_rectangles() {
+        let a = Obb::from_bounds(0.0, 2.0, 0.0, 2.0);
+        let b = Obb::from_bounds(1.0, 3.0, 1.0, 3.0);
+        assert!(a.overlaps(&b));
+        assert!(b.overlaps(&a));
+    }
+
+    #[test]
+    fn separates_disjoint_rectangles() {
+        let a = Obb::from_bounds(0.0, 1.0, 0.0, 1.0);
+        let b = Obb::from_bounds(2.0, 3.0, 0.0, 1.0);
+        assert!(!a.overlaps(&b));
+    }
+
+    #[test]
+    fn tolerates_an_overlap_below_the_threshold() {
+        // Carried over from the prototype: an overlap of less than 6 mm does
+        // not count as contact.
+        let a = Obb::from_bounds(0.0, 1.0, 0.0, 1.0);
+        let barely = Obb::from_bounds(1.0 - 0.005, 2.0, 0.0, 1.0);
+        assert!(!a.overlaps(&barely));
+
+        let clearly = Obb::from_bounds(1.0 - 0.02, 2.0, 0.0, 1.0);
+        assert!(a.overlaps(&clearly));
+    }
+
+    #[test]
+    fn separates_rotated_rectangles_that_axis_aligned_bounds_would_not() {
+        // Two squares turned a half-quarter turn. Each spans ±1.414 on both
+        // axes, so their axis-aligned bounds overlap on [1.086, 1.414] — but
+        // the shapes themselves are 3.54 apart, against a combined reach of
+        // 2.83. Only a proper separating-axis test gets this right.
+        let a = Obb::new(Point::new(0.0, 0.0), Radians::from_degrees(45.0), 1.0, 1.0);
+        let b = Obb::new(Point::new(2.5, 2.5), Radians::from_degrees(45.0), 1.0, 1.0);
+        assert!(!a.overlaps(&b));
     }
 
     #[test]
