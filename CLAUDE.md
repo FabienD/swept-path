@@ -61,14 +61,32 @@ ne soit dans l'obstacle).
 
 ## Résultats de référence à ne pas perdre
 
-Ils servent de tests de non-régression.
+Ils servent de tests de non-régression. **Attention à leur statut** : ces
+valeurs ont été produites pendant le prototypage sous Claude Desktop, sans
+mesure indépendante. Deux d'entre elles se sont révélées fausses lors du
+portage. Chacune est désormais marquée *vérifié* ou *corrigé*.
 
-- Largeur critique : si `W ≥ √(w² + L²)` avec `w` largeur véhicule et `L`
-  profondeur du couloir, **tout angle d'approche passe**. En dessous, la
-  tolérance angulaire s'effondre.
-- Battants ouverts à 90° avec axe à mi-profondeur d'un pilier de 55 cm :
-  couloir ≈ longueur de vantail, tolérance ≈ 4°. Coulissant : couloir =
-  épaisseur de pilier seule.
+- **Tolérance angulaire — corrigé.** L'ancienne note affirmait qu'au-dessus
+  d'une « largeur critique » `√(w² + L²)`, *tout* angle d'approche passe.
+  C'est faux : un véhicule de largeur `w` franchissant un couloir de
+  profondeur `L` à un écart `α` de la perpendiculaire occupe
+
+  ```
+  emprise = w / cos α  +  L · tan α
+  ```
+
+  qui croît sans borne quand `α → 90°`. Aucune ouverture ne fait donc passer
+  tous les angles. La tolérance est la solution de `emprise = W`, et le noyau
+  la reproduit à moins de 3° près sur quatre largeurs d'ouverture
+  (`crates/swept-solver/tests/reference_results.rs`).
+- **Battants à 90°, axe à mi-profondeur d'un pilier de 55 cm — corrigé.**
+  L'ancienne note donnait une tolérance d'environ 4° ; mesure et géométrie
+  concordent sur **environ 14°**. La conclusion qualitative tient : les
+  vantaux réduisent la tolérance de plus de moitié, et rabotent aussi le
+  passage libre de 2,40 m à environ 2,20 m puisque chaque axe est en retrait
+  de 5 cm.
+- **Coulissant — vérifié.** Le couloir se limite à l'épaisseur de pilier
+  (0,55 m dans la scène de référence).
 - L'angle maximal d'ouverture d'un vantail dépend de l'écartement de l'axe
   au nu intérieur du pilier **et** de sa profondeur dans le pilier. Axe à
   mi-profondeur, écartement 5 cm → 91°. Axe reporté sur la face côté cour →
