@@ -1,0 +1,18 @@
+[package]
+name = "swept-solver"
+version = "0.1.0"
+description = "Manoeuvre search for swept path analysis"
+license = "AGPL-3.0-only"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+swept-core = { path = "../swept-core" }
+
+[dev-dependencies]
+proptest = "1.11.0"
+
+[lints]
+workspace = true
