@@ -61,7 +61,7 @@ pas encore consommé.
 |---|---|---|
 | Périmètre | Parité fonctionnelle + défauts structurels corrigés | Ne pas reproduire ce qu'on devra défaire |
 | Découpage Rust | Trois crates | Licences distinctes, dépendances dirigées vers l'intérieur |
-| Interface | TypeScript nu + Vite | Un SVG régénéré en bloc ne tire rien d'un moteur de diff |
+| Interface | TypeScript nu + Vite + Tailwind | Un SVG régénéré en bloc ne tire rien d'un moteur de diff |
 | Oracle de test | Mixte selon le niveau | Figer le bas niveau sans figer les défauts des solveurs |
 | Flux de PR | Séquentiel sur `main`, une PR ouverte à la fois | Relecteur unique, pas de rebase en cascade |
 | Rendu | Liste de primitives + backend SVG | Rend le moteur de rendu remplaçable pour un coût marginal |
@@ -288,6 +288,21 @@ au lot 1.
 
 TypeScript nu, Vite, sortie statique.
 
+**Style : Tailwind CSS 4**, intégré par `@tailwindcss/vite` et configuré en CSS
+via `@theme` — la version 4 n'utilise plus de `tailwind.config.js`. Pas de
+bibliothèque de composants : shadcn/ui et ses équivalents imposent React ou
+Svelte, et l'inventaire des contrôles ne le justifie pas. L'interface compte
+dix-neuf champs numériques, cinq listes déroulantes, deux curseurs, une case à
+cocher, deux boutons et une liste d'alternatives sélectionnables — que des
+éléments natifs. Radix et ses portages apportent l'accessibilité des
+interactions complexes, boîtes de dialogue, popovers, listes combinées, dont
+aucune n'apparaît ici.
+
+La question se rouvrira si les lots 3 et 4 amènent de vrais composants
+composites — comparaison de scénarios, paramétrage des dégagements. Le rendu
+étant isolé derrière la liste de primitives, ce changement resterait confiné à
+la couche de contrôles.
+
 Le rendu se fait en deux temps. Une fonction pure produit une **liste de
 primitives de dessin** — segments, polygones, arcs, étiquettes, chacun portant sa
 bande de proximité — et un backend la traduit. Le lot 1 fournit un seul backend,
@@ -354,7 +369,8 @@ Versions constatées le 8 août 2026 :
 | toolchain | 1.97.1, édition 2024 | typescript | 7.0.2 |
 | wasm-bindgen | 0.2.127 | vite | 8.2.1 |
 | serde | 1.0.229 | vitest | 4.1.10 |
-| serde_json | 1.0.151 | | |
+| serde_json | 1.0.151 | tailwindcss | 4.3.3 |
+| | | @tailwindcss/vite | 4.3.3 |
 | serde-wasm-bindgen | 0.6.5 | | |
 | thiserror | 2.0.20 | | |
 | proptest | 1.11.0 | | |
@@ -408,7 +424,7 @@ observable.
 | 9 | `min_road` : dichotomie de chaussée | encadrement de la largeur trouvée |
 | 10 | `multi` : A\* hybride, budget en nœuds, trait `Progress` | invariant multi ≥ simple |
 | 11 | `swept-wasm` : les trois fonctions, types de transfert | test d'intégration en Node |
-| 12 | Coque web, Worker, appel de bout en bout | verdict textuel affiché, onglet réactif |
+| 12 | Coque web (Vite, Tailwind), Worker, appel de bout en bout | verdict textuel affiché, onglet réactif |
 | 13 | Déploiement Vercel prébuild, preview par PR | l'URL de production répond |
 | 14 | Liste de primitives et backend SVG, scène statique | instantané du rendu |
 | 15 | Trajectoire, bandes, positions fantômes, curseur | parité visuelle avec le prototype |
