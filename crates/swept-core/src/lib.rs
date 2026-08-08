@@ -12,6 +12,7 @@
 //! Lengths are metres, angles are [`units::Radians`].
 
 pub mod geometry;
+pub mod kinematics;
 pub mod units;
 
 /// Crate version, exposed so that callers can report which core produced a
