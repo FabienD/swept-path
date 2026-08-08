@@ -7,64 +7,155 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body class="min-h-dvh bg-stone-50 text-stone-900">
-    <main class="mx-auto max-w-3xl px-4 py-10">
+    <main class="mx-auto max-w-5xl px-4 py-8">
       <h1 class="text-2xl font-semibold tracking-tight">Épure de giration</h1>
-      <p class="mt-2 text-stone-600">
-        Vérifie si un véhicule peut franchir un passage étroit, et en combien
-        de manœuvres.
+      <p class="mt-2 max-w-2xl text-stone-600">
+        Vérifie si un véhicule peut franchir un passage étroit — portail,
+        entrée de cour, box de parking — et en combien de manœuvres.
       </p>
 
-      <form id="params" class="mt-8 grid gap-4 sm:grid-cols-2">
-        <label class="grid gap-1">
-          <span class="text-sm text-stone-600">Passage entre piliers (m)</span>
-          <input
-            id="opening"
-            type="number"
-            step="0.05"
-            value="2.40"
-            class="rounded border border-stone-300 px-3 py-2"
-          />
-        </label>
-        <label class="grid gap-1">
-          <span class="text-sm text-stone-600">Largeur de chaussée (m)</span>
-          <input
-            id="road"
-            type="number"
-            step="0.10"
-            value="4.50"
-            class="rounded border border-stone-300 px-3 py-2"
-          />
-        </label>
-        <label class="grid gap-1">
-          <span class="text-sm text-stone-600">Largeur aux rétroviseurs (m)</span>
-          <input
-            id="mirrors"
-            type="number"
-            step="0.005"
-            value="2.029"
-            class="rounded border border-stone-300 px-3 py-2"
-          />
-        </label>
-        <label class="grid gap-1">
-          <span class="text-sm text-stone-600">Rayon de braquage (m)</span>
-          <input
-            id="radius"
-            type="number"
-            step="0.1"
-            value="5.2"
-            class="rounded border border-stone-300 px-3 py-2"
-          />
-        </label>
-        <button
-          id="run"
-          type="submit"
-          class="rounded bg-stone-900 px-4 py-2 text-stone-50 sm:col-span-2"
-        >
-          Rechercher l'entrée
-        </button>
+      <form id="params" class="mt-8 grid gap-6">
+        <fieldset class="grid gap-3 sm:grid-cols-4">
+          <legend class="mb-2 text-sm font-medium text-stone-700">Le passage</legend>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Type</span>
+            <select id="gate-kind" class="rounded border border-stone-300 px-3 py-2">
+              <option value="sliding">Coulissant ou sans portail</option>
+              <option value="swinging">Battant</option>
+            </select>
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Passage entre piliers</span>
+            <input id="opening" type="number" step="0.05" value="2.40" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Profondeur des piliers</span>
+            <input id="post-depth" type="number" step="0.05" value="0.55" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Largeur des piliers</span>
+            <input id="post-width" type="number" step="0.05" value="0.55" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Épaisseur des murets</span>
+            <input id="wall" type="number" step="0.05" value="0.30" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+        </fieldset>
+
+        <fieldset id="leaf-box" class="hidden grid-cols-2 gap-3 sm:grid-cols-4">
+          <legend class="mb-2 text-sm font-medium text-stone-700">Les vantaux</legend>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Longueur d'un vantail</span>
+            <input id="leaf-length" type="number" step="0.05" value="1.15" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Épaisseur du vantail</span>
+            <input id="leaf-thickness" type="number" step="0.01" value="0.10" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Écartement de l'axe</span>
+            <input id="hinge-offset" type="number" step="0.01" value="0.05" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Position de l'axe (%)</span>
+            <input id="hinge-depth" type="number" step="5" min="0" max="100" value="50" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1 sm:col-span-4">
+            <span class="text-sm text-stone-600">
+              Angle d'ouverture — <span id="angle-value">90</span>°
+              <span id="angle-max" class="ml-2 text-stone-500"></span>
+            </span>
+            <input id="open-angle" type="range" min="70" max="180" step="1" value="90" class="w-full" />
+          </label>
+        </fieldset>
+
+        <fieldset class="grid gap-3 sm:grid-cols-4">
+          <legend class="mb-2 text-sm font-medium text-stone-700">La voirie</legend>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Largeur du trottoir</span>
+            <input id="pavement" type="number" step="0.05" value="1.20" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Largeur du bateau</span>
+            <input id="kerb" type="number" step="0.10" value="3.20" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Largeur de chaussée</span>
+            <input id="road" type="number" step="0.10" value="4.50" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Sens d'arrivée</span>
+            <select id="side" class="rounded border border-stone-300 px-3 py-2">
+              <option value="1">Par la gauche</option>
+              <option value="-1">Par la droite</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <fieldset class="grid gap-3 sm:grid-cols-4">
+          <legend class="mb-2 text-sm font-medium text-stone-700">Le véhicule</legend>
+          <label class="grid gap-1 sm:col-span-2">
+            <span class="text-sm text-stone-600">Modèle</span>
+            <select id="preset" class="rounded border border-stone-300 px-3 py-2"></select>
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Rétroviseurs</span>
+            <select id="mirrors-state" class="rounded border border-stone-300 px-3 py-2">
+              <option value="out">Déployés</option>
+              <option value="folded">Rabattus</option>
+            </select>
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Rayon de braquage</span>
+            <input id="radius" type="number" step="0.1" value="5.2" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Empattement</span>
+            <input id="wheelbase" type="number" step="0.01" value="2.580" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Longueur totale</span>
+            <input id="length" type="number" step="0.01" value="4.190" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Porte-à-faux avant</span>
+            <input id="front-overhang" type="number" step="0.01" value="0.850" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Largeur caisse</span>
+            <input id="body-width" type="number" step="0.005" value="1.825" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Largeur rétros déployés</span>
+            <input id="mirror-width" type="number" step="0.005" value="2.029" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+          <label class="grid gap-1">
+            <span class="text-sm text-stone-600">Rétros rabattus</span>
+            <input id="mirror-width-folded" type="number" step="0.005" value="1.865" class="rounded border border-stone-300 px-3 py-2" />
+          </label>
+        </fieldset>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <button id="run" type="submit" class="rounded bg-stone-900 px-4 py-2 text-stone-50">
+            Rechercher l'entrée
+          </button>
+          <button id="run-min-road" type="button" class="rounded border border-stone-400 px-4 py-2">
+            Chaussée minimale
+          </button>
+          <label class="flex items-center gap-2 text-sm text-stone-700">
+            <span>Sens</span>
+            <select id="direction" class="rounded border border-stone-300 px-2 py-1">
+              <option value="any">Avant ou arrière</option>
+              <option value="forward">Marche avant seulement</option>
+              <option value="reverse">Marche arrière seulement</option>
+            </select>
+          </label>
+        </div>
       </form>
 
       <output id="verdict" class="mt-8 block text-stone-800"></output>
+      <div id="alternatives" class="mt-4 flex flex-wrap gap-2"></div>
+      <dl id="stats" class="mt-4 grid gap-3 sm:grid-cols-3"></dl>
 
       <figure class="mt-6">
         <svg
@@ -74,7 +165,15 @@
           role="img"
           aria-label="Vue en plan de la manœuvre"
         ></svg>
+        <figcaption id="legend" class="mt-2 flex flex-wrap gap-4 text-xs text-stone-600"></figcaption>
       </figure>
+
+      <label class="mt-4 grid gap-1">
+        <span class="text-sm text-stone-600">
+          Position sur le trajet — <span id="scrub-label">100 %</span>
+        </span>
+        <input id="scrub" type="range" min="0" max="100" value="100" step="1" disabled class="w-full" />
+      </label>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
