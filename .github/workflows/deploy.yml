@@ -51,6 +51,17 @@ jobs:
       # No --scope: it expects a team slug, not an id, and VERCEL_ORG_ID with
       # VERCEL_PROJECT_ID already tell the CLI what to target. Passing the id
       # made it look for an entity by that name and 404.
+      # TEMPORARY: two failed diagnoses in a row were guesses. Ask the CLI
+      # what this token can actually see before assuming anything else.
+      - name: Diagnose access
+        run: |
+          echo "--- whoami ---"
+          vercel whoami --token=${{ secrets.VERCEL_TOKEN }} || echo "whoami FAILED"
+          echo "--- projects visible to this token ---"
+          vercel project ls --token=${{ secrets.VERCEL_TOKEN }} || echo "project ls FAILED"
+          echo "--- ids in use ---"
+          echo "org=${VERCEL_ORG_ID:0:12}… project=${VERCEL_PROJECT_ID:0:12}…"
+
       - name: Pull Vercel environment
         run: >
           vercel pull --yes --token=${{ secrets.VERCEL_TOKEN }}
