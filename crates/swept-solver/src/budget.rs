@@ -23,15 +23,51 @@ pub struct Discretisation {
 }
 
 impl Default for Discretisation {
-    /// The target grid from `CLAUDE.md`: 20 cm primitives and a 1° heading
-    /// step.
+    /// The grid that actually performs, measured against the alternative.
+    ///
+    /// `CLAUDE.md` called for 20 cm primitives and a 1° heading step, expecting
+    /// finer search to find the centimetre-margin solutions the prototype
+    /// missed. Measurement says otherwise: see [`Discretisation::fine`]. Until
+    /// progressive refinement exists, the planner keeps the prototype's
+    /// resolution, which finds better plans for a fiftieth of the nodes.
+    ///
+    /// One departure: collision sampling is stepped at 8 cm rather than the
+    /// prototype's 18 cm. That does not drive search cost the way the other
+    /// three do, and 18 cm is coarse enough to step over a thin obstacle.
+    fn default() -> Self {
+        Self {
+            primitive_length: 0.90,
+            heading_step: Radians::from_degrees(6.0),
+            position_step: 0.18,
+            sample_step: 0.08,
+        }
+    }
+}
+
+impl Discretisation {
+    /// The fine grid `CLAUDE.md` asked for: 20 cm primitives, 1° of heading.
+    ///
+    /// **Not the default, on measurement.** Running
+    /// `cargo run -p swept-solver --release --example grid_cost` shows it
+    /// costs roughly fifty times more nodes and returns *worse* plans: 1 mm of
+    /// clearance where the default finds 27 to 76 mm, and nothing at all on a
+    /// 2.20 m opening even with 120 000 nodes.
+    ///
+    /// The cause is not the resolution itself but what the budget buys. Finer
+    /// primitives mean far more nodes reach the landing zone early, so the
+    /// solution cap fills with cramped candidates; raising it to 200 recovers
+    /// a good plan on a 4 m opening, but tighter scenes exhaust the node
+    /// budget first.
+    ///
+    /// The fix is progressive refinement — plan coarse, then refine locally
+    /// around the solution — not a bigger budget. Kept here so the comparison
+    /// stays reproducible.
     ///
     /// The position step is not simply scaled down with the rest. It has to
     /// stay well finer than one primitive, or two states a whole move apart
-    /// land in the same cell and the planner drops one of them. The prototype
-    /// held that ratio at a fifth; a third is kept here, which is more
-    /// cautious.
-    fn default() -> Self {
+    /// land in the same cell and the planner drops one of them.
+    #[must_use]
+    pub fn fine() -> Self {
         Self {
             primitive_length: 0.20,
             heading_step: Radians::from_degrees(1.0),
@@ -41,38 +77,24 @@ impl Default for Discretisation {
     }
 }
 
-impl Discretisation {
-    /// The prototype's own grid, kept so that the cost of refining it can be
-    /// measured rather than guessed.
-    #[must_use]
-    pub fn prototype() -> Self {
-        Self {
-            primitive_length: 0.90,
-            heading_step: Radians::from_degrees(6.0),
-            position_step: 0.18,
-            sample_step: 0.18,
-        }
-    }
-}
-
 /// Node ceiling for one planning depth.
 ///
-/// MEASURED, unlike most constants here. The prototype allowed 18 000 nodes
-/// per depth on a 90 cm / 6° grid, where it settled after about 1 000. On the
-/// 20 cm / 1° grid this crate defaults to, the same scene needs roughly
-/// **55 000** — refining the grid costs some fifty times more nodes — and
-/// 18 000 returns nothing at all. This ceiling is twice the measured need.
+/// MEASURED, unlike most constants here. On the default grid the hardest scene
+/// measured — a 2.20 m opening planned to four moves — settles after about
+/// 29 500 nodes. This ceiling is twice that, leaving room for scenes harder
+/// than any tried.
 ///
 /// Reproduce with `cargo run -p swept-solver --release --example grid_cost`.
-///
-/// The honest fix is progressive refinement: plan coarse, then refine locally
-/// around the solution. Until that exists, this pays the full price up front.
-pub const DEFAULT_MAX_NODES: u32 = 120_000;
+pub const DEFAULT_MAX_NODES: u32 = 60_000;
 
 /// How many landing solutions are collected before a depth stops early.
 ///
-/// ARBITRARY — carried over from the prototype (`index.html:496`).
-pub const DEFAULT_MAX_SOLUTIONS: u16 = 14;
+/// MEASURED. The prototype stopped at 14 (`index.html:496`), which is enough
+/// at its own resolution but throttles anything finer: on a 4 m opening,
+/// raising it to 200 turned a 1 mm plan in two moves into a 66 mm plan in one.
+/// The extra candidates cost little, since reaching the landing zone is what
+/// is expensive, not testing another landing once there.
+pub const DEFAULT_MAX_SOLUTIONS: u16 = 200;
 
 /// What bounds one planning run.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -118,25 +140,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_default_grid_is_finer_than_the_prototype() {
-        let now = Discretisation::default();
-        let before = Discretisation::prototype();
-        assert!(now.primitive_length < before.primitive_length);
-        assert!(now.heading_step.get() < before.heading_step.get());
-        assert!(now.position_step < before.position_step);
+    fn the_fine_grid_really_is_finer() {
+        let fine = Discretisation::fine();
+        let coarse = Discretisation::default();
+        assert!(fine.primitive_length < coarse.primitive_length);
+        assert!(fine.heading_step.get() < coarse.heading_step.get());
+        assert!(fine.position_step < coarse.position_step);
     }
 
     #[test]
-    fn the_visit_grid_stays_finer_than_a_whole_primitive() {
+    fn every_visit_grid_stays_finer_than_a_whole_primitive() {
         // Otherwise two states a full move apart collapse into one cell and
         // the planner discards one of them.
-        let d = Discretisation::default();
-        assert!(
-            d.position_step * 2.0 < d.primitive_length,
-            "position step {} is too coarse for primitives of {}",
-            d.position_step,
-            d.primitive_length
-        );
+        for d in [Discretisation::default(), Discretisation::fine()] {
+            assert!(
+                d.position_step * 2.0 < d.primitive_length,
+                "position step {} is too coarse for primitives of {}",
+                d.position_step,
+                d.primitive_length
+            );
+        }
+    }
+
+    #[test]
+    fn collision_sampling_never_steps_over_a_post() {
+        // A 0.55 m post must never fall between two sampled poses.
+        for d in [Discretisation::default(), Discretisation::fine()] {
+            assert!(d.sample_step < 0.55 / 2.0, "got {}", d.sample_step);
+        }
     }
 
     #[test]
