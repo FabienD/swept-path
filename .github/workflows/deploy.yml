@@ -48,9 +48,12 @@ jobs:
 
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
+      # --scope is explicit: the project lives under a team, and without it
+      # the CLI falls back to the token's default scope and cannot find it.
       - name: Pull Vercel environment
         run: >
           vercel pull --yes --token=${{ secrets.VERCEL_TOKEN }}
+          --scope=${{ secrets.VERCEL_ORG_ID }}
           --environment=${{ env.IS_PRODUCTION == 'true' && 'production' || 'preview' }}
       - name: Prepare the prebuilt artefact
         run: >
@@ -59,4 +62,5 @@ jobs:
       - name: Deploy
         run: >
           vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+          --scope=${{ secrets.VERCEL_ORG_ID }}
           ${{ env.IS_PRODUCTION == 'true' && '--prod' || '' }}
