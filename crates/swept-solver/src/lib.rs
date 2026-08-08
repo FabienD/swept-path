@@ -15,4 +15,5 @@
 //! to reach by then, which made its results impossible to assert in a test.
 
 pub mod budget;
+pub mod path;
 pub mod result;
