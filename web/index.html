@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Épure de giration — swept-path</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="min-h-dvh bg-stone-50 text-stone-900">
+    <main class="mx-auto max-w-3xl px-4 py-10">
+      <h1 class="text-2xl font-semibold tracking-tight">Épure de giration</h1>
+      <p class="mt-2 text-stone-600">
+        Vérifie si un véhicule peut franchir un passage étroit, et en combien
+        de manœuvres.
+      </p>
+
+      <form id="params" class="mt-8 grid gap-4 sm:grid-cols-2">
+        <label class="grid gap-1">
+          <span class="text-sm text-stone-600">Passage entre piliers (m)</span>
+          <input
+            id="opening"
+            type="number"
+            step="0.05"
+            value="2.40"
+            class="rounded border border-stone-300 px-3 py-2"
+          />
+        </label>
+        <label class="grid gap-1">
+          <span class="text-sm text-stone-600">Largeur de chaussée (m)</span>
+          <input
+            id="road"
+            type="number"
+            step="0.10"
+            value="4.50"
+            class="rounded border border-stone-300 px-3 py-2"
+          />
+        </label>
+        <label class="grid gap-1">
+          <span class="text-sm text-stone-600">Largeur aux rétroviseurs (m)</span>
+          <input
+            id="mirrors"
+            type="number"
+            step="0.005"
+            value="2.029"
+            class="rounded border border-stone-300 px-3 py-2"
+          />
+        </label>
+        <label class="grid gap-1">
+          <span class="text-sm text-stone-600">Rayon de braquage (m)</span>
+          <input
+            id="radius"
+            type="number"
+            step="0.1"
+            value="5.2"
+            class="rounded border border-stone-300 px-3 py-2"
+          />
+        </label>
+        <button
+          id="run"
+          type="submit"
+          class="rounded bg-stone-900 px-4 py-2 text-stone-50 sm:col-span-2"
+        >
+          Rechercher l'entrée
+        </button>
+      </form>
+
+      <output id="verdict" class="mt-8 block text-stone-800"></output>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
