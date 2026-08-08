@@ -14,4 +14,5 @@
 //! after 2.2 seconds per depth and returned whatever the machine had managed
 //! to reach by then, which made its results impossible to assert in a test.
 
+pub mod budget;
 pub mod result;
