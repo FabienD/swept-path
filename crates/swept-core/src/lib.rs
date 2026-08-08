@@ -13,6 +13,7 @@
 
 pub mod geometry;
 pub mod kinematics;
+pub mod scene;
 pub mod units;
 pub mod vehicle;
 
