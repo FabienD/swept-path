@@ -8,6 +8,12 @@ rust-version = "1.97.1"
 authors = ["Fabien D."]
 repository = "https://github.com/FabienD/swept-path"
 
+# The solvers are numeric inner loops: unoptimised they run tens of times
+# slower, which turns a quick suite into a multi-minute one on CI. Optimising
+# the test profile costs a little compile time and buys all of it back.
+[profile.test]
+opt-level = 2
+
 [workspace.lints.rust]
 missing_docs = "deny"
 

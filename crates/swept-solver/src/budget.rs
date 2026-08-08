@@ -49,19 +49,23 @@ impl Discretisation {
     ///
     /// **Not the default, on measurement.** Running
     /// `cargo run -p swept-solver --release --example grid_cost` shows it
-    /// costs roughly fifty times more nodes and returns *worse* plans: 1 mm of
-    /// clearance where the default finds 27 to 76 mm, and nothing at all on a
-    /// 2.20 m opening even with 120 000 nodes.
+    /// costs tens of times more nodes and returns *worse* plans: about 1 mm of
+    /// clearance where the default finds 12 to 55 mm.
     ///
-    /// The cause is not the resolution itself but what the budget buys. Finer
-    /// primitives mean far more nodes reach the landing zone early, so the
-    /// solution cap fills with cramped candidates; raising it to 200 recovers
-    /// a good plan on a 4 m opening, but tighter scenes exhaust the node
-    /// budget first.
+    /// The cause is not the resolution but the cost function. Nothing in
+    /// `moves × 5 + distance × 0.18 + heuristic` rewards clearance, so the
+    /// planner takes the shortest path, which means shaving obstacles. Shorter
+    /// primitives simply let it shave more finely — the coarse grid is
+    /// protected by its own clumsiness, not by any virtue.
     ///
-    /// The fix is progressive refinement — plan coarse, then refine locally
-    /// around the solution — not a bigger budget. Kept here so the comparison
-    /// stays reproducible.
+    /// Measured: on a 4 m opening the tightest point of a fine-grid plan sits
+    /// at pose 14 of 327, at `(-5.90, -2.47)` — grazing the kerb six metres
+    /// short of the gateway, nowhere near the opening.
+    ///
+    /// The fix is therefore not a bigger budget but a cost function that
+    /// values room, or a filter on plans that shave. Progressive refinement
+    /// would help with the node count, not with this. Kept here so the
+    /// comparison stays reproducible.
     ///
     /// The position step is not simply scaled down with the rest. It has to
     /// stay well finer than one primitive, or two states a whole move apart

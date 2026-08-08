@@ -79,6 +79,7 @@ pub fn land(
 ) -> Option<Landing> {
     let needed = entry_depth(scene, vehicle);
     let step = Discretisation::default().sample_step;
+    let mut best: Option<Landing> = None;
 
     for direction in [Direction::Forward, Direction::Reverse] {
         if allowed.is_some_and(|only| only != direction) {
@@ -123,8 +124,12 @@ pub fn land(
                 };
                 poses.extend(sample_arc(at, 0.0, signed, step));
 
-                if let Some(min_clearance) = evaluate(&poses, field) {
-                    return Some(Landing {
+                if let Some(min_clearance) = evaluate(&poses, field)
+                    && best
+                        .as_ref()
+                        .is_none_or(|b| min_clearance > b.min_clearance)
+                {
+                    best = Some(Landing {
                         poses,
                         min_clearance,
                         direction,
@@ -133,7 +138,7 @@ pub fn land(
             }
         }
     }
-    None
+    best
 }
 
 #[cfg(test)]

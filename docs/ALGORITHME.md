@@ -161,21 +161,39 @@ Relevé par `cargo run -p swept-solver --release --example grid_cost` :
 | fine | 3,00 m | 60 000 | 1 mm | 2 |
 | fine | 4,00 m | 60 000 | 1 mm | 2 |
 
-La grille fine coûte une cinquantaine de fois plus de nœuds **et rend de moins
-bons plans**. La cause n'est pas la résolution en elle-même : à pas fin,
-beaucoup plus de nœuds atteignent tôt la zone d'atterrissage, si bien que le
-quota de solutions se remplit de candidats à l'étroit. Relever ce quota de 14 à
-200 récupère un bon plan sur une ouverture de 4 m, mais les scènes plus
-serrées épuisent d'abord le budget de nœuds.
+La grille fine coûte des dizaines de fois plus de nœuds **et rend de moins bons
+plans**.
+
+La cause n'est pas la résolution mais **la fonction de coût**. Rien dans
+`manœuvres × 5 + distance × 0,18 + heuristique` ne récompense la marge : le
+planificateur cherche le chemin le plus court, donc il rase les obstacles. Des
+primitives plus courtes lui permettent simplement de raser plus finement. La
+grille grossière n'est pas meilleure par vertu, elle est protégée par sa
+maladresse.
+
+La localisation du point le plus serré le montre sans ambiguïté. Sur une
+ouverture de 4 m :
+
+| grille | marge minimale | position dans le plan | où |
+|---|---|---|---|
+| défaut | 26,6 mm | pose 66 sur 171 | devant l'ouverture |
+| fine | 1,3 mm | pose 14 sur 327 | `(−5,90 ; −2,47)` — contre la bordure, six mètres avant le portail |
+
+Le millimètre n'est donc pas frôlé contre un pilier mais **contre le trottoir,
+au tout début de l'approche**, loin du passage.
 
 **Décision :** la grille par défaut reste celle du prototype ;
-`Discretisation::fine()` demeure disponible et documentée. La bonne réponse
-est le **raffinement progressif** — planifier grossier, puis affiner localement
-autour de la solution trouvée — et non un budget plus gros. C'est une tâche à
-part entière, à porter au lot 2.
+`Discretisation::fine()` demeure disponible et documentée. Le correctif n'est
+pas un budget plus gros ni même le raffinement progressif — ceux-là traitent le
+nombre de nœuds, pas le problème. Il faut **une fonction de coût qui valorise
+la marge**, ou un filtre écartant les plans qui rasent. À porter au lot 2.
 
-Le quota de solutions passe en revanche de 14 à 200, sur mesure : tester un
-atterrissage de plus est bon marché, c'est atteindre la zone qui coûte.
+Le quota de solutions passe de 14 à 200, sur mesure : tester un atterrissage de
+plus est bon marché, c'est atteindre la zone qui coûte.
+
+Une remarque pour l'interface : la marge rapportée est le minimum sur **tout**
+le trajet, approche lointaine comprise. Frôler une bordure sur la route n'a pas
+la même portée que frôler un pilier. Distinguer les deux relèvera du lot 1c.
 
 ## 9. Dette assumée
 
