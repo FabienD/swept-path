@@ -93,6 +93,15 @@ mod tests {
     use crate::budget::Silent;
     use swept_core::scene::{GateKind, Post};
 
+    /// The seeding logic under test does not depend on how deep the planner
+    /// gets to dig, so the tests do not pay for a full-depth search.
+    fn thrifty() -> SearchBudget {
+        SearchBudget {
+            max_nodes: 6_000,
+            ..SearchBudget::default()
+        }
+    }
+
     fn scene(opening: f64) -> Scene {
         Scene {
             left_post: Post {
@@ -156,7 +165,7 @@ mod tests {
     fn more_moves_never_yield_less_room_than_the_one_move_answer() {
         // The invariant CLAUDE.md calls out as acquired and not to be lost.
         let (vehicle, sc) = (lbx(), scene(3.2));
-        let outcome = alternatives(&vehicle, &sc, SearchBudget::default(), &mut Silent, None);
+        let outcome = alternatives(&vehicle, &sc, thrifty(), &mut Silent, None);
         if let Outcome::Found(list) = outcome
             && let Some(one) = list.iter().find(|m| m.moves == 1)
         {

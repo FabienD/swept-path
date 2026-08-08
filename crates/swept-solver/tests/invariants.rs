@@ -36,6 +36,16 @@ fn lbx() -> Vehicle {
     Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 5.2).expect("valid vehicle")
 }
 
+/// A small node ceiling: these properties test invariants that hold whatever
+/// the budget, so exploring sixty thousand nodes per case buys nothing but
+/// minutes of CI.
+fn thrifty() -> SearchBudget {
+    SearchBudget {
+        max_nodes: 6_000,
+        ..SearchBudget::default()
+    }
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(16))]
 
@@ -81,7 +91,7 @@ proptest! {
         let vehicle = lbx();
         let sc = scene(opening, 0.55, 4.5);
         let ceiling = (opening - vehicle.mirror_width) / 2.0;
-        if let Some(best) = alternatives(&vehicle, &sc, SearchBudget::default(), &mut Silent, None).best() {
+        if let Some(best) = alternatives(&vehicle, &sc, thrifty(), &mut Silent, None).best() {
             prop_assert!(best.min_clearance <= ceiling + 1e-6);
         }
     }
@@ -102,7 +112,7 @@ proptest! {
     fn multi_is_never_worse_than_simple(opening in 2.4_f64..5.0, road in 3.5_f64..7.0) {
         let (vehicle, sc) = (lbx(), scene(opening, 0.55, road));
         if let swept_solver::result::Outcome::Found(list) =
-            alternatives(&vehicle, &sc, SearchBudget::default(), &mut Silent, None)
+            alternatives(&vehicle, &sc, thrifty(), &mut Silent, None)
             && let Some(one) = list.iter().find(|m| m.moves == 1)
         {
             for other in list.iter().filter(|m| m.moves > 1) {
