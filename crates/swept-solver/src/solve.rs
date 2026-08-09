@@ -91,7 +91,23 @@ pub fn alternatives(
             budget_exhausted: exhausted,
         };
     }
+
+    // Drop dominated alternatives. Extra manoeuvres have to buy room: an
+    // answer in three moves offering no more than the one in a single move is
+    // not an option, it is noise. The earlier guard only compared against the
+    // *exact* one-move answer, so on a scene where the exhaustive sweep finds
+    // nothing — most tight ones — there was no reference and everything got
+    // through.
     found.sort_by_key(|m| m.moves);
+    let mut roomiest = f64::MIN;
+    found.retain(|m| {
+        let keep = m.min_clearance > roomiest;
+        if keep {
+            roomiest = m.min_clearance;
+        }
+        keep
+    });
+
     Outcome::Found(found)
 }
 
@@ -222,6 +238,48 @@ mod tests {
                 other.min_clearance,
                 one.min_clearance
             );
+        }
+    }
+
+    /// Regression: three manoeuvres offered 0.3 cm where one offered 4.5.
+    ///
+    /// The guard only compared against the *exact* one-move answer, so on a
+    /// scene where the exhaustive sweep finds nothing — which is most tight
+    /// ones — there was no reference at all and everything got through.
+    #[test]
+    fn more_moves_must_buy_more_room_than_every_shorter_answer() {
+        // Fabien's gateway, with the pivot radius rather than the published
+        // one: swinging leaves at 90 degrees, 1.25 m pavement, 6.20 m road.
+        let vehicle = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 3.59).expect("valid");
+        for opening in [2.30_f64, 2.40, 2.60, 3.00] {
+            let mut sc = scene(opening);
+            sc.pavement_width = 1.25;
+            sc.road_width = 6.20;
+            sc.dropped_kerb_width = 3.20;
+            sc.gate = GateKind::Swinging {
+                leaf_length: 1.15,
+                leaf_thickness: 0.04,
+                hinge_offset: 0.035,
+                hinge_depth_ratio: 0.5,
+                open_angle: swept_core::units::Radians::from_degrees(90.0),
+            };
+            let Outcome::Found(list) =
+                alternatives(&vehicle, &sc, SearchBudget::default(), &mut Silent, None)
+            else {
+                continue;
+            };
+            for (i, deeper) in list.iter().enumerate() {
+                for shorter in &list[..i] {
+                    assert!(
+                        deeper.min_clearance > shorter.min_clearance,
+                        "{opening} m: {} moves gave {} against {} for {} moves",
+                        deeper.moves,
+                        deeper.min_clearance,
+                        shorter.min_clearance,
+                        shorter.moves
+                    );
+                }
+            }
         }
     }
 
