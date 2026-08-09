@@ -162,6 +162,10 @@ impl VehicleDto {
                 code: String::from("mirrors_narrower_than_body"),
                 field: Some(String::from("mirror_width")),
             },
+            VehicleError::ImplausibleTurningRadius => ErrorDto {
+                code: String::from("implausible_turning_radius"),
+                field: Some(String::from("min_turning_radius")),
+            },
         })
     }
 }

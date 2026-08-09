@@ -15,6 +15,8 @@ export interface VehiclePreset extends VehicleDto {
   label: string;
   /** Width over the mirrors once folded, in metres. */
   mirror_width_folded: number;
+  /** The radius as published, kerb to kerb, kept for display. */
+  kerb_radius: number;
 }
 
 /**
@@ -27,6 +29,33 @@ export interface VehiclePreset extends VehicleDto {
  */
 const FOLDED_MARGIN_M = 0.04;
 
+/**
+ * How much narrower the track is than the body, in metres.
+ *
+ * ESTIMATED. Wheels sit inboard of the bodywork; the gap is roughly a
+ * handspan each side on a modern car. Only used to convert a published
+ * turning radius, where an error of a few centimetres moves the result by
+ * about as much.
+ */
+const BODY_TO_TRACK_M = 0.26;
+
+/**
+ * Converts a kerb-to-kerb radius into the rear-axle pivot radius.
+ *
+ * Mirrors `swept_core::vehicle::pivot_radius_from_kerb`. Manufacturers
+ * publish the circle traced by the outer front wheel; the bicycle model turns
+ * about the rear axle, which runs well inside it. Using the published figure
+ * directly makes every vehicle turn about half again as wide as it really
+ * can — and the simulator then invents manoeuvres to make up for it.
+ */
+function pivotRadius(kerbRadius: number, wheelbase: number, width: number): number {
+  const track = width - BODY_TO_TRACK_M;
+  const atFrontAxle = kerbRadius - track / 2;
+  const squared = atFrontAxle * atFrontAxle - wheelbase * wheelbase;
+  return squared > 0 ? Math.sqrt(squared) : kerbRadius;
+}
+
+/** Builds a preset from the figures manufacturers actually publish. */
 function preset(
   id: string,
   label: string,
@@ -35,7 +64,7 @@ function preset(
   front_overhang: number,
   width: number,
   mirror_width: number,
-  min_turning_radius: number,
+  kerb_radius: number,
 ): VehiclePreset {
   return {
     id,
@@ -46,7 +75,8 @@ function preset(
     width,
     mirror_width,
     mirror_width_folded: width + FOLDED_MARGIN_M,
-    min_turning_radius,
+    kerb_radius,
+    min_turning_radius: pivotRadius(kerb_radius, wheelbase, width),
   };
 }
 

@@ -24,6 +24,21 @@ describe("vehicle presets", () => {
     }
   });
 
+  it("turns tighter than the published radius, on every preset", () => {
+    // Published figures are kerb to kerb, traced by the outer front wheel.
+    // The bicycle model pivots about the rear axle, well inside that circle.
+    for (const v of VEHICLES) {
+      expect(v.min_turning_radius, `${v.label}`).toBeLessThan(v.kerb_radius);
+      expect(v.min_turning_radius, `${v.label}`).toBeGreaterThan(v.kerb_radius / 2);
+    }
+  });
+
+  it("converts the LBX to the radius the geometry implies", () => {
+    const lbx = vehicleById("lexus-lbx");
+    expect(lbx?.kerb_radius).toBe(5.2);
+    expect(lbx?.min_turning_radius).toBeCloseTo(3.59, 1);
+  });
+
   it("finds a preset by id, and nothing by a wrong one", () => {
     expect(vehicleById("lexus-lbx")?.label).toBe("Lexus LBX");
     expect(vehicleById("no-such-car")).toBeUndefined();

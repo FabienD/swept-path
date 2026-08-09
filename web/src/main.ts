@@ -195,7 +195,13 @@ function applyPreset(id: string): void {
   set("body-width", preset.width);
   set("mirror-width", preset.mirror_width);
   set("mirror-width-folded", preset.mirror_width_folded);
-  set("radius", preset.min_turning_radius, 1);
+  set("radius", preset.min_turning_radius, 2);
+  // Say where the number came from: it is not the one on the spec sheet, and
+  // someone checking against the manufacturer would otherwise think it wrong.
+  const note = byId("radius-note");
+  if (note) {
+    note.textContent = `— déduit de ${preset.kerb_radius.toFixed(1)} m entre trottoirs`;
+  }
   clearResult();
 }
 
