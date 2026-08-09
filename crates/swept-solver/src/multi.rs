@@ -9,7 +9,7 @@
 //! always yield the same plan.
 
 use crate::budget::{Discretisation, Progress, SearchBudget};
-use crate::landing::{Landing, land};
+use crate::landing::{Landing, landings};
 use crate::result::{Confidence, DirectedPose, Maneuver, Outcome};
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};
@@ -306,12 +306,15 @@ pub fn plan(
         let heading_error = (FRAC_PI_2 - pose.heading.get())
             .abs()
             .min((-FRAC_PI_2 - pose.heading.get()).abs());
-        if pose.x.abs() < LANDING_TRIGGER_X_M
-            && heading_error < LANDING_TRIGGER_HEADING_RAD
-            && let Some(landing) = land(pose, vehicle, scene, &field, allowed)
-        {
-            let total = moves + u8::from(landing.direction != direction);
-            if let Some(slot) = best.get_mut(usize::from(total)) {
+        if pose.x.abs() < LANDING_TRIGGER_X_M && heading_error < LANDING_TRIGGER_HEADING_RAD {
+            // Each landing is filed under what it actually costs: turning
+            // round to back in is a move, and a roomier landing that spends
+            // one is not the same answer as a tighter one that does not.
+            for landing in landings(pose, vehicle, scene, &field, allowed) {
+                let total = moves + u8::from(landing.direction != direction);
+                let Some(slot) = best.get_mut(usize::from(total)) else {
+                    continue;
+                };
                 if slot
                     .as_ref()
                     .is_none_or(|(_, b)| landing.min_clearance > b.min_clearance)
@@ -319,10 +322,10 @@ pub fn plan(
                     *slot = Some((index, landing));
                 }
                 solutions[usize::from(total)] += 1;
-                // Nothing left to improve anywhere: stop.
-                if solutions.iter().all(|&n| n >= budget.max_solutions) {
-                    break;
-                }
+            }
+            // Nothing left to improve anywhere: stop.
+            if solutions.iter().all(|&n| n >= budget.max_solutions) {
+                break;
             }
         }
 
