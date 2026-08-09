@@ -68,6 +68,13 @@ pub fn alternatives(
                     continue;
                 }
                 match found.iter_mut().find(|m| m.moves == candidate.moves) {
+                    // A heuristic result never displaces an exact one. The
+                    // sweep is exhaustive on its grid and says so; letting a
+                    // planner overwrite it would raise the one-move figure
+                    // that every deeper plan is measured against, and deeper
+                    // plans already filtered against the old one would end up
+                    // below it — breaking multi-never-worse-than-simple.
+                    Some(existing) if existing.is_exact() => {}
                     Some(existing) if candidate.min_clearance > existing.min_clearance => {
                         *existing = candidate;
                     }
@@ -179,6 +186,42 @@ mod tests {
                     one.min_clearance
                 );
             }
+        }
+    }
+
+    /// Regression, found by proptest.
+    ///
+    /// Once `plan()` started reporting a one-move alternative of its own, a
+    /// heuristic result with more clearance than the exhaustive sweep would
+    /// replace it. That raised the figure every deeper plan is measured
+    /// against, after those plans had already been filtered against the old
+    /// one — so multi came out worse than simple on this exact scene.
+    #[test]
+    fn a_heuristic_plan_never_displaces_the_exact_one_move_answer() {
+        let vehicle = lbx();
+        let mut sc = scene(2.701_696_162_945_853);
+        sc.road_width = 5.795_297_516_544_246;
+
+        let Outcome::Found(list) = alternatives(&vehicle, &sc, thrifty(), &mut Silent, None) else {
+            panic!("this scene admits an entry");
+        };
+
+        let one = list
+            .iter()
+            .find(|m| m.moves == 1)
+            .expect("a one-move answer exists here");
+        assert!(
+            one.is_exact(),
+            "the one-move answer must stay the exact one"
+        );
+        for other in list.iter().filter(|m| m.moves > 1) {
+            assert!(
+                other.min_clearance >= one.min_clearance - 1e-9,
+                "{} moves gave {} against {} for one move",
+                other.moves,
+                other.min_clearance,
+                one.min_clearance
+            );
         }
     }
 
