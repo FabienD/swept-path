@@ -56,26 +56,27 @@ pub fn alternatives(
         .fold(f64::MIN, f64::max);
     let has_one_move = one_move_clearance > f64::MIN;
 
-    for depth in 2..=MAX_MOVES {
-        match plan(vehicle, scene, depth, budget, progress, allowed) {
-            Outcome::Found(list) => {
-                for candidate in list {
-                    // Never present a deeper plan that is worse than the exact
-                    // one-move answer.
-                    if has_one_move && candidate.min_clearance < one_move_clearance {
-                        continue;
+    // One search, every depth. plan() explores the space once and reports the
+    // roomiest landing for each move count, so calling it per depth would
+    // re-explore the same states three times over for nothing.
+    match plan(vehicle, scene, MAX_MOVES, budget, progress, allowed) {
+        Outcome::Found(list) => {
+            for candidate in list {
+                // Never present a deeper plan that is worse than the exact
+                // one-move answer.
+                if has_one_move && candidate.min_clearance < one_move_clearance {
+                    continue;
+                }
+                match found.iter_mut().find(|m| m.moves == candidate.moves) {
+                    Some(existing) if candidate.min_clearance > existing.min_clearance => {
+                        *existing = candidate;
                     }
-                    match found.iter_mut().find(|m| m.moves == candidate.moves) {
-                        Some(existing) if candidate.min_clearance > existing.min_clearance => {
-                            *existing = candidate;
-                        }
-                        Some(_) => {}
-                        None => found.push(candidate),
-                    }
+                    Some(_) => {}
+                    None => found.push(candidate),
                 }
             }
-            Outcome::NotFound { budget_exhausted } => exhausted |= budget_exhausted,
         }
+        Outcome::NotFound { budget_exhausted } => exhausted |= budget_exhausted,
     }
 
     if found.is_empty() {
