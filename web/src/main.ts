@@ -17,6 +17,11 @@ import { CANCELLED, SolverClient } from "./worker/client";
 
 const VIEWPORT = { width: 1000, height: 600 };
 const client = new SolverClient();
+// Instant queries get their own worker. They must neither cancel a search in
+// flight nor be cancelled by one — which is exactly what happened when
+// clearResult() started cancelling: it killed the angle query fired a line
+// earlier, and the slider was never bounded.
+const probe = new SolverClient();
 
 const store = createStore({
   busy: false,
@@ -24,6 +29,7 @@ const store = createStore({
   alternatives: [] as ManeuverDto[],
   selected: 0,
   position: 1,
+  maxAngleDegrees: null as number | null,
 });
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
@@ -221,11 +227,13 @@ async function syncMaxAngle(): Promise<void> {
   if (!label || !slider) return;
   if (byId<HTMLSelectElement>("gate-kind")?.value !== "swinging") {
     label.textContent = "";
+    store.set({ maxAngleDegrees: null });
     return;
   }
   try {
-    const radians = await client.maxGateAngle(readScene());
+    const radians = await probe.maxGateAngle(readScene());
     const degrees = Math.round((radians * 180) / Math.PI);
+    store.set({ maxAngleDegrees: degrees });
     slider.max = String(degrees);
     if (Number(slider.value) > degrees) {
       slider.value = String(degrees);
@@ -238,6 +246,7 @@ async function syncMaxAngle(): Promise<void> {
     label.textContent = `maximum ${degrees}° avant que le vantail ne touche le pilier`;
   } catch {
     label.textContent = "";
+    store.set({ maxAngleDegrees: null });
   }
 }
 
@@ -289,6 +298,23 @@ form?.addEventListener("submit", async (event) => {
     store.set({ busy: false, verdict: "Calcul interrompu." });
     return;
   }
+  // The slider is bounded by max_gate_angle, but a bound that fails silently
+  // would let someone compute a scene where the leaf passes through its own
+  // post — an answer that means nothing. Refuse rather than pretend.
+  const requested = readScene();
+  const { maxAngleDegrees } = store.get();
+  if (requested.gate.kind === "swinging" && maxAngleDegrees !== null) {
+    const degrees = (requested.gate.open_angle * 180) / Math.PI;
+    if (degrees > maxAngleDegrees + 0.5) {
+      store.set({
+        verdict:
+          `Un vantail ne peut pas s'ouvrir à ${degrees.toFixed(0)}° avec cet axe : ` +
+          `il traverserait le pilier. Le maximum est ${maxAngleDegrees}°.`,
+      });
+      return;
+    }
+  }
+
   store.set({ busy: true, verdict: "Calcul en cours…", alternatives: [] });
 
   try {
