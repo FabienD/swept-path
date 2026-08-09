@@ -64,24 +64,26 @@ fn wrap(angle: f64) -> f64 {
     a
 }
 
-/// Tries to finish the entry from `from`.
+/// Every way of finishing the entry from `from`: at most one per direction.
 ///
-/// `allowed` restricts which direction may be used; `None` allows both. The
-/// first collision-free landing found is returned — radii are tried tightest
-/// first, so that is also the most compact one.
+/// Returning both matters. Landing in reverse is often roomier, but it costs
+/// a move when the vehicle was going forwards — so the roomiest landing is
+/// not always the best one, and only the caller knows the exchange rate.
+/// Picking on clearance alone here made a one-move entry unreachable.
 #[must_use]
-pub fn land(
+pub fn landings(
     from: Pose,
     vehicle: &Vehicle,
     scene: &Scene,
     field: &ClearanceField,
     allowed: Option<Direction>,
-) -> Option<Landing> {
+) -> Vec<Landing> {
     let needed = entry_depth(scene, vehicle);
     let step = Discretisation::default().sample_step;
-    let mut best: Option<Landing> = None;
+    let mut found: Vec<Landing> = Vec::with_capacity(2);
 
     for direction in [Direction::Forward, Direction::Reverse] {
+        let mut best: Option<Landing> = None;
         if allowed.is_some_and(|only| only != direction) {
             continue;
         }
@@ -137,8 +139,9 @@ pub fn land(
                 }
             }
         }
+        found.extend(best);
     }
-    best
+    found
 }
 
 #[cfg(test)]
@@ -185,7 +188,10 @@ mod tests {
         let field = ClearanceField::new(&sc, &vehicle);
         // Already pointing into the yard, just short of the wall.
         let from = Pose::new(0.0, -2.0, Radians::from_degrees(90.0));
-        let landing = land(from, &vehicle, &sc, &field, None).expect("a clear run in");
+        let landing = landings(from, &vehicle, &sc, &field, None)
+            .into_iter()
+            .next()
+            .expect("a clear run in");
         assert_eq!(landing.direction, Direction::Forward);
         assert!(landing.min_clearance > 0.0);
     }
@@ -195,7 +201,10 @@ mod tests {
         let (vehicle, sc) = (lbx(), scene(5.0));
         let field = ClearanceField::new(&sc, &vehicle);
         let from = Pose::new(0.0, -2.0, Radians::from_degrees(90.0));
-        let landing = land(from, &vehicle, &sc, &field, None).expect("a clear run in");
+        let landing = landings(from, &vehicle, &sc, &field, None)
+            .into_iter()
+            .next()
+            .expect("a clear run in");
         let last = landing.poses.last().expect("a landing has poses");
         assert!(
             last.y >= entry_depth(&sc, &vehicle) - 1e-6,
@@ -209,7 +218,10 @@ mod tests {
         let (vehicle, sc) = (lbx(), scene(5.0));
         let field = ClearanceField::new(&sc, &vehicle);
         let from = Pose::new(0.0, -2.0, Radians::from_degrees(90.0));
-        if let Some(landing) = land(from, &vehicle, &sc, &field, Some(Direction::Reverse)) {
+        if let Some(landing) = landings(from, &vehicle, &sc, &field, Some(Direction::Reverse))
+            .into_iter()
+            .next()
+        {
             assert_eq!(landing.direction, Direction::Reverse);
         }
     }
@@ -220,6 +232,6 @@ mod tests {
         let field = ClearanceField::new(&sc, &vehicle);
         // Pointing along the road, far off to the side.
         let from = Pose::new(-6.0, -3.0, Radians::default());
-        assert!(land(from, &vehicle, &sc, &field, None).is_none());
+        assert!(landings(from, &vehicle, &sc, &field, None).is_empty());
     }
 }
