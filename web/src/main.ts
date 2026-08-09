@@ -13,7 +13,7 @@ import { boundsFor, sceneToPrimitives } from "./render/scene";
 import { renderSvg } from "./render/svg";
 import { createStore } from "./state/store";
 import { arrivesFromTheRight, readRequest, readScene } from "./ui/form";
-import { SolverClient } from "./worker/client";
+import { CANCELLED, SolverClient } from "./worker/client";
 
 const VIEWPORT = { width: 1000, height: 600 };
 const client = new SolverClient();
@@ -141,9 +141,14 @@ function renderAlternatives(): void {
 }
 
 store.subscribe(() => {
-  const { verdict, alternatives, selected } = store.get();
+  const { verdict, alternatives, selected, busy } = store.get();
   const output = byId("verdict");
   if (output) output.textContent = verdict;
+
+  const run = byId("run");
+  if (run) {
+    run.textContent = busy ? "Arrêter le calcul" : "Rechercher l'entrée";
+  }
 
   renderAlternatives();
   const current = alternatives[selected];
@@ -159,7 +164,16 @@ store.subscribe(() => {
 /* ------------------------------------------------------------------ form */
 
 function clearResult(): void {
-  store.set({ alternatives: [], selected: 0, position: 1, verdict: "" });
+  // Whatever is running answers a question that has just changed, so it is
+  // abandoned rather than left to overwrite the screen with a stale verdict.
+  client.cancel();
+  store.set({
+    alternatives: [],
+    selected: 0,
+    position: 1,
+    verdict: "",
+    busy: false,
+  });
 }
 
 function applyPreset(id: string): void {
@@ -268,7 +282,13 @@ byId<HTMLInputElement>("scrub")?.addEventListener("input", (event) => {
 
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (store.get().busy) return;
+  // While a search runs the button stops it, rather than being inert or
+  // silently queueing another one.
+  if (store.get().busy) {
+    client.cancel();
+    store.set({ busy: false, verdict: "Calcul interrompu." });
+    return;
+  }
   store.set({ busy: true, verdict: "Calcul en cours…", alternatives: [] });
 
   try {
@@ -298,9 +318,11 @@ form?.addEventListener("submit", async (event) => {
       )} de marge dans le passage (${confidenceLabel(best.confidence)}).${elsewhere}`,
     });
   } catch (thrown) {
-    store.set({ verdict: errorMessage(thrown as ErrorDto) });
+    const error = thrown as ErrorDto;
+    if (error.code !== CANCELLED) store.set({ verdict: errorMessage(error) });
   } finally {
-    store.set({ busy: false });
+    // Only clear the flag if nothing took over in the meantime.
+    store.set({ busy: client.busy });
   }
 });
 
@@ -315,9 +337,10 @@ byId("run-min-road")?.addEventListener("click", async () => {
           : `Il faut au minimum ${metres(width)} de chaussée pour entrer en un seul mouvement.`,
     });
   } catch (thrown) {
-    store.set({ verdict: errorMessage(thrown as ErrorDto) });
+    const error = thrown as ErrorDto;
+    if (error.code !== CANCELLED) store.set({ verdict: errorMessage(error) });
   } finally {
-    store.set({ busy: false });
+    store.set({ busy: client.busy });
   }
 });
 
