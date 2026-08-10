@@ -24,7 +24,8 @@
 //! through [`Pose::advance`] and checking it lands on the goal. That test
 //! depends on no source and settles any disagreement.
 
-use crate::kinematics::Pose;
+use super::{CurvePath, Segment, Steering};
+use crate::kinematics::{Direction, Pose};
 use std::f64::consts::TAU;
 
 /// Wraps an angle into `[0, 2π)`.
@@ -76,6 +77,137 @@ impl Frame {
             beta: mod_2pi(to.heading.get() - line_of_sight),
         })
     }
+}
+
+/// One of the six Dubins words.
+///
+/// `L` and `R` are arcs at the minimum radius, `S` a straight run. The letters
+/// read in order of travel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Word {
+    /// Left, straight, left.
+    Lsl,
+    /// Right, straight, right.
+    Rsr,
+    /// Left, straight, right.
+    Lsr,
+    /// Right, straight, left.
+    Rsl,
+    /// Right, left, right.
+    Rlr,
+    /// Left, right, left.
+    Lrl,
+}
+
+impl Word {
+    /// Every word, in a fixed order so that results are reproducible.
+    pub const ALL: [Self; 6] = [
+        Self::Lsl,
+        Self::Rsr,
+        Self::Lsr,
+        Self::Rsl,
+        Self::Rlr,
+        Self::Lrl,
+    ];
+
+    /// The steering held over each of the three pieces.
+    #[must_use]
+    pub const fn steerings(self) -> [Steering; 3] {
+        use Steering::{Left, Right, Straight};
+        match self {
+            Self::Lsl => [Left, Straight, Left],
+            Self::Rsr => [Right, Straight, Right],
+            Self::Lsr => [Left, Straight, Right],
+            Self::Rsl => [Right, Straight, Left],
+            Self::Rlr => [Right, Left, Right],
+            Self::Lrl => [Left, Right, Left],
+        }
+    }
+}
+
+/// Solves one family in the normalised frame.
+///
+/// Returns the three normalised lengths — radians for the arcs, radii for the
+/// straight run — or `None` when the family does not apply to this frame.
+/// A family failing is ordinary: `LSR` needs the two circles far enough apart
+/// to admit a common tangent, and `RLR` needs them close enough to admit a
+/// third circle touching both.
+#[must_use]
+pub fn solve(word: Word, frame: Frame) -> Option<[f64; 3]> {
+    let Frame { d, alpha, beta } = frame;
+    let (sin_a, cos_a) = alpha.sin_cos();
+    let (sin_b, cos_b) = beta.sin_cos();
+    // The cosine of the angle between the two headings, which every family
+    // needs and which is cheaper to take once than four times.
+    let cos_turn = (alpha - beta).cos();
+
+    match word {
+        Word::Lsl => {
+            let squared = 2.0 + d * d - 2.0 * cos_turn + 2.0 * d * (sin_a - sin_b);
+            if squared < 0.0 {
+                return None;
+            }
+            let tangent = (cos_b - cos_a).atan2(d + sin_a - sin_b);
+            Some([
+                mod_2pi(tangent - alpha),
+                squared.sqrt(),
+                mod_2pi(beta - tangent),
+            ])
+        }
+        Word::Rsr => {
+            let squared = 2.0 + d * d - 2.0 * cos_turn + 2.0 * d * (sin_b - sin_a);
+            if squared < 0.0 {
+                return None;
+            }
+            let tangent = (cos_a - cos_b).atan2(d - sin_a + sin_b);
+            Some([
+                mod_2pi(alpha - tangent),
+                squared.sqrt(),
+                mod_2pi(tangent - beta),
+            ])
+        }
+        Word::Lsr => {
+            let squared = -2.0 + d * d + 2.0 * cos_turn + 2.0 * d * (sin_a + sin_b);
+            if squared < 0.0 {
+                return None;
+            }
+            let straight = squared.sqrt();
+            let tangent = (-cos_a - cos_b).atan2(d + sin_a + sin_b) - (-2.0f64).atan2(straight);
+            Some([mod_2pi(tangent - alpha), straight, mod_2pi(tangent - beta)])
+        }
+        Word::Rsl => {
+            let squared = -2.0 + d * d + 2.0 * cos_turn - 2.0 * d * (sin_a + sin_b);
+            if squared < 0.0 {
+                return None;
+            }
+            let straight = squared.sqrt();
+            let tangent = (cos_a + cos_b).atan2(d - sin_a - sin_b) - 2.0f64.atan2(straight);
+            Some([mod_2pi(alpha - tangent), straight, mod_2pi(beta - tangent)])
+        }
+        Word::Rlr | Word::Lrl => None, // Task 4.
+    }
+}
+
+/// Builds one family's path between two poses, in world coordinates.
+///
+/// Returns `None` when the family does not apply, or when the radius is not a
+/// usable positive length.
+#[must_use]
+pub fn path(word: Word, from: Pose, to: Pose, radius: f64) -> Option<CurvePath> {
+    let frame = Frame::between(from, to, radius)?;
+    let lengths = solve(word, frame)?;
+    if lengths.iter().any(|l| !l.is_finite()) {
+        return None;
+    }
+    let steerings = word.steerings();
+    let segments = (0..3)
+        .map(|i| {
+            // Normalised lengths are radians for arcs and radii for the
+            // straight run. Multiplying by the radius turns both into metres.
+            Segment::new(steerings[i], Direction::Forward, lengths[i] * radius)
+        })
+        .collect();
+    Some(CurvePath::new(segments, radius))
 }
 
 #[cfg(test)]
@@ -148,5 +280,93 @@ mod tests {
         assert!(Frame::between(from, to, 0.0).is_none());
         assert!(Frame::between(from, to, -1.0).is_none());
         assert!(Frame::between(from, to, f64::NAN).is_none());
+    }
+
+    /// Integrates a word's path and checks it lands on the goal.
+    ///
+    /// This is the arbiter for every family: it consults no published table,
+    /// only the kinematics the rest of the crate already trusts.
+    fn assert_lands_on(word: Word, from: Pose, to: Pose, radius: f64) {
+        let path =
+            path(word, from, to, radius).unwrap_or_else(|| panic!("{word:?} should apply here"));
+        let end = path.end(from);
+        assert!(
+            (end.x - to.x).abs() < 1e-9,
+            "{word:?}: x off by {}",
+            end.x - to.x
+        );
+        assert!(
+            (end.y - to.y).abs() < 1e-9,
+            "{word:?}: y off by {}",
+            end.y - to.y
+        );
+        let heading_error = mod_2pi(end.heading.get() - to.heading.get());
+        let heading_error = heading_error.min(TAU - heading_error);
+        assert!(
+            heading_error < 1e-9,
+            "{word:?}: heading off by {heading_error}"
+        );
+    }
+
+    #[test]
+    fn every_csc_family_lands_on_the_goal() {
+        // Far apart, so all four apply: the two poses are further than four
+        // radii, which no CSC family can fail to join.
+        let from = Pose::new(0.0, 0.0, Radians::new(0.4));
+        let to = Pose::new(12.0, 7.0, Radians::new(2.1));
+        for word in [Word::Lsl, Word::Rsr, Word::Lsr, Word::Rsl] {
+            assert_lands_on(word, from, to, 3.0);
+        }
+    }
+
+    #[test]
+    fn a_csc_path_never_reverses() {
+        let from = Pose::new(0.0, 0.0, Radians::new(0.4));
+        let to = Pose::new(12.0, 7.0, Radians::new(2.1));
+        for word in [Word::Lsl, Word::Rsr, Word::Lsr, Word::Rsl] {
+            let path = path(word, from, to, 3.0).expect("applies");
+            assert_eq!(path.reversals(), 0, "{word:?} reversed");
+            for segment in path.segments() {
+                assert_eq!(segment.direction, Direction::Forward);
+            }
+        }
+    }
+
+    #[test]
+    fn lsl_is_a_straight_line_when_the_poses_are_aligned() {
+        // Same heading, goal straight ahead: both arcs vanish and only the
+        // straight run survives, so the path is exactly the separation.
+        let from = Pose::default();
+        let to = Pose::new(9.0, 0.0, Radians::default());
+        let path = path(Word::Lsl, from, to, 3.0).expect("applies");
+        assert!((path.length() - 9.0).abs() < 1e-9);
+        assert_eq!(path.segments().len(), 1);
+        assert_eq!(path.segments()[0].steering, Steering::Straight);
+    }
+
+    #[test]
+    fn a_crossing_family_does_not_apply_when_the_poses_are_too_close() {
+        // LSR and RSL need room for the straight run that crosses between the
+        // two circles. Inside two radii there is none.
+        let from = Pose::default();
+        let to = Pose::new(0.2, 0.0, Radians::new(PI));
+        assert!(path(Word::Lsr, from, to, 5.0).is_none());
+    }
+
+    #[test]
+    fn every_word_keeps_to_the_turning_radius() {
+        let from = Pose::new(0.0, 0.0, Radians::new(0.4));
+        let to = Pose::new(12.0, 7.0, Radians::new(2.1));
+        let radius = 3.0;
+        for word in [Word::Lsl, Word::Rsr, Word::Lsr, Word::Rsl] {
+            let path = path(word, from, to, radius).expect("applies");
+            for segment in path.segments() {
+                let curvature = segment.curvature(radius).abs();
+                assert!(
+                    curvature < 1.0 / radius + 1e-12,
+                    "{word:?} turns tighter than the vehicle can"
+                );
+            }
+        }
     }
 }
