@@ -260,7 +260,12 @@ fn corridor_depth(scene: &Scene) -> f64 {
 const ALERT_BANDS_M: [f64; 2] = [0.25, 0.10];
 
 /// Annotates a manoeuvre with everything the interface needs to draw it.
-fn describe(maneuver: &Maneuver, field: &ClearanceField, corridor: f64) -> ManeuverDto {
+fn describe(
+    maneuver: &Maneuver,
+    vehicle: &Vehicle,
+    field: &ClearanceField,
+    corridor: f64,
+) -> ManeuverDto {
     let poses: Vec<PoseDto> = maneuver
         .poses
         .iter()
@@ -292,9 +297,20 @@ fn describe(maneuver: &Maneuver, field: &ClearanceField, corridor: f64) -> Maneu
         }
     }
 
+    // Which poses count as "in the gateway" is decided on the *vehicle*, not
+    // on the pose. A pose is the rear axle; what threads the opening is the
+    // nose, up to a wheelbase and an overhang ahead of it, and the mirrors
+    // with it. Filtering on the axle alone got this backwards twice over: it
+    // dropped the moment the nose passes between the posts — the tightest of
+    // the whole entry — and it kept poses where the axle has reached the
+    // corridor but the vehicle is already out in the yard, which is roomy.
+    //
+    // The figure that came out could therefore exceed `(W - w) / 2`, the room
+    // the opening physically has, and it is the figure the verdict leads with.
+    let ahead = vehicle.wheelbase + vehicle.front_overhang;
     let in_gateway = poses
         .iter()
-        .filter(|p| p.y >= 0.0 && p.y <= corridor)
+        .filter(|p| p.y >= -ahead && p.y <= corridor + vehicle.rear_overhang)
         .map(|p| p.clearance)
         .fold(f64::INFINITY, f64::min);
 
@@ -357,7 +373,10 @@ pub fn run_solve(request: SolveRequest) -> Result<SolveResponse, ErrorDto> {
             budget_exhausted,
         },
         Outcome::Found(list) => SolveResponse {
-            alternatives: list.iter().map(|m| describe(m, &field, corridor)).collect(),
+            alternatives: list
+                .iter()
+                .map(|m| describe(m, &vehicle, &field, corridor))
+                .collect(),
             budget_exhausted: false,
         },
     })
@@ -506,6 +525,51 @@ mod tests {
         for m in &response.alternatives {
             assert!(m.metres_under_25cm <= m.distance + 1e-9);
             assert!(m.metres_under_10cm <= m.metres_under_25cm + 1e-9);
+        }
+    }
+
+    /// The clearance the verdict leads with can never exceed the room the
+    /// opening physically has.
+    ///
+    /// `(W - w) / 2` is the ceiling whatever the path, and the gateway figure
+    /// used to sail past it: it selected poses by the rear axle, so it dropped
+    /// the moment the nose threads the posts and kept the roomy moments after
+    /// the whole vehicle is through. A number above the ceiling is not good
+    /// news, it is a number answering a different question.
+    #[test]
+    fn the_gateway_clearance_never_exceeds_what_the_opening_holds() {
+        let mut scene = scene_dto();
+        scene.left_post.inner_edge_x = -2.29 / 2.0;
+        scene.right_post.inner_edge_x = 2.29 / 2.0;
+        scene.pavement_width = 1.30;
+        scene.road_width = 5.90;
+        scene.gate = GateDto::Swinging {
+            leaf_length: 1.15,
+            leaf_thickness: 0.04,
+            hinge_offset: 0.035,
+            hinge_depth_ratio: 0.5,
+            open_angle: std::f64::consts::PI * 118.0 / 180.0,
+        };
+        let mut vehicle = vehicle_dto();
+        vehicle.min_turning_radius = 3.59;
+
+        let response = run_solve(SolveRequest {
+            scene,
+            vehicle,
+            forward_only: None,
+        })
+        .expect("valid dimensions");
+
+        let opening = scene.right_post.inner_edge_x - scene.left_post.inner_edge_x;
+        let ceiling = (opening - vehicle.mirror_width) / 2.0;
+        for alternative in &response.alternatives {
+            assert!(
+                alternative.min_clearance_in_gateway <= ceiling + 1e-9,
+                "{} moves: {:.1} cm in a gateway that holds {:.1} cm",
+                alternative.moves,
+                alternative.min_clearance_in_gateway * 100.0,
+                ceiling * 100.0
+            );
         }
     }
 }
