@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 32902f80ea0529b0097b76b60803d4b397ee3da3c84350bf1b25f7da36ae5613 # shrinks to from = Pose { x: -11.817686772629195, y: 2.8189704788594545, heading: Radians(0.4384593908714965) }, to = Pose { x: 5.942933673257208, y: 11.55528119530469, heading: Radians(5.954130075693988) }, radius = 1.3653497458730293

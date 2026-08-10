@@ -12,6 +12,7 @@
 //! Lengths are metres, angles are [`units::Radians`].
 
 pub mod clearance;
+pub mod curves;
 pub mod geometry;
 pub mod kinematics;
 pub mod scene;

@@ -100,7 +100,50 @@ jamais moins bon que la réponse à un mouvement, puisque celle-ci figure
 toujours parmi les candidats et que tout plan plus profond qui ferait pire est
 écarté.
 
-## 6. Pourquoi il n'y a pas d'horloge
+## 6. Les courbes de Dubins
+
+Le solveur construit ses trajectoires candidates à la main : une droite, un
+quart de tour, une droite. Cette forme est arbitraire, et sur un passage serré
+aucune de ses 7 410 variantes ne passe.
+
+Dubins a montré en 1957 que le chemin le plus court entre deux poses, pour un
+véhicule qui ne peut pas braquer plus court qu'un certain rayon et qui n'a pas
+de marche arrière, est **toujours** l'un de six mots : quatre du type
+arc-droite-arc (`LSL`, `RSR`, `LSR`, `RSL`) et deux du type arc-arc-arc
+(`RLR`, `LRL`). Chacun a une forme close : aucune recherche, aucune itération.
+
+Les quatre premiers s'appliquent quand les poses sont éloignées. Les deux
+derniers existent quand les **cercles de braquage** sont assez proches pour
+qu'un troisième cercle les touche tous les deux — c'est-à-dire le régime d'une
+entrée de cour. Le seuil est bien celui des cercles, pas celui des poses : les
+caps décalent chaque centre d'un rayon, si bien que deux poses distantes de
+quatre rayons et demi peuvent encore admettre un `LRL`.
+
+**Une précision qui décide de tout l'usage.** Ces courbes minimisent la
+*longueur*. Ce projet mesure la *marge*. La plus courte est celle qui rase le
+plus. On n'utilise donc jamais `shortest`, mais `all` : on énumère les six,
+on écarte celles qui touchent un obstacle, et on garde la plus dégagée. La
+longueur ne sert qu'à départager.
+
+**Comment on sait que les formules sont justes.** On ne les compare pas à
+d'autres formules — les versions publiées divergent, sur `LSR` et `LRL` en
+particulier. On construit la courbe, on l'intègre avec la cinématique du
+véhicule, et on vérifie qu'elle arrive sur la pose visée à 1e-9 près, position
+et cap. Ce test ne dépend d'aucune source. Il tourne sur des paires de poses
+nommées et sur des paires engendrées aléatoirement par `proptest`.
+
+Les paires engendrées ont d'ailleurs immédiatement gagné leur place. Un chemin
+`RSL` commençait par un arc de 0,86 mm, qu'un seuil d'un millimètre écartait
+comme négligeable ; il faisait pourtant tourner le véhicule de 0,63 mrad, et
+les 20,7 m de ligne droite qui suivaient amplifiaient l'erreur en 13 mm à
+l'arrivée. **Supprimer un segment coûte son cap, pas seulement sa longueur** —
+et 13 mm, sur un passage où la marge totale vaut 13 cm, ne sont pas
+négligeables. Le seuil est descendu au nanomètre.
+
+Ce module ne fait encore rien d'autre qu'exister : brancher ces courbes dans
+la recherche exacte est le lot suivant.
+
+## 7. Pourquoi il n'y a pas d'horloge
 
 Le prototype bornait sa recherche par un plafond de nœuds **et** une échéance
 de 2,2 secondes par profondeur. Le résultat dépendait donc de la machine, et ne
@@ -111,7 +154,7 @@ mêmes entrées produisent toujours le même plan — c'est vérifié par un tes
 L'annulation par l'utilisateur relèvera du Web Worker, qu'il suffit de tuer :
 le domaine n'a pas à la connaître.
 
-## 7. Ce que valent les résultats de référence
+## 8. Ce que valent les résultats de référence
 
 Le `CLAUDE.md` conservait quatre résultats issus du prototypage. Le portage en
 a vérifié deux et **infirmé deux**.
@@ -142,7 +185,7 @@ qualitative survit : les vantaux réduisent la tolérance de plus de moitié, et
 rabotent le passage de 2,40 m à environ 2,20 m puisque chaque axe est en
 retrait de 5 cm.
 
-## 8. Le coût de la grille de planification
+## 9. Le coût de la grille de planification
 
 Le `CLAUDE.md` demandait de raffiner la grille de 90 cm et 6° à 20 cm et 1°,
 pour trouver les solutions à marge centimétrique que le prototype ratait.
@@ -195,7 +238,7 @@ Une remarque pour l'interface : la marge rapportée est le minimum sur **tout**
 le trajet, approche lointaine comprise. Frôler une bordure sur la route n'a pas
 la même portée que frôler un pilier. Distinguer les deux relèvera du lot 1c.
 
-## 9. Dette assumée
+## 10. Dette assumée
 
 Trente-trois constantes du noyau sont marquées `ARBITRARY` : reprises du
 prototype, sans justification connue. Elles sont nommées et documentées une par
