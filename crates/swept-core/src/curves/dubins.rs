@@ -230,6 +230,32 @@ pub fn path(word: Word, from: Pose, to: Pose, radius: f64) -> Option<CurvePath> 
     Some(CurvePath::new(segments, radius))
 }
 
+/// Every Dubins path that applies between two poses.
+///
+/// The order is [`Word::ALL`], so the result is reproducible. Families that do
+/// not apply are simply absent; an empty vector means no forward-only path
+/// exists at this radius, which happens only when the radius is unusable.
+///
+/// This — and not [`shortest`] — is what a clearance-seeking caller wants.
+/// The shortest path is the one that grazes most.
+#[must_use]
+pub fn all(from: Pose, to: Pose, radius: f64) -> Vec<CurvePath> {
+    Word::ALL
+        .iter()
+        .filter_map(|&word| path(word, from, to, radius))
+        .collect()
+}
+
+/// The shortest Dubins path, or `None` if none applies.
+///
+/// Ties break on [`Word::ALL`] order, so the answer is deterministic.
+#[must_use]
+pub fn shortest(from: Pose, to: Pose, radius: f64) -> Option<CurvePath> {
+    all(from, to, radius)
+        .into_iter()
+        .min_by(|a, b| a.length().total_cmp(&b.length()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -386,8 +412,11 @@ mod tests {
 
     #[test]
     fn a_ccc_family_does_not_apply_when_the_poses_are_far_apart() {
-        // Beyond four radii there is no third circle touching both, and the
-        // closed form's arccos leaves its domain.
+        // Same heading and thirteen radii apart, so the two turning circles
+        // sit thirteen radii from each other too. A third circle of the same
+        // radius cannot touch both past four, and the closed form's arccos
+        // leaves its domain. (Separation alone would not be enough to say
+        // this: opposed headings pull the centres two radii closer.)
         let from = Pose::default();
         let to = Pose::new(40.0, 0.0, Radians::default());
         assert!(path(Word::Rlr, from, to, 3.0).is_none());
@@ -419,5 +448,110 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn all_returns_every_applicable_family() {
+        // Far apart, so the four arc-straight-arc families all apply. Whether
+        // an arc-arc-arc family joins them is *not* settled by the separation
+        // alone: `d` measures pose to pose, while the three-arc condition is
+        // about the distance between turning-circle centres, and the headings
+        // displace each centre by a radius. Four and a half radii apart, `LRL`
+        // does apply here — and lands. So this pins what actually holds:
+        // everything `path` accepts is present, and nothing else is.
+        let from = Pose::new(0.0, 0.0, Radians::new(0.4));
+        let to = Pose::new(12.0, 7.0, Radians::new(2.1));
+        let applicable = Word::ALL
+            .into_iter()
+            .filter(|&word| path(word, from, to, 3.0).is_some())
+            .count();
+        let paths = all(from, to, 3.0);
+        assert_eq!(paths.len(), applicable);
+        assert!(
+            paths.len() >= 4,
+            "the four arc-straight-arc families always apply this far apart"
+        );
+        for path in paths {
+            let end = path.end(from);
+            assert!((end.x - to.x).abs() < 1e-9);
+            assert!((end.y - to.y).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn all_returns_nothing_when_the_radius_is_unusable() {
+        let from = Pose::default();
+        let to = Pose::new(10.0, 0.0, Radians::default());
+        assert!(all(from, to, 0.0).is_empty());
+    }
+
+    #[test]
+    fn every_returned_path_lands_on_the_goal() {
+        // The contract the callers rely on: whatever comes back is usable
+        // without rechecking. Lot 2b will test these for collision and keep
+        // the roomiest, and it must not have to filter out broken ones first.
+        let from = Pose::new(1.0, -2.0, Radians::new(1.3));
+        let to = Pose::new(6.0, 4.0, Radians::new(0.2));
+        for path in all(from, to, 2.5) {
+            let end = path.end(from);
+            assert!((end.x - to.x).abs() < 1e-9);
+            assert!((end.y - to.y).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn the_shortest_is_no_longer_than_any_other() {
+        let from = Pose::new(1.0, -2.0, Radians::new(1.3));
+        let to = Pose::new(6.0, 4.0, Radians::new(0.2));
+        let best = shortest(from, to, 2.5).expect("some family applies");
+        for path in all(from, to, 2.5) {
+            assert!(best.length() <= path.length() + 1e-12);
+        }
+    }
+
+    #[test]
+    fn the_shortest_beats_the_straight_line_only_by_matching_it() {
+        // Aligned poses: no curve can be shorter than the separation, and one
+        // achieves it. A shortest path below that would mean the geometry is
+        // wrong, not that it found a clever route.
+        let from = Pose::default();
+        let to = Pose::new(9.0, 0.0, Radians::default());
+        let best = shortest(from, to, 3.0).expect("some family applies");
+        assert!((best.length() - 9.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_close_reversed_goal_is_reached_at_all() {
+        // Half a radius apart, pointing the other way — the regime a courtyard
+        // entry actually poses, and the one the old hand-built candidates
+        // could not represent. The assertion is deliberately not "the answer
+        // comes from RLR": several families may apply, and which one wins is
+        // not a property worth freezing. What matters is that an answer exists
+        // and that it lands.
+        let from = Pose::default();
+        let to = Pose::new(1.5, 0.5, Radians::new(PI));
+        let best = shortest(from, to, 3.0).expect("some family applies");
+        let end = best.end(from);
+        assert!((end.x - to.x).abs() < 1e-9);
+        assert!((end.y - to.y).abs() < 1e-9);
+        let heading_error = mod_2pi(end.heading.get() - to.heading.get());
+        assert!(heading_error.min(TAU - heading_error) < 1e-9);
+    }
+
+    #[test]
+    fn the_three_arc_families_appear_when_the_poses_are_close() {
+        // The CCC words exist for under four radii of separation. Losing them
+        // would go unnoticed — the CSC words still answer — so this pins their
+        // presence explicitly.
+        let from = Pose::default();
+        let to = Pose::new(1.5, 0.5, Radians::new(PI));
+        let three_arc = [Word::Rlr, Word::Lrl]
+            .into_iter()
+            .filter(|&word| path(word, from, to, 3.0).is_some())
+            .count();
+        assert!(
+            three_arc > 0,
+            "no arc-arc-arc family applied at half a radius"
+        );
     }
 }
