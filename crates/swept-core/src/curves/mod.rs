@@ -16,6 +16,25 @@
 //! room left between the vehicle and the posts. The shortest path grazes more,
 //! not less. So the callers ask for every admissible curve, discard those that
 //! collide, and keep the roomiest. Length only breaks ties.
+//!
+//! # Example
+//!
+//! ```
+//! use swept_core::curves::dubins;
+//! use swept_core::kinematics::Pose;
+//! use swept_core::units::Radians;
+//!
+//! // A vehicle facing along the road, asked to end up nine metres ahead
+//! // facing the same way, cannot do better than driving straight.
+//! let from = Pose::default();
+//! let to = Pose::new(9.0, 0.0, Radians::default());
+//! let best = dubins::shortest(from, to, 3.0).expect("some family applies");
+//! assert!((best.length() - 9.0).abs() < 1e-9);
+//!
+//! // But the caller usually wants every option, to keep the roomiest rather
+//! // than the shortest.
+//! assert!(!dubins::all(from, to, 3.0).is_empty());
+//! ```
 
 use crate::kinematics::{Direction, Pose, sample_arc};
 
