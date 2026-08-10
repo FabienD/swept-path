@@ -20,5 +20,6 @@ pub mod landing;
 pub mod min_road;
 pub mod multi;
 pub mod path;
+pub mod poses;
 pub mod result;
 pub mod solve;
