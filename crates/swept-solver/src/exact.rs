@@ -1,9 +1,33 @@
 //! Exhaustive search for a one-move entry.
 //!
-//! Every combination on the grid is tried and the roomiest is kept. Because
-//! the sweep is complete, a failure here means something: there is no one-move
-//! entry *on this grid*. That is what makes this solver the reference the
-//! planner is seeded from.
+//! Every pair of poses on the grid is tried, joined by every Dubins curve that
+//! applies at every radius, and the roomiest collision-free result is kept.
+//! Because the sweep is complete, a failure here means something: there is no
+//! one-move entry *on this grid*. That is what makes this solver the reference
+//! the planner is seeded from.
+//!
+//! # Why every curve and not the shortest
+//!
+//! Dubins curves minimise length. This search maximises clearance, and the
+//! shortest path is the one that grazes most — so it asks for all of them and
+//! sorts by room. Length never enters the comparison.
+//!
+//! # Reverse
+//!
+//! Backing along a path covers exactly the ground that driving forward along
+//! it in the other direction covers. A reverse entry is therefore a Dubins
+//! problem too: the same curves, read from the goal back to the start with
+//! both headings turned about.
+//!
+//! # What a failure here does and does not mean
+//!
+//! It means no one-move entry exists on this grid — not that the vehicle
+//! cannot get in. It may still get in over several moves, which is what
+//! `multi` is for. And the sweep only knows the geometry it is given: a
+//! gateway this search refuses may well be one a driver threads daily, if the
+//! model charges for something reality does not. The pavement is the standing
+//! example — modelled as a wall of infinite height, when a mirror a metre up
+//! clears a fifteen-centimetre kerb without noticing it.
 
 use crate::budget::Discretisation;
 use crate::path::evaluate_at_least;

@@ -72,10 +72,24 @@ segments sans accumuler de dérive.
 
 ## 5. Les trois solveurs, et ce que chacun prouve
 
-**La recherche exacte** balaie toutes les combinaisons d'une grille — rayon de
-braquage, position latérale de départ, point d'engagement — et retient la plus
+**La recherche exacte** balaie des poses de départ le long de la chaussée et
+des poses d'arrivée dans l'axe du passage, relie chaque paire par toutes les
+courbes de Dubins applicables à chaque rayon de braquage, et retient la plus
 dégagée. Comme le balayage est complet, **son échec est informatif** : il n'y a
 pas d'entrée en un mouvement sur cette grille.
+
+L'entrée en marche arrière emprunte les mêmes courbes. Reculer le long d'un
+trajet, sous le modèle bicyclette, c'est le parcourir à l'envers : il suffit
+donc de résoudre le problème retourné — de l'arrivée vers le départ, les deux
+caps pivotés d'un demi-tour — puis de relire le résultat à l'endroit.
+
+Un échec dit qu'il n'existe pas d'entrée en un mouvement **sur cette grille et
+dans ce modèle**. La nuance n'est pas rhétorique : un passage que la recherche
+refuse peut être un passage qu'un conducteur franchit tous les jours, si le
+modèle facture quelque chose que la réalité ne facture pas. Le trottoir en est
+l'exemple courant — modélisé comme un mur de hauteur infinie, alors qu'un
+rétroviseur à un mètre du sol survole une bordure de quinze centimètres sans
+la voir.
 
 **Le planificateur multi-manœuvres** est un A\* hybride sur `(x, y, θ, sens)`.
 Le coût dominant est le nombre de changements de sens — un conducteur compte
@@ -140,8 +154,41 @@ l'arrivée. **Supprimer un segment coûte son cap, pas seulement sa longueur** �
 et 13 mm, sur un passage où la marge totale vaut 13 cm, ne sont pas
 négligeables. Le seuil est descendu au nanomètre.
 
-Ce module ne fait encore rien d'autre qu'exister : brancher ces courbes dans
-la recherche exacte est le lot suivant.
+Ces courbes sont désormais ce que la recherche exacte essaie. La forme figée
+d'autrefois — une droite, un quart de tour, une droite — n'était rien d'autre
+qu'un mot `LSL` ou `RSR` avec deux contraintes gratuites en plus : l'arc faisait
+exactement 90°, et la droite d'approche exactement 5 m. Les lever ne coûte rien
+et donne accès aux crochets à trois arcs, qui sont précisément ce qu'exige une
+entrée serrée. Sur cinq variantes du portail mesuré, l'ancienne forme ne
+trouvait **rien du tout** ; le balayage en résout quatre.
+
+La pose d'arrivée est devenue explicite au passage, et cela corrige un défaut
+qui n'avait rien à voir : le critère d'arrivée était « avoir franchi la
+profondeur d'entrée », qui ne contraint ni la position ni le cap, d'où le
+véhicule qui terminait de travers dans la cour. Une courbe exige une pose
+complète, donc on ne balaie que des arrivées à moins de 5° de la
+perpendiculaire.
+
+**Ce que le balayage a coûté, et comment il a été payé.** Une paire de poses
+donne jusqu'à six courbes, et il y a bien plus de paires qu'il n'y avait de
+candidats : la première version tenait 10,5 s là où l'ancienne recherche en
+mettait 0,15. Deux mesures l'ont ramenée sous la seconde sans rien concéder sur
+la couverture.
+
+La première est une passe de reconnaissance : au lieu de parcourir les poses
+dans l'ordre — ce qui fait payer toute la remontée de la rue avant d'atteindre
+le passage, là où un candidat meurt presque toujours — on sonde d'abord huit
+poses réparties d'un bout à l'autre. La correction est intacte, puisqu'une
+collision réfute le chemin où qu'on la trouve ; seul l'ordre de découverte
+change.
+
+La seconde est un rééquilibrage des axes, décidé en les mesurant un à un.
+Doubler le nombre de points d'entrée, de caps d'arrivée ou de rayons n'achetait
+**aucune marge** ; doubler le nombre de positions de départ le long de la rue
+la faisait passer de 0,1 à 4,2 cm. Cet axe décide de *l'endroit où le virage
+commence*, et la fenêtre où un virage retombe droit dans un passage étroit fait
+quelques centimètres de large. Il a donc reçu le budget dont les trois autres
+n'avaient pas besoin.
 
 ## 7. Pourquoi il n'y a pas d'horloge
 
@@ -257,6 +304,27 @@ Les plus susceptibles de changer une conclusion :
 
 Trois valeurs seulement sont marquées `MEASURED` : `DEFAULT_MAX_NODES`,
 `DEFAULT_MAX_SOLUTIONS` et le choix de la grille par défaut.
+
+**Le trottoir est un mur de hauteur infinie**, et c'est la dette qui coûte le
+plus cher aujourd'hui. Sur le portail mesuré — 2,29 m de passage, 5,90 m de
+chaussée, 1,30 m de trottoir — la recherche exacte ne trouve aucune entrée en
+un mouvement, et la géométrie explique pourquoi : il faut au véhicule son rayon
+de braquage entier, 3,59 m, entre le point de départ le plus bas et le point où
+il doit être droit, et la rue n'en offre que 1,44. Or le propriétaire y entre
+tous les jours, rétroviseurs déployés.
+
+L'écart ne vient ni de la grille ni des courbes : la trajectoire idéale
+construite à la main entre elle aussi en collision. Il vient du modèle. Un
+rétroviseur à un mètre du sol survole une bordure de quinze centimètres, mais
+en 2D pur il la heurte, ce qui interdit au véhicule d'approcher du trottoir —
+c'est-à-dire exactement la place qui lui manque pour tourner. C'est le défaut
+n° 5 du `CLAUDE.md`, et il faut un attribut de hauteur sur les obstacles
+(`full` / `low`) avec la hauteur des points du véhicule pour le lever.
+
+Mesuré à l'appui, sur cette rue et ce véhicule : vantaux à 90° et rétros
+déployés, rien ; vantaux à 118°, 4,2 cm ; coulissant, 5,0 cm ; vantaux à 90° et
+rétros rabattus, 2,6 cm. La géométrie du modèle est cohérente — c'est le modèle
+qui est trop sévère.
 
 **Rien n'est encore ancré dans le réel.** Le noyau calcule ce que la géométrie
 prédit — c'est vérifié — mais il le calcule sur des dimensions supposées :
