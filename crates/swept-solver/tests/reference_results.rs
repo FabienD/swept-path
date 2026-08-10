@@ -9,7 +9,10 @@ use swept_core::kinematics::Pose;
 use swept_core::scene::{GateKind, Post, Scene};
 use swept_core::units::Radians;
 use swept_core::vehicle::Vehicle;
+use swept_solver::budget::{SearchBudget, Silent};
 use swept_solver::exact::{Approach, Grid, search};
+use swept_solver::result::Outcome;
+use swept_solver::solve::alternatives;
 
 fn lbx() -> Vehicle {
     Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 5.2).expect("valid vehicle")
@@ -254,4 +257,124 @@ fn clearance_never_exceeds_the_geometric_ceiling() {
             );
         }
     }
+}
+
+/// The measured gateway: 2.29 m clear, 1.30 m pavement, 5.90 m carriageway,
+/// and leaves that swing back past square.
+fn measured_gateway() -> Scene {
+    Scene {
+        left_post: Post {
+            inner_edge_x: -2.29 / 2.0,
+            width: 0.55,
+            depth: 0.55,
+        },
+        right_post: Post {
+            inner_edge_x: 2.29 / 2.0,
+            width: 0.55,
+            depth: 0.55,
+        },
+        wall_thickness: 0.30,
+        pavement_width: 1.30,
+        dropped_kerb_width: 3.20,
+        road_width: 5.90,
+        gate: GateKind::Swinging {
+            leaf_length: 1.15,
+            leaf_thickness: 0.04,
+            hinge_offset: 0.035,
+            hinge_depth_ratio: 0.5,
+            open_angle: Radians::from_degrees(118.0),
+        },
+    }
+}
+
+/// Criteria 1, 2 and 3 of the Dubins design, on the gateway that motivated it,
+/// through the answer the interface actually receives.
+///
+/// Before this lot the exhaustive sweep returned nothing here, so the answer
+/// came from the planner and was labelled heuristic — it proved nothing.
+#[test]
+fn the_measured_gateway_admits_a_proved_one_move_entry() {
+    let vehicle = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 3.59).expect("valid vehicle");
+    let scene = measured_gateway();
+
+    let Outcome::Found(list) =
+        alternatives(&vehicle, &scene, SearchBudget::default(), &mut Silent, None)
+    else {
+        panic!("this gateway admits an entry");
+    };
+
+    // Criterion 1: a one-move entry, and one the sweep proved rather than
+    // stumbled on.
+    let one = list
+        .iter()
+        .find(|m| m.moves == 1)
+        .expect("a one-move entry exists");
+    assert!(
+        one.is_exact(),
+        "a one-move entry must come from the exhaustive sweep, not the planner"
+    );
+
+    // Criterion 2, first half: the geometric ceiling. Clearance can never
+    // exceed half the difference between the opening and the vehicle's widest
+    // point, whatever the path. A figure above it would not be good news but
+    // proof that the clearance field is lying.
+    let ceiling = (scene.opening_width() - vehicle.mirror_width) / 2.0;
+    assert!(
+        one.min_clearance <= ceiling + 1e-9,
+        "{:.1} cm claimed against a {:.1} cm ceiling",
+        one.min_clearance * 100.0,
+        ceiling * 100.0
+    );
+    assert!(
+        one.min_clearance > 0.0,
+        "an entry with no room is not an entry"
+    );
+
+    // Criterion 2, second half: the tightest point is in the gateway, not
+    // against a kerb six metres short of it. A path whose worst moment is out
+    // on the road has not been squeezed by the opening at all, and its figure
+    // answers a different question than the one that was asked.
+    let field = ClearanceField::new(&scene, &vehicle);
+    let (_, where_it_is) = one
+        .poses
+        .iter()
+        .filter_map(|step| match field.at(step.pose) {
+            Clearance::Clear(margin) => Some((margin, step.pose)),
+            Clearance::Collision => None,
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .expect("a collision-free manoeuvre has a tightest point");
+    // The gateway runs from the outer face of the wall to behind the leaves,
+    // and the approach across the pavement counts as part of threading it.
+    let gateway_far_side = scene.left_post.depth.max(scene.right_post.depth)
+        + match scene.gate {
+            GateKind::Swinging { leaf_length, .. } => leaf_length,
+            GateKind::Sliding => 0.0,
+        };
+    // What is recorded is the pose of the *rear axle*, while what actually
+    // grazes is a mirror or a front corner, up to a wheelbase and an overhang
+    // ahead of it. So the window reaches back by that much: an axle still out
+    // on the road can perfectly well have its nose in the opening, and that
+    // moment is part of threading it. What the window still excludes is the
+    // failure this criterion is about — a tightest point out on the
+    // carriageway, metres before the vehicle has anything to thread.
+    let nose_reach = vehicle.wheelbase + vehicle.front_overhang;
+    let window = (-scene.pavement_width - nose_reach)..=gateway_far_side;
+    assert!(
+        window.contains(&where_it_is.y),
+        "tightest point at y={:.2} m, outside the gateway (which spans {:.2} to {:.2})",
+        where_it_is.y,
+        -scene.pavement_width - nose_reach,
+        gateway_far_side
+    );
+
+    // Criterion 3: the vehicle finishes square to the opening, rather than
+    // askew in the yard as the old depth-only arrival test allowed.
+    let finish = one.poses.last().expect("a manoeuvre has poses");
+    let off_square = (finish.pose.heading.get() - std::f64::consts::FRAC_PI_2).abs();
+    assert!(
+        off_square.to_degrees() <= 5.0 + 1e-9,
+        "finished {:.1} degrees off square",
+        off_square.to_degrees()
+    );
 }
