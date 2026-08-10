@@ -479,6 +479,27 @@ mod tests {
     }
 
     #[test]
+    fn a_very_short_leading_arc_is_not_dropped() {
+        // Found by the property tests, and worth naming because the cause is
+        // not obvious. `RSL` opens here with an arc of 0.86 mm, which the
+        // original millimetre threshold on [`NEGLIGIBLE_LENGTH_M`] discarded.
+        // The arc is tiny but it turns the vehicle by 0.63 mrad, and the 20.7 m
+        // straight run that follows amplifies that into 13 mm at the landing
+        // point. Dropping a segment costs its heading, not merely its length.
+        let from = Pose::new(
+            -11.817_686_772_629_195,
+            2.818_970_478_859_454_5,
+            Radians::new(0.438_459_390_871_496_5),
+        );
+        let to = Pose::new(
+            5.942_933_673_257_208,
+            11.555_281_195_304_69,
+            Radians::new(5.954_130_075_693_988),
+        );
+        assert_lands_on(Word::Rsl, from, to, 1.365_349_745_873_029_3);
+    }
+
+    #[test]
     fn all_returns_nothing_when_the_radius_is_unusable() {
         let from = Pose::default();
         let to = Pose::new(10.0, 0.0, Radians::default());

@@ -10,5 +10,12 @@ repository.workspace = true
 
 [dependencies]
 
+# Development only, so the published crate still has no dependency at all and
+# keeps its MIT OR Apache-2.0 licensing. The closed forms in `curves` are
+# exactly the kind of code where a named case passes and a generated one does
+# not.
+[dev-dependencies]
+proptest = "1.11.0"
+
 [lints]
 workspace = true

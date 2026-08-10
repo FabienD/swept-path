@@ -34,10 +34,23 @@ pub enum Steering {
 
 /// Shortest segment worth keeping, in metres.
 ///
-/// ARBITRARY — a millimetre is below anything this domain measures, and the
-/// closed forms routinely return arcs of 1e-16 m where a family degenerates.
-/// Keeping them would inflate the reversal count and clutter the drawing.
-pub const NEGLIGIBLE_LENGTH_M: f64 = 0.001;
+/// A nanometre — deliberately far below what this domain measures, which is
+/// not the reasoning one would expect. "Below what anyone measures" argues for
+/// a millimetre, and a millimetre is wrong: dropping an arc does not only lose
+/// its length, it loses the heading it was turning through. An arc of length
+/// `l` at radius `R` sweeps `l / R`, and every metre travelled afterwards
+/// amplifies that error.
+///
+/// The property tests found the case: an `RSL` opening with a 0.86 mm arc at a
+/// 1.37 m radius, followed by a 20.7 m straight run. The arc turns the vehicle
+/// by 0.63 mrad; discarding it moves the landing point by 13 mm. On a gateway
+/// where the entire available margin is 13 cm, that is not negligible.
+///
+/// At a nanometre the amplified error stays under a micrometre for any radius
+/// and path length this domain produces. The constant then does only what it
+/// was meant to do: drop the exactly degenerate arcs the closed forms return,
+/// such as the leading arc of an `LSL` whose headings already agree.
+pub const NEGLIGIBLE_LENGTH_M: f64 = 1e-9;
 
 /// One piece of a path: constant steering, constant gear, a given length.
 #[derive(Debug, Clone, Copy, PartialEq)]
