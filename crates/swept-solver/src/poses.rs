@@ -35,10 +35,10 @@ pub const ENTRY_SPAN_M: f64 = 0.9;
 ///
 /// ARBITRARY. The old search drove a fixed 5 m run-up and started the turn at
 /// `entry_x - radius - 5`, which for the radii tried put the first pose
-/// between 8 and 12 m short of the opening. Fourteen metres covers that and
-/// leaves room for a wider turn; anything further back is straight road that
-/// buys no clearance.
-pub const APPROACH_REACH_M: f64 = 14.0;
+/// between 8 and 12 m short of the opening. Ten metres covers the useful part
+/// of that: anything further back is straight road that buys no clearance and
+/// costs every candidate the poses to sample it.
+pub const APPROACH_REACH_M: f64 = 10.0;
 
 /// How far the final heading may sit from square to the opening, in degrees.
 ///
@@ -65,11 +65,17 @@ fn spread(low: f64, high: f64, steps: u16) -> Vec<f64> {
 ///
 /// Returns an empty vector when the carriageway is too narrow for the vehicle
 /// to sit in at all — a result, not an error.
+///
+/// The lane runs from the far kerb to the near one, and the near kerb is the
+/// pavement edge, not the wall. The prototype bounded this at `y = 0` and so
+/// offered start poses with the mirrors out over the footway — poses the
+/// clearance field rejects on the spot, since the pavement is a solid obstacle
+/// everywhere but across the dropped kerb.
 #[must_use]
 pub fn start_poses(vehicle: &Vehicle, scene: &Scene, x_steps: u16, lateral_steps: u16) -> Vec<Pose> {
     let half_width = vehicle.mirror_width / 2.0;
     let low = -scene.pavement_width - scene.road_width + half_width + LANE_MARGIN_M;
-    let high = -half_width - LANE_MARGIN_M;
+    let high = -scene.pavement_width - half_width - LANE_MARGIN_M;
     if low > high {
         return Vec::new();
     }
@@ -161,11 +167,17 @@ mod tests {
     fn the_lateral_sweep_keeps_the_mirrors_inside_the_lane() {
         // A start pose whose mirrors already overhang the kerb is not a start
         // at all: the sweep would spend its budget on candidates that collide
-        // before they move.
+        // before they move. The pavement is a solid obstacle everywhere but
+        // across the dropped kerb, so the lane ends at its edge, not at the
+        // wall.
         let (vehicle, sc) = (lbx(), scene(3.0));
         let half = vehicle.mirror_width / 2.0;
         for pose in start_poses(&vehicle, &sc, 4, 6) {
-            assert!(pose.y + half <= -LANE_MARGIN_M + 1e-12, "got y={}", pose.y);
+            assert!(
+                pose.y + half <= -sc.pavement_width - LANE_MARGIN_M + 1e-12,
+                "got y={}",
+                pose.y
+            );
             assert!(
                 pose.y - half >= -sc.pavement_width - sc.road_width + LANE_MARGIN_M - 1e-12,
                 "got y={}",

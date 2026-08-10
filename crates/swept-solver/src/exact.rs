@@ -6,12 +6,14 @@
 //! planner is seeded from.
 
 use crate::budget::Discretisation;
-use crate::path::{evaluate, forward_path, reverse_path};
+use crate::path::evaluate_at_least;
+use crate::poses::{goal_poses, start_poses};
 use crate::result::{Confidence, DirectedPose, Maneuver, Outcome};
 use swept_core::clearance::ClearanceField;
+use swept_core::curves::CurvePath;
+use swept_core::curves::dubins;
 use swept_core::kinematics::{Direction, Pose};
 use swept_core::scene::Scene;
-use swept_core::units::Radians;
 use swept_core::vehicle::Vehicle;
 
 /// Which way the vehicle drives in.
@@ -28,87 +30,81 @@ pub enum Approach {
 /// ARBITRARY — carried over from the prototype (`index.html:368`).
 pub const RADIUS_STEP_M: f64 = 0.5;
 
-/// How far either side of the opening centre the turn is aimed, in metres.
-///
-/// ARBITRARY — carried over from the prototype (`index.html:372`).
-pub const ENTRY_SPAN_M: f64 = 0.9;
-
-/// Clearance kept between the vehicle's widest point and the lane edges when
-/// choosing where the run-up is driven, in metres.
-///
-/// ARBITRARY — carried over from the prototype (`index.html:362`).
-pub const LANE_MARGIN_M: f64 = 0.02;
-
-/// Increment between the approach angles tried when reversing, in degrees.
-///
-/// ARBITRARY — carried over from the prototype (`index.html:382`).
-pub const REVERSE_ANGLE_STEP_DEGREES: f64 = 8.0;
-
-/// Increment between the setbacks tried when reversing, in metres.
-///
-/// ARBITRARY — carried over from the prototype (`index.html:384`).
-pub const REVERSE_SETBACK_STEP_M: f64 = 0.5;
-
 /// How many values of each parameter the sweep tries.
+///
+/// Every count is a number of *intervals*, so a count of `n` yields `n + 1`
+/// values, and zero yields the midpoint alone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Grid {
     /// Turning radii, from the vehicle's tightest upwards.
     pub radius_steps: u16,
-    /// Lateral positions across the carriageway.
+    /// Positions along the road the approach may start from.
+    pub start_x_steps: u16,
+    /// Positions across the carriageway the approach may start from.
     pub lateral_steps: u16,
-    /// Entry points along the opening.
+    /// Points along the opening the entry is aimed at.
     pub entry_steps: u16,
-    /// Approach angles, reversing only.
-    pub angle_steps: u16,
-    /// Setbacks before the turn, reversing only.
-    pub setback_steps: u16,
+    /// Final headings tried, spread about square to the opening.
+    pub heading_steps: u16,
 }
 
 impl Grid {
     /// The full sweep, used whenever the answer is shown to a user.
+    ///
+    /// Coarser per axis than the shape-based sweep it replaces, and richer
+    /// overall: one pair of poses yields up to six curves where the old
+    /// parameters yielded one path.
+    ///
+    /// MEASURED, by `examples/bench.rs` on a 2.6 m opening: 26 775 pose pairs,
+    /// 742 ms for a forward sweep, against 41 ms for [`Grid::coarse`]. The
+    /// ceiling is the second beyond which the interface stops feeling like it
+    /// answers, and the axes were traded against each other to sit under it:
+    /// `start_x_steps` is the one that must stay generous, since it decides
+    /// *where the turn begins*, and starving it was what made the carriageway
+    /// bisection return nothing at all.
     #[must_use]
     pub fn fine() -> Self {
         Self {
-            radius_steps: 12,
-            lateral_steps: 18,
-            entry_steps: 29,
-            angle_steps: 5,
-            setback_steps: 4,
+            radius_steps: 4,
+            start_x_steps: 16,
+            lateral_steps: 6,
+            entry_steps: 8,
+            heading_steps: 4,
         }
     }
 
     /// A cheaper sweep, for callers that run the search many times over —
     /// the carriageway bisection in particular.
+    ///
+    /// **Every count divides its counterpart in [`Grid::fine`], on purpose.**
+    /// The pose grids place value `i` of `n` at `low + (high - low) * i / n`,
+    /// so halving the count keeps exactly every other value — and keeps it
+    /// *bit for bit*, since IEEE division is correctly rounded and `2i / 2n`
+    /// and `i / n` are the same rational. The coarse sweep therefore
+    /// tries a strict subset of what the fine one tries, which makes "finer is
+    /// never worse" a property rather than a hope. The radii need no such care:
+    /// they step by a fixed increment from the vehicle's tightest, so a smaller
+    /// count is simply a prefix.
     #[must_use]
     pub fn coarse() -> Self {
         Self {
-            radius_steps: 8,
-            lateral_steps: 12,
-            entry_steps: 17,
-            angle_steps: 5,
-            setback_steps: 4,
+            radius_steps: 2,
+            start_x_steps: 8,
+            lateral_steps: 3,
+            entry_steps: 4,
+            heading_steps: 2,
         }
     }
 
-    /// How many candidates this grid produces, useful for reporting cost.
+    /// How many pose pairs this grid produces, useful for reporting cost.
+    ///
+    /// Each pair yields up to six Dubins curves, so the number of paths
+    /// actually evaluated is at most six times this.
     #[must_use]
-    pub fn candidate_count(self, approach: Approach) -> u64 {
-        let base = u64::from(self.radius_steps + 1) * u64::from(self.entry_steps + 1);
-        match approach {
-            Approach::Forward => base * u64::from(self.lateral_steps + 1),
-            Approach::Reverse => {
-                base * u64::from(self.angle_steps + 1) * u64::from(self.setback_steps + 1)
-            }
-        }
-    }
-}
-
-/// Keeps the roomiest candidate seen so far.
-fn consider(best: &mut Option<(Vec<Pose>, f64)>, poses: Vec<Pose>, field: &ClearanceField) {
-    if let Some(margin) = evaluate(&poses, field)
-        && best.as_ref().is_none_or(|(_, m)| margin > *m)
-    {
-        *best = Some((poses, margin));
+    pub fn candidate_count(self) -> u64 {
+        let starts = u64::from(self.start_x_steps + 1) * u64::from(self.lateral_steps + 1);
+        let goals = u64::from(self.entry_steps + 1) * u64::from(self.heading_steps + 1);
+        u64::from(self.radius_steps + 1) * starts * goals
     }
 }
 
@@ -117,12 +113,10 @@ fn consider(best: &mut Option<(Vec<Pose>, f64)>, poses: Vec<Pose>, field: &Clear
 pub fn search(vehicle: &Vehicle, scene: &Scene, approach: Approach, grid: Grid) -> Outcome {
     let field = ClearanceField::new(scene, vehicle);
     let step = Discretisation::default().sample_step;
-    let half_width = vehicle.mirror_width / 2.0;
 
-    // Where along the carriageway the run-up may be driven.
-    let low = -scene.pavement_width - scene.road_width + half_width + LANE_MARGIN_M;
-    let high = -half_width - LANE_MARGIN_M;
-    if low > high {
+    let starts = start_poses(vehicle, scene, grid.start_x_steps, grid.lateral_steps);
+    let goals = goal_poses(vehicle, scene, grid.entry_steps, grid.heading_steps);
+    if starts.is_empty() || goals.is_empty() {
         return Outcome::NotFound {
             budget_exhausted: false,
         };
@@ -132,30 +126,20 @@ pub fn search(vehicle: &Vehicle, scene: &Scene, approach: Approach, grid: Grid) 
 
     for i in 0..=grid.radius_steps {
         let radius = vehicle.min_turning_radius + f64::from(i) * RADIUS_STEP_M;
-        for k in 0..=grid.entry_steps {
-            let entry_x =
-                -ENTRY_SPAN_M + 2.0 * ENTRY_SPAN_M * f64::from(k) / f64::from(grid.entry_steps);
-            match approach {
-                Approach::Forward => {
-                    for j in 0..=grid.lateral_steps {
-                        let lateral =
-                            low + (high - low) * f64::from(j) / f64::from(grid.lateral_steps);
-                        let poses = forward_path(vehicle, scene, radius, lateral, entry_x, step);
-                        consider(&mut best, poses, &field);
-                    }
-                }
-                Approach::Reverse => {
-                    for a in 0..=grid.angle_steps {
-                        let angle =
-                            Radians::from_degrees(f64::from(a) * REVERSE_ANGLE_STEP_DEGREES);
-                        for d in 0..=grid.setback_steps {
-                            let setback = f64::from(d) * REVERSE_SETBACK_STEP_M;
-                            if let Some(poses) =
-                                reverse_path(vehicle, scene, radius, entry_x, setback, angle, step)
-                            {
-                                consider(&mut best, poses, &field);
-                            }
-                        }
+        for &start in &starts {
+            for &goal in &goals {
+                for curve in curves_between(approach, start, goal, radius) {
+                    // The path is sampled from `start`, which the curve
+                    // excludes, so the starting pose is prepended by hand.
+                    let mut path = vec![start];
+                    path.extend(curve_poses(approach, &curve, start, goal, step));
+
+                    // Only a strictly roomier candidate is worth walking to
+                    // the end. `floor` is the best clearance so far, so most
+                    // candidates die within a few poses.
+                    let floor = best.as_ref().map_or(f64::NEG_INFINITY, |(_, m)| *m);
+                    if let Some(margin) = evaluate_at_least(&path, &field, floor) {
+                        best = Some((path, margin));
                     }
                 }
             }
@@ -185,11 +169,38 @@ pub fn search(vehicle: &Vehicle, scene: &Scene, approach: Approach, grid: Grid) 
     }
 }
 
+/// Every curve joining two poses for the given approach.
+///
+/// Reverse is filled in by the next task. Returning nothing meanwhile is
+/// deliberate: no test drives a reverse sweep, and `solve::alternatives` tries
+/// forward first and stops as soon as it answers.
+fn curves_between(approach: Approach, start: Pose, goal: Pose, radius: f64) -> Vec<CurvePath> {
+    match approach {
+        Approach::Forward => dubins::all(start, goal, radius),
+        Approach::Reverse => Vec::new(),
+    }
+}
+
+/// Samples a curve into the poses the vehicle actually occupies.
+fn curve_poses(
+    approach: Approach,
+    curve: &CurvePath,
+    start: Pose,
+    _goal: Pose,
+    step: f64,
+) -> Vec<Pose> {
+    match approach {
+        Approach::Forward => curve.poses(start, step),
+        Approach::Reverse => Vec::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use swept_core::clearance::Clearance;
     use swept_core::scene::{GateKind, Post};
+    use swept_core::units::Radians;
 
     /// A scene whose dropped kerb is wider than the opening, as a real one is:
     /// the kerb has to be dropped at least across the gateway.
@@ -298,9 +309,168 @@ mod tests {
 
     #[test]
     fn a_coarse_grid_visits_fewer_candidates_than_a_fine_one() {
-        assert!(
-            Grid::coarse().candidate_count(Approach::Forward)
-                < Grid::fine().candidate_count(Approach::Forward)
+        assert!(Grid::coarse().candidate_count() < Grid::fine().candidate_count());
+    }
+
+    /// The measured gateway: 2.29 m clear, 1.30 m pavement, 5.90 m
+    /// carriageway, and the pivot radius rather than the kerb radius.
+    fn measured_gateway(open_degrees: f64) -> Scene {
+        let mut sc = scene_with_opening(2.29);
+        sc.pavement_width = 1.30;
+        sc.road_width = 5.90;
+        sc.dropped_kerb_width = 3.20;
+        sc.gate = GateKind::Swinging {
+            leaf_length: 1.15,
+            leaf_thickness: 0.04,
+            hinge_offset: 0.035,
+            hinge_depth_ratio: 0.5,
+            open_angle: Radians::from_degrees(open_degrees),
+        };
+        sc
+    }
+
+    fn lbx_pivot() -> Vehicle {
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 3.59).expect("valid vehicle")
+    }
+
+    #[test]
+    fn a_narrow_opening_that_defeated_the_old_shape_now_admits_an_entry() {
+        // The old fixed shape — straight, quarter turn, straight — found
+        // nothing at all on this gateway, at any leaf angle, out of 7 410
+        // candidates. Lifting its two gratuitous constraints is what buys the
+        // entry: the turn no longer has to be exactly ninety degrees, and the
+        // approach no longer has to be exactly five metres.
+        let outcome = search(
+            &lbx_pivot(),
+            &measured_gateway(118.0),
+            Approach::Forward,
+            Grid::fine(),
         );
+        let best = outcome
+            .best()
+            .expect("Dubins finds what the fixed shape could not");
+        assert_eq!(best.moves, 1);
+        assert!(best.is_exact(), "an exhaustive sweep says so");
+        assert!(best.min_clearance > 0.0, "got {}", best.min_clearance);
+    }
+
+    #[test]
+    fn leaves_square_to_the_wall_defeat_this_gateway_whatever_the_curve() {
+        // Not a shortcoming of the sweep, and worth pinning so nobody spends a
+        // day widening the grid over it. A leaf held at ninety degrees makes
+        // the passage a 1.70 m corridor, which tolerates almost no angle,
+        // while the vehicle needs its full turning radius of clear depth
+        // before its nose reaches the wall — and this street leaves 1.44 m.
+        // The entry appears as soon as either constraint eases: opening the
+        // leaves further, or a sliding gate.
+        let vehicle = lbx_pivot();
+        let square = search(
+            &vehicle,
+            &measured_gateway(90.0),
+            Approach::Forward,
+            Grid::fine(),
+        );
+        assert!(square.best().is_none(), "geometry, not grid coverage");
+
+        let mut sliding = measured_gateway(90.0);
+        sliding.gate = GateKind::Sliding;
+        assert!(
+            search(&vehicle, &sliding, Approach::Forward, Grid::fine())
+                .best()
+                .is_some(),
+            "without the leaves the same street admits the same vehicle"
+        );
+    }
+
+    #[test]
+    fn the_vehicle_finishes_square_to_the_opening() {
+        // Criterion 3 of the design. The old arrival test only demanded depth,
+        // so the vehicle could end up askew in the yard.
+        let outcome = search(
+            &lbx(),
+            &scene_with_opening(4.0),
+            Approach::Forward,
+            Grid::fine(),
+        );
+        let best = outcome.best().expect("4 m admits an entry");
+        let last = best.poses.last().expect("a manoeuvre has poses");
+        let off_square = (last.pose.heading.get() - std::f64::consts::FRAC_PI_2).abs();
+        assert!(
+            off_square.to_degrees() <= 5.0 + 1e-9,
+            "finished {} degrees off square",
+            off_square.to_degrees()
+        );
+    }
+
+    #[test]
+    fn a_forward_sweep_never_reverses() {
+        let outcome = search(
+            &lbx(),
+            &scene_with_opening(4.0),
+            Approach::Forward,
+            Grid::fine(),
+        );
+        let best = outcome.best().expect("4 m admits an entry");
+        for step in &best.poses {
+            assert_eq!(step.direction, Direction::Forward);
+        }
+    }
+
+    #[test]
+    fn the_path_starts_on_the_road_and_ends_in_the_yard() {
+        let (vehicle, sc) = (lbx(), scene_with_opening(4.0));
+        let outcome = search(&vehicle, &sc, Approach::Forward, Grid::fine());
+        let best = outcome.best().expect("4 m admits an entry");
+        let first = best.poses.first().expect("a manoeuvre has poses");
+        let last = best.poses.last().expect("a manoeuvre has poses");
+        assert!(
+            first.pose.y < 0.0,
+            "starts on the road, got y={}",
+            first.pose.y
+        );
+        assert!(
+            last.pose.y >= crate::path::entry_depth(&sc, &vehicle) - 1e-6,
+            "ends past the entry depth, got y={}",
+            last.pose.y
+        );
+    }
+
+    #[test]
+    fn the_coarse_grid_divides_the_fine_one_on_every_axis() {
+        // This is what makes the next test a property instead of a hope. Two
+        // sweeps at unrelated step counts share almost no values, so a coarse
+        // grid could legitimately beat a fine one. Making each coarse count
+        // divide its fine counterpart makes the coarse sweep try a strict
+        // subset, bit for bit.
+        let (fine, coarse) = (Grid::fine(), Grid::coarse());
+        for (f, c, axis) in [
+            (fine.start_x_steps, coarse.start_x_steps, "start_x"),
+            (fine.lateral_steps, coarse.lateral_steps, "lateral"),
+            (fine.entry_steps, coarse.entry_steps, "entry"),
+            (fine.heading_steps, coarse.heading_steps, "heading"),
+        ] {
+            assert!(
+                c > 0,
+                "{axis}: a coarse count of zero cannot divide anything"
+            );
+            assert_eq!(f % c, 0, "{axis}: {c} does not divide {f}");
+        }
+        // Radii step by a fixed increment, so a smaller count is a prefix.
+        assert!(coarse.radius_steps <= fine.radius_steps);
+    }
+
+    #[test]
+    fn a_finer_grid_never_finds_less_room_than_a_coarser_one() {
+        let (vehicle, sc) = (lbx(), scene_with_opening(3.0));
+        let coarse = search(&vehicle, &sc, Approach::Forward, Grid::coarse());
+        let fine = search(&vehicle, &sc, Approach::Forward, Grid::fine());
+        if let (Some(c), Some(f)) = (coarse.best(), fine.best()) {
+            assert!(
+                f.min_clearance >= c.min_clearance - 1e-9,
+                "coarse gave {}, fine gave {}",
+                c.min_clearance,
+                f.min_clearance
+            );
+        }
     }
 }
