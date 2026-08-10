@@ -127,11 +127,30 @@ pub fn reverse_path(
 /// Scores a path: its tightest clearance, or `None` if it collides anywhere.
 #[must_use]
 pub fn evaluate(poses: &[Pose], field: &ClearanceField) -> Option<f64> {
+    evaluate_at_least(poses, field, f64::NEG_INFINITY)
+}
+
+/// Scores a path, giving up as soon as it can no longer beat `floor`.
+///
+/// Returns the same answer as [`evaluate`] whenever it returns `Some`. The
+/// difference is what it does with a bad candidate: a sweep looking for the
+/// roomiest path does not need to know *how* bad a worse one is, only that it
+/// is worse. Passing the best clearance found so far as `floor` rejects most
+/// candidates within a few poses instead of walking all two hundred.
+///
+/// Pass `f64::NEG_INFINITY` to score unconditionally.
+#[must_use]
+pub fn evaluate_at_least(poses: &[Pose], field: &ClearanceField, floor: f64) -> Option<f64> {
     let mut smallest = f64::MAX;
     for pose in poses {
         match field.at(*pose) {
             Clearance::Collision => return None,
-            Clearance::Clear(margin) => smallest = smallest.min(margin),
+            Clearance::Clear(margin) => {
+                if margin <= floor {
+                    return None;
+                }
+                smallest = smallest.min(margin);
+            }
         }
     }
     (smallest < f64::MAX).then_some(smallest)
@@ -240,5 +259,50 @@ mod tests {
             .map(|i| Pose::new(-8.0 + f64::from(i) * 0.4, 0.15, Radians::default()))
             .collect();
         assert_eq!(evaluate(&poses, &field), None);
+    }
+
+    #[test]
+    fn a_floor_below_everything_gives_the_same_answer_as_evaluating() {
+        let (scene, vehicle) = (wide_scene(), lbx());
+        let field = ClearanceField::new(&scene, &vehicle);
+        let poses: Vec<Pose> = (0..40)
+            .map(|i| Pose::new(-8.0 + f64::from(i) * 0.4, -3.5, Radians::default()))
+            .collect();
+        let plain = evaluate(&poses, &field).expect("a clear path");
+        let floored = evaluate_at_least(&poses, &field, f64::NEG_INFINITY).expect("a clear path");
+        assert!((plain - floored).abs() < 1e-12);
+    }
+
+    #[test]
+    fn a_path_that_cannot_beat_the_floor_is_abandoned() {
+        // The sweep only wants to know whether a candidate beats the best so
+        // far. Once a pose falls below that, how much worse it gets is of no
+        // interest, and finishing the walk would be wasted work.
+        let (scene, vehicle) = (wide_scene(), lbx());
+        let field = ClearanceField::new(&scene, &vehicle);
+        let poses: Vec<Pose> = (0..40)
+            .map(|i| Pose::new(-8.0 + f64::from(i) * 0.4, -3.5, Radians::default()))
+            .collect();
+        let reachable = evaluate(&poses, &field).expect("a clear path");
+        assert_eq!(evaluate_at_least(&poses, &field, reachable + 0.01), None);
+    }
+
+    #[test]
+    fn a_colliding_path_is_refused_whatever_the_floor() {
+        let (scene, vehicle) = (wide_scene(), lbx());
+        let field = ClearanceField::new(&scene, &vehicle);
+        let poses: Vec<Pose> = (0..40)
+            .map(|i| Pose::new(-8.0 + f64::from(i) * 0.4, 0.15, Radians::default()))
+            .collect();
+        assert_eq!(evaluate_at_least(&poses, &field, f64::NEG_INFINITY), None);
+    }
+
+    #[test]
+    fn an_empty_path_scores_nothing() {
+        // Guards the `smallest < f64::MAX` sentinel: an empty path must not
+        // come back as infinitely roomy and win the sweep.
+        let (scene, vehicle) = (wide_scene(), lbx());
+        let field = ClearanceField::new(&scene, &vehicle);
+        assert_eq!(evaluate_at_least(&[], &field, f64::NEG_INFINITY), None);
     }
 }
