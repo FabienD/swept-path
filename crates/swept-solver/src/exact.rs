@@ -57,21 +57,31 @@ impl Grid {
     /// overall: one pair of poses yields up to six curves where the old
     /// parameters yielded one path.
     ///
-    /// MEASURED, by `examples/bench.rs` on a 2.6 m opening: 26 775 pose pairs,
-    /// 742 ms for a forward sweep, against 41 ms for [`Grid::coarse`]. The
-    /// ceiling is the second beyond which the interface stops feeling like it
-    /// answers, and the axes were traded against each other to sit under it:
-    /// `start_x_steps` is the one that must stay generous, since it decides
-    /// *where the turn begins*, and starving it was what made the carriageway
-    /// bisection return nothing at all.
+    /// MEASURED by `examples/bench.rs`: 38 025 pose pairs, 766 ms for a
+    /// forward sweep and 1.1 s for a reverse one, against 29 and 44 ms for
+    /// [`Grid::coarse`]. The budget is the second or so beyond which a tool
+    /// stops feeling like it answers.
+    ///
+    /// The counts are not uniform because the axes are not worth the same.
+    /// Measured on a 2.29 m opening, doubling `entry_steps`, `heading_steps`
+    /// or `radius_steps` bought **no clearance at all**, while `start_x_steps`
+    /// took it from 0.1 cm to 4.2 cm. That axis decides *where the turn
+    /// begins*, and the window where a turn lands square in a narrow opening
+    /// is a few centimetres wide — so it gets the budget the other three do
+    /// not need. Starving it is also what made the carriageway bisection
+    /// return nothing at all.
+    ///
+    /// Every count is even, which matters: the grids are inclusive of their
+    /// bounds, so an odd count would straddle the centre value rather than
+    /// land on it — and dead centre is exactly where an entry is aimed.
     #[must_use]
     pub fn fine() -> Self {
         Self {
-            radius_steps: 4,
-            start_x_steps: 16,
-            lateral_steps: 6,
-            entry_steps: 8,
-            heading_steps: 4,
+            radius_steps: 2,
+            start_x_steps: 64,
+            lateral_steps: 12,
+            entry_steps: 4,
+            heading_steps: 2,
         }
     }
 
@@ -90,10 +100,10 @@ impl Grid {
     #[must_use]
     pub fn coarse() -> Self {
         Self {
-            radius_steps: 2,
-            start_x_steps: 8,
-            lateral_steps: 3,
-            entry_steps: 4,
+            radius_steps: 1,
+            start_x_steps: 16,
+            lateral_steps: 4,
+            entry_steps: 2,
             heading_steps: 2,
         }
     }
@@ -229,7 +239,13 @@ fn curve_poses(
             sampled.extend(curve.poses(entry, step));
             sampled.pop();
             sampled.reverse();
-            sampled.into_iter().map(turned_about).collect()
+            // Turned back in place: this runs on every candidate of every
+            // sweep, and collecting into a second vector cost the reverse
+            // approach a third of its time for nothing.
+            for pose in &mut sampled {
+                *pose = turned_about(*pose);
+            }
+            sampled
         }
     }
 }
@@ -346,8 +362,22 @@ mod tests {
     }
 
     #[test]
-    fn a_coarse_grid_visits_fewer_candidates_than_a_fine_one() {
+    fn a_coarse_grid_visits_fewer_pairs_than_a_fine_one() {
         assert!(Grid::coarse().candidate_count() < Grid::fine().candidate_count());
+    }
+
+    #[test]
+    fn the_fine_grid_stays_within_a_workable_number_of_pairs() {
+        // ARBITRARY ceiling, and deliberately generous: this is not a
+        // performance target but a tripwire. A grid that quietly grew by an
+        // order of magnitude would still return correct answers, just far too
+        // slowly for a worker the interface waits on — and nothing else in the
+        // suite would notice.
+        assert!(
+            Grid::fine().candidate_count() <= 60_000,
+            "the fine grid now visits {} pairs",
+            Grid::fine().candidate_count()
+        );
     }
 
     /// The measured gateway: 2.29 m clear, 1.30 m pavement, 5.90 m
