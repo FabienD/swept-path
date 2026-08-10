@@ -26,19 +26,19 @@
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Passage entre piliers</span>
-            <input id="opening" type="number" step="0.05" value="2.40" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="opening" type="number" min="0" step="0.01" value="2.40" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Profondeur des piliers</span>
-            <input id="post-depth" type="number" step="0.05" value="0.55" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="post-depth" type="number" min="0" step="0.01" value="0.55" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Largeur des piliers</span>
-            <input id="post-width" type="number" step="0.05" value="0.55" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="post-width" type="number" min="0" step="0.01" value="0.55" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Épaisseur des murets</span>
-            <input id="wall" type="number" step="0.05" value="0.30" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="wall" type="number" min="0" step="0.01" value="0.30" class="rounded border border-stone-300 px-3 py-2" />
           </label>
         </fieldset>
 
@@ -46,15 +46,15 @@
           <legend class="mb-2 text-sm font-medium text-stone-700">Les vantaux</legend>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Longueur d'un vantail</span>
-            <input id="leaf-length" type="number" step="0.05" value="1.15" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="leaf-length" type="number" min="0" step="0.01" value="1.15" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Épaisseur du vantail</span>
-            <input id="leaf-thickness" type="number" step="0.005" value="0.04" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="leaf-thickness" type="number" min="0" step="0.001" value="0.04" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Écartement de l'axe</span>
-            <input id="hinge-offset" type="number" step="0.005" value="0.035" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="hinge-offset" type="number" min="0" step="0.001" value="0.035" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Position de l'axe (%)</span>
@@ -73,15 +73,15 @@
           <legend class="mb-2 text-sm font-medium text-stone-700">La voirie</legend>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Largeur du trottoir</span>
-            <input id="pavement" type="number" step="0.05" value="1.25" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="pavement" type="number" min="0" step="0.01" value="1.30" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Largeur du bateau</span>
-            <input id="kerb" type="number" step="0.10" value="3.20" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="kerb" type="number" min="0" step="0.01" value="3.20" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Largeur de chaussée</span>
-            <input id="road" type="number" step="0.10" value="6.20" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="road" type="number" min="0" step="0.01" value="5.90" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Sens d'arrivée</span>
@@ -110,31 +110,31 @@
               Rayon de pivot
               <span id="radius-note" class="text-stone-500"></span>
             </span>
-            <input id="radius" type="number" step="0.05" value="3.59" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="radius" type="number" min="0" step="0.001" value="3.59" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Empattement</span>
-            <input id="wheelbase" type="number" step="0.01" value="2.580" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="wheelbase" type="number" min="0" step="0.001" value="2.580" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Longueur totale</span>
-            <input id="length" type="number" step="0.01" value="4.190" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="length" type="number" min="0" step="0.001" value="4.190" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Porte-à-faux avant</span>
-            <input id="front-overhang" type="number" step="0.01" value="0.850" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="front-overhang" type="number" min="0" step="0.001" value="0.850" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Largeur caisse</span>
-            <input id="body-width" type="number" step="0.005" value="1.825" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="body-width" type="number" min="0" step="0.001" value="1.825" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Largeur rétros déployés</span>
-            <input id="mirror-width" type="number" step="0.005" value="2.029" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="mirror-width" type="number" min="0" step="0.001" value="2.029" class="rounded border border-stone-300 px-3 py-2" />
           </label>
           <label class="grid gap-1">
             <span class="text-sm text-stone-600">Rétros rabattus</span>
-            <input id="mirror-width-folded" type="number" step="0.005" value="1.865" class="rounded border border-stone-300 px-3 py-2" />
+            <input id="mirror-width-folded" type="number" min="0" step="0.001" value="1.865" class="rounded border border-stone-300 px-3 py-2" />
           </label>
         </fieldset>
 
