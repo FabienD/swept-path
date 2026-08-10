@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+/* Proximity bands, carried over from the prototype (index.html:605). Kept as
+   tokens rather than literals so the renderer never hard-codes a colour. */
+@theme {
+  --color-band-clear: #2c6e8f;
+  --color-band-watch: #d9a400;
+  --color-band-close: #dd6b1f;
+  --color-band-tight: #c42b1c;
+}

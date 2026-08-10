@@ -9,7 +9,7 @@
 //! always yield the same plan.
 
 use crate::budget::{Discretisation, Progress, SearchBudget};
-use crate::landing::{Landing, land};
+use crate::landing::{Landing, landings};
 use crate::result::{Confidence, DirectedPose, Maneuver, Outcome};
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};
@@ -133,14 +133,15 @@ fn heuristic(pose: &Pose, goal: f64) -> f64 {
         + HEADING_ERROR_WEIGHT * (FRAC_PI_2 - pose.heading.get()).abs()
 }
 
-/// Turns a finished search back into a manoeuvre.
+/// Turns one finished search branch back into a manoeuvre.
 fn assemble(
     arena: &[Node],
     goal_index: usize,
     landing: &Landing,
     field: &ClearanceField,
     exhausted: bool,
-) -> Outcome {
+    moves: u8,
+) -> Maneuver {
     let mut chain: Vec<usize> = Vec::new();
     let mut cursor = Some(goal_index);
     while let Some(i) = cursor {
@@ -177,15 +178,14 @@ fn assemble(
         })
         .unwrap_or(landing.min_clearance);
 
-    let extra = u8::from(landing.direction != arena[goal_index].direction);
-    Outcome::Found(vec![Maneuver {
+    Maneuver {
         poses,
         min_clearance,
-        moves: arena[goal_index].moves + extra,
+        moves,
         confidence: Confidence::Heuristic {
             budget_exhausted: exhausted,
         },
-    }])
+    }
 }
 
 /// The search frontier: every visited node, the open set, and the cells
@@ -278,8 +278,14 @@ pub fn plan(
     };
 
     let mut expanded: u32 = 0;
-    let mut best: Option<(usize, Landing)> = None;
-    let mut solutions: u16 = 0;
+    // The roomiest landing found for each total move count. One search now
+    // answers every depth, instead of one search per depth re-exploring the
+    // same space — which cost three times over for nothing.
+    let mut best: Vec<Option<(usize, Landing)>> = vec![None; usize::from(max_moves) + 2];
+    // Counted per move count, not overall: a single quota would fill up with
+    // landings at one depth and stop the search before it ever reached the
+    // others.
+    let mut solutions: Vec<u16> = vec![0; usize::from(max_moves) + 2];
     let mut exhausted = false;
 
     while let Some(Ranked { index, .. }) = heap.pop() {
@@ -300,18 +306,25 @@ pub fn plan(
         let heading_error = (FRAC_PI_2 - pose.heading.get())
             .abs()
             .min((-FRAC_PI_2 - pose.heading.get()).abs());
-        if pose.x.abs() < LANDING_TRIGGER_X_M
-            && heading_error < LANDING_TRIGGER_HEADING_RAD
-            && let Some(landing) = land(pose, vehicle, scene, &field, allowed)
-        {
-            let better = best
-                .as_ref()
-                .is_none_or(|(_, b)| landing.min_clearance > b.min_clearance);
-            if better {
-                best = Some((index, landing));
+        if pose.x.abs() < LANDING_TRIGGER_X_M && heading_error < LANDING_TRIGGER_HEADING_RAD {
+            // Each landing is filed under what it actually costs: turning
+            // round to back in is a move, and a roomier landing that spends
+            // one is not the same answer as a tighter one that does not.
+            for landing in landings(pose, vehicle, scene, &field, allowed) {
+                let total = moves + u8::from(landing.direction != direction);
+                let Some(slot) = best.get_mut(usize::from(total)) else {
+                    continue;
+                };
+                if slot
+                    .as_ref()
+                    .is_none_or(|(_, b)| landing.min_clearance > b.min_clearance)
+                {
+                    *slot = Some((index, landing));
+                }
+                solutions[usize::from(total)] += 1;
             }
-            solutions += 1;
-            if solutions >= budget.max_solutions {
+            // Nothing left to improve anywhere: stop.
+            if solutions.iter().all(|&n| n >= budget.max_solutions) {
                 break;
             }
         }
@@ -362,13 +375,39 @@ pub fn plan(
         }
     }
 
-    let Some((goal_index, landing)) = best else {
+    collect(&arena, &best, &field, exhausted)
+}
+
+/// Turns the best landing of each move count into an outcome.
+fn collect(
+    arena: &[Node],
+    best: &[Option<(usize, Landing)>],
+    field: &ClearanceField,
+    exhausted: bool,
+) -> Outcome {
+    let found: Vec<Maneuver> = best
+        .iter()
+        .enumerate()
+        .filter_map(|(total, slot)| {
+            let (index, landing) = slot.as_ref()?;
+            #[allow(clippy::cast_possible_truncation)]
+            Some(assemble(
+                arena,
+                *index,
+                landing,
+                field,
+                exhausted,
+                total as u8,
+            ))
+        })
+        .collect();
+
+    if found.is_empty() {
         return Outcome::NotFound {
             budget_exhausted: exhausted,
         };
-    };
-
-    assemble(&arena, goal_index, &landing, &field, exhausted)
+    }
+    Outcome::Found(found)
 }
 
 #[cfg(test)]
@@ -417,6 +456,31 @@ mod tests {
             "got {} moves",
             best.moves
         );
+    }
+
+    /// One search, every depth. Exploring once and reading off each move
+    /// count is what removes the threefold cost of planning depth by depth.
+    #[test]
+    fn a_single_search_yields_one_alternative_per_move_count() {
+        let outcome = plan(
+            &lbx(),
+            &scene(2.6),
+            4,
+            SearchBudget::default(),
+            &mut Silent,
+            None,
+        );
+        if let Outcome::Found(list) = outcome {
+            let counts: Vec<u8> = list.iter().map(|m| m.moves).collect();
+            let mut unique = counts.clone();
+            unique.sort_unstable();
+            unique.dedup();
+            assert_eq!(counts.len(), unique.len(), "one per move count: {counts:?}");
+            assert!(
+                list.len() > 1,
+                "a 2.6 m opening admits several depths, got {counts:?}"
+            );
+        }
     }
 
     #[test]

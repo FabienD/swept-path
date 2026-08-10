@@ -16,3 +16,6 @@ crates/swept-wasm/pkg/
 .env
 .env.local
 .vercel
+web/src/generated/
+web/dist/
+.env*

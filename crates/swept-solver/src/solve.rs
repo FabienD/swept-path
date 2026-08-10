@@ -56,26 +56,34 @@ pub fn alternatives(
         .fold(f64::MIN, f64::max);
     let has_one_move = one_move_clearance > f64::MIN;
 
-    for depth in 2..=MAX_MOVES {
-        match plan(vehicle, scene, depth, budget, progress, allowed) {
-            Outcome::Found(list) => {
-                for candidate in list {
-                    // Never present a deeper plan that is worse than the exact
-                    // one-move answer.
-                    if has_one_move && candidate.min_clearance < one_move_clearance {
-                        continue;
+    // One search, every depth. plan() explores the space once and reports the
+    // roomiest landing for each move count, so calling it per depth would
+    // re-explore the same states three times over for nothing.
+    match plan(vehicle, scene, MAX_MOVES, budget, progress, allowed) {
+        Outcome::Found(list) => {
+            for candidate in list {
+                // Never present a deeper plan that is worse than the exact
+                // one-move answer.
+                if has_one_move && candidate.min_clearance < one_move_clearance {
+                    continue;
+                }
+                match found.iter_mut().find(|m| m.moves == candidate.moves) {
+                    // A heuristic result never displaces an exact one. The
+                    // sweep is exhaustive on its grid and says so; letting a
+                    // planner overwrite it would raise the one-move figure
+                    // that every deeper plan is measured against, and deeper
+                    // plans already filtered against the old one would end up
+                    // below it — breaking multi-never-worse-than-simple.
+                    Some(existing) if existing.is_exact() => {}
+                    Some(existing) if candidate.min_clearance > existing.min_clearance => {
+                        *existing = candidate;
                     }
-                    match found.iter_mut().find(|m| m.moves == candidate.moves) {
-                        Some(existing) if candidate.min_clearance > existing.min_clearance => {
-                            *existing = candidate;
-                        }
-                        Some(_) => {}
-                        None => found.push(candidate),
-                    }
+                    Some(_) => {}
+                    None => found.push(candidate),
                 }
             }
-            Outcome::NotFound { budget_exhausted } => exhausted |= budget_exhausted,
         }
+        Outcome::NotFound { budget_exhausted } => exhausted |= budget_exhausted,
     }
 
     if found.is_empty() {
@@ -83,7 +91,23 @@ pub fn alternatives(
             budget_exhausted: exhausted,
         };
     }
+
+    // Drop dominated alternatives. Extra manoeuvres have to buy room: an
+    // answer in three moves offering no more than the one in a single move is
+    // not an option, it is noise. The earlier guard only compared against the
+    // *exact* one-move answer, so on a scene where the exhaustive sweep finds
+    // nothing — most tight ones — there was no reference and everything got
+    // through.
     found.sort_by_key(|m| m.moves);
+    let mut roomiest = f64::MIN;
+    found.retain(|m| {
+        let keep = m.min_clearance > roomiest;
+        if keep {
+            roomiest = m.min_clearance;
+        }
+        keep
+    });
+
     Outcome::Found(found)
 }
 
@@ -177,6 +201,84 @@ mod tests {
                     other.min_clearance,
                     one.min_clearance
                 );
+            }
+        }
+    }
+
+    /// Regression, found by proptest.
+    ///
+    /// Once `plan()` started reporting a one-move alternative of its own, a
+    /// heuristic result with more clearance than the exhaustive sweep would
+    /// replace it. That raised the figure every deeper plan is measured
+    /// against, after those plans had already been filtered against the old
+    /// one — so multi came out worse than simple on this exact scene.
+    #[test]
+    fn a_heuristic_plan_never_displaces_the_exact_one_move_answer() {
+        let vehicle = lbx();
+        let mut sc = scene(2.701_696_162_945_853);
+        sc.road_width = 5.795_297_516_544_246;
+
+        let Outcome::Found(list) = alternatives(&vehicle, &sc, thrifty(), &mut Silent, None) else {
+            panic!("this scene admits an entry");
+        };
+
+        let one = list
+            .iter()
+            .find(|m| m.moves == 1)
+            .expect("a one-move answer exists here");
+        assert!(
+            one.is_exact(),
+            "the one-move answer must stay the exact one"
+        );
+        for other in list.iter().filter(|m| m.moves > 1) {
+            assert!(
+                other.min_clearance >= one.min_clearance - 1e-9,
+                "{} moves gave {} against {} for one move",
+                other.moves,
+                other.min_clearance,
+                one.min_clearance
+            );
+        }
+    }
+
+    /// Regression: three manoeuvres offered 0.3 cm where one offered 4.5.
+    ///
+    /// The guard only compared against the *exact* one-move answer, so on a
+    /// scene where the exhaustive sweep finds nothing — which is most tight
+    /// ones — there was no reference at all and everything got through.
+    #[test]
+    fn more_moves_must_buy_more_room_than_every_shorter_answer() {
+        // Fabien's gateway, with the pivot radius rather than the published
+        // one: swinging leaves at 90 degrees, 1.25 m pavement, 6.20 m road.
+        let vehicle = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 3.59).expect("valid");
+        for opening in [2.30_f64, 2.40, 2.60, 3.00] {
+            let mut sc = scene(opening);
+            sc.pavement_width = 1.25;
+            sc.road_width = 6.20;
+            sc.dropped_kerb_width = 3.20;
+            sc.gate = GateKind::Swinging {
+                leaf_length: 1.15,
+                leaf_thickness: 0.04,
+                hinge_offset: 0.035,
+                hinge_depth_ratio: 0.5,
+                open_angle: swept_core::units::Radians::from_degrees(90.0),
+            };
+            let Outcome::Found(list) =
+                alternatives(&vehicle, &sc, SearchBudget::default(), &mut Silent, None)
+            else {
+                continue;
+            };
+            for (i, deeper) in list.iter().enumerate() {
+                for shorter in &list[..i] {
+                    assert!(
+                        deeper.min_clearance > shorter.min_clearance,
+                        "{opening} m: {} moves gave {} against {} for {} moves",
+                        deeper.moves,
+                        deeper.min_clearance,
+                        shorter.min_clearance,
+                        shorter.moves
+                    );
+                }
             }
         }
     }
