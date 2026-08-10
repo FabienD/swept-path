@@ -9,11 +9,13 @@ use crate::budget::Discretisation;
 use crate::path::evaluate_at_least;
 use crate::poses::{goal_poses, start_poses};
 use crate::result::{Confidence, DirectedPose, Maneuver, Outcome};
+use std::f64::consts::{PI, TAU};
 use swept_core::clearance::ClearanceField;
 use swept_core::curves::CurvePath;
 use swept_core::curves::dubins;
 use swept_core::kinematics::{Direction, Pose};
 use swept_core::scene::Scene;
+use swept_core::units::Radians;
 use swept_core::vehicle::Vehicle;
 
 /// Which way the vehicle drives in.
@@ -169,29 +171,66 @@ pub fn search(vehicle: &Vehicle, scene: &Scene, approach: Approach, grid: Grid) 
     }
 }
 
+/// The same pose, turned about.
+///
+/// A vehicle backing along a path covers exactly the ground a vehicle driving
+/// forward along the same path in the other direction covers. Turning both
+/// poses about is what turns a reverse problem into a Dubins one.
+///
+/// The heading is wrapped, because this is applied twice — once to state the
+/// problem, once to read the answer back — and [`Radians`] does not wrap on
+/// its own. Without it a reverse entry would come out a full turn off, and
+/// carry that all the way to the interface, which would report a vehicle
+/// finishing 361 degrees from square.
+fn turned_about(pose: Pose) -> Pose {
+    Pose::new(
+        pose.x,
+        pose.y,
+        Radians::new((pose.heading.get() + PI).rem_euclid(TAU)),
+    )
+}
+
 /// Every curve joining two poses for the given approach.
 ///
-/// Reverse is filled in by the next task. Returning nothing meanwhile is
-/// deliberate: no test drives a reverse sweep, and `solve::alternatives` tries
-/// forward first and stops as soon as it answers.
+/// Forward is Dubins directly. Reverse is Dubins on the turned-about problem,
+/// read from the goal back to the start — which is why the arguments are
+/// swapped here and the samples reversed in [`curve_poses`].
 fn curves_between(approach: Approach, start: Pose, goal: Pose, radius: f64) -> Vec<CurvePath> {
     match approach {
         Approach::Forward => dubins::all(start, goal, radius),
-        Approach::Reverse => Vec::new(),
+        Approach::Reverse => dubins::all(turned_about(goal), turned_about(start), radius),
     }
 }
 
 /// Samples a curve into the poses the vehicle actually occupies.
+///
+/// For a reverse approach the curve runs from goal to start with the headings
+/// turned about, so the samples are turned back and read in reverse. The
+/// vehicle's own pose is what the caller wants, not the direction it happens
+/// to be travelling in.
 fn curve_poses(
     approach: Approach,
     curve: &CurvePath,
     start: Pose,
-    _goal: Pose,
+    goal: Pose,
     step: f64,
 ) -> Vec<Pose> {
     match approach {
         Approach::Forward => curve.poses(start, step),
-        Approach::Reverse => Vec::new(),
+        Approach::Reverse => {
+            // `CurvePath::poses` excludes its starting pose and includes its
+            // ending one. Read backwards, the curve's *excluded* beginning is
+            // the journey's goal — so putting it back is what makes the
+            // journey land on the goal exactly, rather than one sampling step
+            // short of it. Its end, conversely, is the journey's start, which
+            // the caller prepends itself, so that one is dropped.
+            let entry = turned_about(goal);
+            let mut sampled = vec![entry];
+            sampled.extend(curve.poses(entry, step));
+            sampled.pop();
+            sampled.reverse();
+            sampled.into_iter().map(turned_about).collect()
+        }
     }
 }
 
@@ -200,7 +239,6 @@ mod tests {
     use super::*;
     use swept_core::clearance::Clearance;
     use swept_core::scene::{GateKind, Post};
-    use swept_core::units::Radians;
 
     /// A scene whose dropped kerb is wider than the opening, as a real one is:
     /// the kerb has to be dropped at least across the gateway.
@@ -457,6 +495,77 @@ mod tests {
         }
         // Radii step by a fixed increment, so a smaller count is a prefix.
         assert!(coarse.radius_steps <= fine.radius_steps);
+    }
+
+    #[test]
+    fn a_reverse_entry_is_driven_backwards_from_the_road_into_the_yard() {
+        let (vehicle, sc) = (lbx(), scene_with_opening(4.0));
+        let outcome = search(&vehicle, &sc, Approach::Reverse, Grid::fine());
+        let best = outcome.best().expect("4 m admits a reverse entry");
+        let first = best.poses.first().expect("a manoeuvre has poses");
+        let last = best.poses.last().expect("a manoeuvre has poses");
+
+        assert!(
+            first.pose.y < 0.0,
+            "starts on the road, got y={}",
+            first.pose.y
+        );
+        assert!(
+            last.pose.y >= crate::path::entry_depth(&sc, &vehicle) - 1e-6,
+            "ends past the entry depth, got y={}",
+            last.pose.y
+        );
+        for step in &best.poses {
+            assert_eq!(step.direction, Direction::Reverse);
+        }
+    }
+
+    #[test]
+    fn a_reverse_entry_also_finishes_square_to_the_opening() {
+        let outcome = search(
+            &lbx(),
+            &scene_with_opening(4.0),
+            Approach::Reverse,
+            Grid::fine(),
+        );
+        let best = outcome.best().expect("4 m admits a reverse entry");
+        let last = best.poses.last().expect("a manoeuvre has poses");
+        let off_square = (last.pose.heading.get() - std::f64::consts::FRAC_PI_2).abs();
+        assert!(
+            off_square.to_degrees() <= 5.0 + 1e-9,
+            "finished {} degrees off square",
+            off_square.to_degrees()
+        );
+    }
+
+    #[test]
+    fn a_reverse_path_is_the_forward_path_of_the_turned_about_problem() {
+        // The symmetry the whole task rests on, checked on its own rather than
+        // through a sweep: backing from A to B covers the same ground as
+        // driving forward from B to A with both headings turned about.
+        let start = Pose::new(-6.0, -2.5, Radians::default());
+        let goal = Pose::new(0.3, 5.0, Radians::new(std::f64::consts::FRAC_PI_2));
+        let radius = 4.0;
+
+        let curves = curves_between(Approach::Reverse, start, goal, radius);
+        assert!(!curves.is_empty(), "some family applies here");
+
+        for curve in &curves {
+            let poses = curve_poses(Approach::Reverse, curve, start, goal, 0.05);
+            let last = *poses.last().expect("a sampled path is never empty");
+            assert!(
+                (last.x - goal.x).abs() < 1e-6,
+                "x off by {}",
+                last.x - goal.x
+            );
+            assert!(
+                (last.y - goal.y).abs() < 1e-6,
+                "y off by {}",
+                last.y - goal.y
+            );
+            let error = (last.heading.get() - goal.heading.get()).rem_euclid(2.0 * PI);
+            assert!(error.min(2.0 * PI - error) < 1e-6, "heading off by {error}");
+        }
     }
 
     #[test]

@@ -72,7 +72,12 @@ fn spread(low: f64, high: f64, steps: u16) -> Vec<f64> {
 /// clearance field rejects on the spot, since the pavement is a solid obstacle
 /// everywhere but across the dropped kerb.
 #[must_use]
-pub fn start_poses(vehicle: &Vehicle, scene: &Scene, x_steps: u16, lateral_steps: u16) -> Vec<Pose> {
+pub fn start_poses(
+    vehicle: &Vehicle,
+    scene: &Scene,
+    x_steps: u16,
+    lateral_steps: u16,
+) -> Vec<Pose> {
     let half_width = vehicle.mirror_width / 2.0;
     let low = -scene.pavement_width - scene.road_width + half_width + LANE_MARGIN_M;
     let high = -scene.pavement_width - half_width - LANE_MARGIN_M;
@@ -145,7 +150,11 @@ mod tests {
         let starts = start_poses(&vehicle, &sc, 4, 6);
         assert!(!starts.is_empty());
         for pose in &starts {
-            assert!(pose.y < 0.0, "a start belongs on the road, got y={}", pose.y);
+            assert!(
+                pose.y < 0.0,
+                "a start belongs on the road, got y={}",
+                pose.y
+            );
             assert!(
                 pose.y > -sc.pavement_width - sc.road_width,
                 "a start belongs on the carriageway, got y={}",
