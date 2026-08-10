@@ -184,7 +184,27 @@ pub fn solve(word: Word, frame: Frame) -> Option<[f64; 3]> {
             let tangent = (cos_a + cos_b).atan2(d - sin_a - sin_b) - 2.0f64.atan2(straight);
             Some([mod_2pi(alpha - tangent), straight, mod_2pi(beta - tangent)])
         }
-        Word::Rlr | Word::Lrl => None, // Task 4.
+        Word::Rlr => {
+            // The middle arc's half-angle comes from the law of cosines on the
+            // triangle joining the three circle centres. Outside [-1, 1] the
+            // triangle does not close: no third circle touches both.
+            let cosine = (6.0 - d * d + 2.0 * cos_turn + 2.0 * d * (sin_a - sin_b)) / 8.0;
+            if cosine.abs() > 1.0 {
+                return None;
+            }
+            let middle = mod_2pi(TAU - cosine.acos());
+            let first = mod_2pi(alpha - (cos_a - cos_b).atan2(d - sin_a + sin_b) + middle / 2.0);
+            Some([first, middle, mod_2pi(alpha - beta - first + middle)])
+        }
+        Word::Lrl => {
+            let cosine = (6.0 - d * d + 2.0 * cos_turn + 2.0 * d * (sin_b - sin_a)) / 8.0;
+            if cosine.abs() > 1.0 {
+                return None;
+            }
+            let middle = mod_2pi(TAU - cosine.acos());
+            let first = mod_2pi(-alpha + (-cos_a + cos_b).atan2(d + sin_a - sin_b) + middle / 2.0);
+            Some([first, middle, mod_2pi(beta - alpha - first + middle)])
+        }
     }
 }
 
@@ -351,6 +371,37 @@ mod tests {
         let from = Pose::default();
         let to = Pose::new(0.2, 0.0, Radians::new(PI));
         assert!(path(Word::Lsr, from, to, 5.0).is_none());
+    }
+
+    #[test]
+    fn every_ccc_family_lands_on_the_goal() {
+        // Close together and nearly reversed: the regime where three arcs beat
+        // any arc-straight-arc, and the regime an entry manoeuvre lives in.
+        let from = Pose::new(0.0, 0.0, Radians::new(0.2));
+        let to = Pose::new(2.0, 1.0, Radians::new(2.6));
+        for word in [Word::Rlr, Word::Lrl] {
+            assert_lands_on(word, from, to, 3.0);
+        }
+    }
+
+    #[test]
+    fn a_ccc_family_does_not_apply_when_the_poses_are_far_apart() {
+        // Beyond four radii there is no third circle touching both, and the
+        // closed form's arccos leaves its domain.
+        let from = Pose::default();
+        let to = Pose::new(40.0, 0.0, Radians::default());
+        assert!(path(Word::Rlr, from, to, 3.0).is_none());
+        assert!(path(Word::Lrl, from, to, 3.0).is_none());
+    }
+
+    #[test]
+    fn a_ccc_path_never_reverses() {
+        let from = Pose::new(0.0, 0.0, Radians::new(0.2));
+        let to = Pose::new(2.0, 1.0, Radians::new(2.6));
+        for word in [Word::Rlr, Word::Lrl] {
+            let path = path(word, from, to, 3.0).expect("applies");
+            assert_eq!(path.reversals(), 0, "{word:?} reversed");
+        }
     }
 
     #[test]
