@@ -31,6 +31,29 @@ pub const MOVE_COST: f64 = 5.0;
 /// ARBITRARY — carried over from the prototype (`index.html:513`).
 pub const LENGTH_COST_PER_M: f64 = 0.18;
 
+/// Below this clearance, a plan starts paying for being tight, in metres.
+///
+/// ARBITRARY in magnitude, but not in choice: it is the wider of the two alert
+/// bands the interface already draws, so the planner charges for exactly what
+/// the interface calls "vigilance". Above it, room is free — a plan with 30 cm
+/// to spare has nothing to gain from 40.
+pub const TIGHTNESS_THRESHOLD_M: f64 = 0.25;
+
+/// Cost charged per metre of shortfall below [`TIGHTNESS_THRESHOLD_M`].
+///
+/// **Chosen so that room can never outweigh a manoeuvre.** The shortfall is
+/// bounded by the threshold itself — a zero margin falls short by the whole of
+/// it — so the worst a plan can pay is `0.25 * 16 = 4.0`, against
+/// [`MOVE_COST`] of 5.0 for one more shunt. The property therefore holds on
+/// every scene by arithmetic rather than by calibration, and a test pins it.
+pub const TIGHTNESS_COST: f64 = 16.0;
+
+/// Room can never outweigh a manoeuvre, and the compiler enforces it.
+///
+/// Stronger than a test: change either constant so that a plan could buy its
+/// way past a shunt, and the crate stops building.
+const _: () = assert!(TIGHTNESS_THRESHOLD_M * TIGHTNESS_COST < MOVE_COST);
+
 /// Weight given to heading error in the heuristic.
 ///
 /// ARBITRARY — carried over from the prototype (`index.html:471`).
@@ -85,6 +108,14 @@ struct Node {
     direction: Direction,
     moves: u8,
     travelled: f64,
+    /// Worst shortfall below [`TIGHTNESS_THRESHOLD_M`] anywhere on the way
+    /// here, in metres.
+    ///
+    /// The **worst**, not the sum: a plan is as tight as its tightest moment,
+    /// and summing would let a long roomy plan out-cost a short grazing one.
+    /// It can only grow along a path, so the cost stays monotonic and the A\*
+    /// stays correct.
+    worst_shortfall: f64,
     parent: Option<usize>,
     segment: Vec<Pose>,
 }
@@ -233,6 +264,7 @@ fn seed(
             direction: Direction::Forward,
             moves: 1,
             travelled: 0.0,
+            worst_shortfall: 0.0,
             parent: None,
             segment: Vec::new(),
         });
@@ -242,6 +274,35 @@ fn seed(
         });
     }
     Some(frontier)
+}
+
+/// How far a clearance falls below the threshold, in metres. Zero above it.
+fn shortfall(margin: f64) -> f64 {
+    (TIGHTNESS_THRESHOLD_M - margin).max(0.0)
+}
+
+/// What a node is ranked on: shunts, then distance, then how tight it got.
+fn score_of(moves: u8, travelled: f64, worst_shortfall: f64, end: &Pose, goal: f64) -> f64 {
+    f64::from(moves) * MOVE_COST
+        + travelled * LENGTH_COST_PER_M
+        + worst_shortfall * TIGHTNESS_COST
+        + heuristic(end, goal)
+}
+
+/// The smallest clearance along a segment, or `None` if it collides.
+///
+/// The collision test already asks the field for every margin here and used to
+/// throw them away. Keeping the smallest costs nothing, and it is what lets a
+/// plan value room.
+fn tightest_margin(segment: &[Pose], field: &ClearanceField) -> Option<f64> {
+    let mut tightest = f64::INFINITY;
+    for probe in segment {
+        match field.at(*probe) {
+            Clearance::Collision => return None,
+            Clearance::Clear(margin) => tightest = tightest.min(margin),
+        }
+    }
+    Some(tightest)
 }
 
 fn goal_depth(scene: &Scene) -> f64 {
@@ -298,9 +359,15 @@ pub fn plan(
             progress.nodes_expanded(max_moves, expanded);
         }
 
-        let (pose, direction, moves, travelled) = {
+        let (pose, direction, moves, travelled, worst_shortfall) = {
             let node = &arena[index];
-            (node.pose, node.direction, node.moves, node.travelled)
+            (
+                node.pose,
+                node.direction,
+                node.moves,
+                node.travelled,
+                node.worst_shortfall,
+            )
         };
 
         let heading_error = (FRAC_PI_2 - pose.heading.get())
@@ -346,9 +413,9 @@ pub fn plan(
                     Direction::Reverse => -grid.primitive_length,
                 };
                 let segment = sample_arc(pose, curvature, signed, grid.sample_step);
-                if segment.iter().any(|p| field.at(*p) == Clearance::Collision) {
+                let Some(tightest) = tightest_margin(&segment, &field) else {
                     continue;
-                }
+                };
                 let end = pose.advance(curvature, signed);
 
                 if !seen.insert(cell(&end, step_direction, grid)) {
@@ -356,14 +423,14 @@ pub fn plan(
                 }
 
                 let next_travelled = travelled + grid.primitive_length;
-                let score = f64::from(next_moves) * MOVE_COST
-                    + next_travelled * LENGTH_COST_PER_M
-                    + heuristic(&end, goal);
+                let next_worst = worst_shortfall.max(shortfall(tightest));
+                let score = score_of(next_moves, next_travelled, next_worst, &end, goal);
                 arena.push(Node {
                     pose: end,
                     direction: step_direction,
                     moves: next_moves,
                     travelled: next_travelled,
+                    worst_shortfall: next_worst,
                     parent: Some(index),
                     segment,
                 });
@@ -571,5 +638,34 @@ mod tests {
             None,
         );
         assert!(spy.0 > 0, "the planner never reported progress");
+    }
+
+    #[test]
+    fn the_planner_prefers_the_roomier_of_two_plans() {
+        // A wide opening leaves the planner a choice: it can graze a post or
+        // stay off it for the same number of moves. Before this batch nothing
+        // in the cost told the two apart, so it took whichever was shorter.
+        //
+        // MEASURED by `examples/grid_cost`: on a 4 m opening the default grid
+        // returned 2.6 cm before and 4.9 cm after. The floor below is set well
+        // under that, since the point is to catch a planner that has gone back
+        // to grazing, not to freeze a figure that will drift with the grid.
+        let (vehicle, sc) = (lbx(), scene(4.0));
+        let outcome = plan(&vehicle, &sc, 3, SearchBudget::default(), &mut Silent, None);
+        let best = outcome.best().expect("4 m should be plannable");
+        let field = ClearanceField::new(&sc, &vehicle);
+        let tightest = best
+            .poses
+            .iter()
+            .filter_map(|step| match field.at(step.pose) {
+                Clearance::Clear(margin) => Some(margin),
+                Clearance::Collision => None,
+            })
+            .fold(f64::INFINITY, f64::min);
+        assert!(
+            tightest > 0.04,
+            "the planner still grazes: {:.1} cm at its tightest",
+            tightest * 100.0
+        );
     }
 }
