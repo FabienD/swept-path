@@ -383,3 +383,41 @@ fn the_measured_gateway_admits_a_proved_one_move_entry() {
         off_square.to_degrees()
     );
 }
+
+/// What this batch was built for.
+///
+/// The pure 2D model treats a kerb as a wall of infinite height, so the only
+/// candidates the exhaustive sweep refused on this gateway were those whose
+/// front overhang swings over the pavement beside the dropped kerb. Declaring
+/// the kerb for what it is can only help — never hinder, since every candidate
+/// that was drivable before still is.
+///
+/// MEASURED, and worth knowing: on **this** gateway it buys nothing at all.
+/// A wall, a 12 cm kerb and no pavement whatsoever all return 4.15 cm, with
+/// the same tightest point and not one pose overhanging. What limits this
+/// entry is the opening, not the footway. The batch makes the model right
+/// where it was wrong; it does not make this gateway easier.
+#[test]
+fn a_low_kerb_never_costs_room_and_may_buy_some() {
+    let vehicle =
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid vehicle");
+
+    let walled = measured_gateway();
+    let mut low = measured_gateway();
+    // MEASURED — a standard French T2 kerb stands 12 cm above the gutter.
+    low.kerb_height = 0.12;
+
+    let walled_best = search(&vehicle, &walled, Approach::Forward, Grid::fine());
+    let low_best = search(&vehicle, &low, Approach::Forward, Grid::fine());
+
+    match (walled_best.best(), low_best.best()) {
+        (Some(w), Some(l)) => assert!(
+            l.min_clearance >= w.min_clearance - 1e-9,
+            "a wall gave {:.1} cm, a kerb gave {:.1} cm",
+            w.min_clearance * 100.0,
+            l.min_clearance * 100.0
+        ),
+        (Some(_), None) => panic!("lowering the kerb removed an entry that existed"),
+        (None, _) => { /* nothing to compare, and the batch is not at fault */ }
+    }
+}

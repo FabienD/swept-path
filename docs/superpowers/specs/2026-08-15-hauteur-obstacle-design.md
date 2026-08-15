@@ -6,12 +6,20 @@ Le modèle est purement 2D : tout obstacle est un mur de hauteur infinie. Une
 bordure de trottoir de douze centimètres arrête donc un rétroviseur qui, dans
 la réalité, passe un mètre au-dessus.
 
-Ce n'est pas une imprécision de plus. C'est la différence entre « aucune entrée
-en un mouvement n'existe » et une voiture qui rentre tous les jours. Sur le
-portail qui a motivé le projet — 2,29 m de passage libre, un trottoir de
-1,30 m — les seuls candidats que la recherche exacte refuse sont ceux dont le
-porte-à-faux avant balaie au-dessus du trottoir voisin du bateau. Le solveur a
-raison sur sa géométrie et tort sur le monde.
+Ce n'est pas une imprécision de plus : le solveur a raison sur sa géométrie et
+tort sur le monde, et rien dans ses résultats ne le signale.
+
+**Correction mesurée à l'implémentation.** Cette section affirmait d'abord que
+le portail de référence — 2,29 m de passage libre, trottoir de 1,30 m — était
+justement bloqué par là. C'est faux, et la mesure le dit : sur cette scène, un
+mur, une bordure de 12 cm et l'absence totale de trottoir rendent **tous les
+trois 4,15 cm**, au même point le plus serré, sans qu'une seule pose surplombe
+quoi que ce soit. Ce qui limite cette entrée est l'ouverture, pas le trottoir.
+
+Le lot garde sa raison d'être — un modèle qui traite une bordure comme un mur
+se trompera ailleurs, et se trompe en silence — mais il ne faut pas lui prêter
+un gain qu'il n'apporte pas ici. La conclusion du projet tient une fois de
+plus : la largeur du passage domine tout.
 
 Ce lot donne une hauteur aux obstacles et une garde au sol au véhicule, pour
 que la carrosserie puisse surplomber ce qui est plus bas qu'elle.
