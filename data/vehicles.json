@@ -3,7 +3,7 @@
   "units": "metres",
   "note": "Provenance par champ. source: manufacturer | measured | derived | corroborated | estimated | null. manufacturer = lu sur un document liste dans documents[]. corroborated = concordant sur plusieurs sources independantes, aucune constructeur. derived = calcule a partir d'une autre valeur, un diametre de braquage par exemple. null signifie inconnu, jamais zero.",
   "caveats": {
-    "front_overhang": "Rarement publie. Lexus le donne, les autres non.",
+    "front_overhang": "Rarement publie. Lexus le donne, les autres non. Ou il manque, la somme PAF + PAR reste connue au millimetre (longueur moins empattement), ce qui borne l'erreur : se tromper de 5 cm a l'avant en retire 5 a l'arriere, la longueur totale reste juste et seule la position de l'essieu dans le vehicule se deplace.",
     "width_mirrors": "Le point le plus large, et presque toujours le critique. Porsche et Tesla le publient, Lexus et Kia non.",
     "width": "Chez Lexus et Tesla, la largeur annoncee est celle mesuree retros replies, non la tole nue. C'est une borne haute de la caisse, a quelques millimetres pres.",
     "ground_clearance": "Donnee a vide, convention de mesure variable, elements souples generalement exclus - or la levre de pare-chocs est ce qui surplombe en premier.",
@@ -374,12 +374,12 @@
         "source": "manufacturer"
       },
       "front_overhang": {
-        "v": null,
-        "source": null
+        "v": 1.0,
+        "source": "estimated"
       },
       "rear_overhang": {
-        "v": null,
-        "source": null
+        "v": 1.077,
+        "source": "derived"
       },
       "width": {
         "v": 1.808,
@@ -424,12 +424,12 @@
         "source": "manufacturer"
       },
       "front_overhang": {
-        "v": null,
-        "source": null
+        "v": 1.0,
+        "source": "estimated"
       },
       "rear_overhang": {
-        "v": null,
-        "source": null
+        "v": 1.04,
+        "source": "derived"
       },
       "width": {
         "v": 1.852,
@@ -474,12 +474,12 @@
         "source": "manufacturer"
       },
       "front_overhang": {
-        "v": null,
-        "source": null
+        "v": 1.0,
+        "source": "estimated"
       },
       "rear_overhang": {
-        "v": null,
-        "source": null
+        "v": 1.092,
+        "source": "derived"
       },
       "width": {
         "v": 1.852,
