@@ -26,6 +26,7 @@ const probe = new SolverClient();
 const store = createStore({
   busy: false,
   verdict: "",
+  progress: "",
   alternatives: [] as ManeuverDto[],
   selected: 0,
   position: 1,
@@ -152,9 +153,14 @@ function renderAlternatives(): void {
 }
 
 store.subscribe(() => {
-  const { verdict, alternatives, selected, busy } = store.get();
+  const { verdict, alternatives, selected, busy, progress } = store.get();
   const output = byId("verdict");
   if (output) output.textContent = verdict;
+
+  const bar = byId("progress");
+  if (bar) bar.classList.toggle("hidden", !busy);
+  const note = byId("progress-note");
+  if (note) note.textContent = progress;
 
   const run = byId("run");
   if (run) {
@@ -183,6 +189,7 @@ function clearResult(): void {
     selected: 0,
     position: 1,
     verdict: "",
+    progress: "",
     busy: false,
   });
 }
@@ -311,7 +318,7 @@ form?.addEventListener("submit", async (event) => {
   // silently queueing another one.
   if (store.get().busy) {
     client.cancel();
-    store.set({ busy: false, verdict: "Calcul interrompu." });
+    store.set({ busy: false, verdict: "Calcul interrompu.", progress: "" });
     return;
   }
   // The slider is bounded by max_gate_angle, but a bound that fails silently
@@ -331,10 +338,22 @@ form?.addEventListener("submit", async (event) => {
     }
   }
 
-  store.set({ busy: true, verdict: "Calcul en cours…", alternatives: [] });
+  // The exhaustive sweep runs first and reports nothing — it has no nodes to
+  // count — so this is what the interface shows until the first progress
+  // message says the planner has taken over.
+  store.set({
+    busy: true,
+    verdict: "Calcul en cours…",
+    progress: "Balayage exhaustif des entrées à une manœuvre…",
+    alternatives: [],
+  });
 
   try {
-    const response = await client.solve(readRequest());
+    const response = await client.solve(readRequest(), (moves, expanded) => {
+      store.set({
+        progress: `Planification à ${moves} manœuvres — ${expanded.toLocaleString("fr-FR")} nœuds explorés`,
+      });
+    });
     if (response.alternatives.length === 0) {
       // An exhaustive sweep proves absence; a heuristic one does not.
       store.set({
@@ -364,7 +383,7 @@ form?.addEventListener("submit", async (event) => {
     if (error.code !== CANCELLED) store.set({ verdict: errorMessage(error) });
   } finally {
     // Only clear the flag if nothing took over in the meantime.
-    store.set({ busy: client.busy });
+    store.set({ busy: client.busy, progress: "" });
   }
 });
 

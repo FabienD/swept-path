@@ -15,6 +15,7 @@ crate-type = ["cdylib", "rlib"]
 swept-core = { path = "../swept-core" }
 swept-solver = { path = "../swept-solver" }
 wasm-bindgen = "0.2.127"
+js-sys = "0.3.104"
 serde = { version = "1.0.229", features = ["derive"] }
 serde-wasm-bindgen = "0.6.5"
 console_error_panic_hook = { version = "0.1.7", optional = true }

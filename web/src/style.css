@@ -9,3 +9,14 @@
   --color-band-tight: #c42b1c;
   --color-overhang: #7c3aed;
 }
+
+/* The indeterminate progress bar: a band sweeping end to end, because
+   neither half of a search can honestly report a percentage. */
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}

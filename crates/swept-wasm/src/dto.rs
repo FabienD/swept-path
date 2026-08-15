@@ -10,7 +10,7 @@ use swept_core::kinematics::Direction;
 use swept_core::scene::{GateKind, Post, Scene};
 use swept_core::units::Radians;
 use swept_core::vehicle::{Vehicle, VehicleError};
-use swept_solver::budget::{SearchBudget, Silent};
+use swept_solver::budget::{Progress, SearchBudget, Silent};
 use swept_solver::result::{Confidence, Maneuver, Outcome};
 use swept_solver::solve::alternatives;
 
@@ -365,6 +365,23 @@ fn describe(
 ///
 /// Returns an [`ErrorDto`] when the vehicle dimensions are rejected.
 pub fn run_solve(request: SolveRequest) -> Result<SolveResponse, ErrorDto> {
+    run_solve_reporting(request, &mut Silent)
+}
+
+/// Runs a search, reporting progress as the planner expands nodes.
+///
+/// The exhaustive sweep runs first and says nothing — it has no nodes to
+/// count. **The first report is therefore the signal that the sweep is done**
+/// and the planner has taken over, which is what lets the interface name both
+/// phases without instrumenting the sweep at all.
+///
+/// # Errors
+///
+/// Returns an [`ErrorDto`] when the vehicle dimensions are rejected.
+pub fn run_solve_reporting(
+    request: SolveRequest,
+    progress: &mut impl Progress,
+) -> Result<SolveResponse, ErrorDto> {
     let vehicle = request.vehicle.into_domain()?;
     let scene = request.scene.into_domain();
     let allowed = request.forward_only.map(|forward| {
@@ -375,13 +392,7 @@ pub fn run_solve(request: SolveRequest) -> Result<SolveResponse, ErrorDto> {
         }
     });
 
-    let outcome = alternatives(
-        &vehicle,
-        &scene,
-        SearchBudget::default(),
-        &mut Silent,
-        allowed,
-    );
+    let outcome = alternatives(&vehicle, &scene, SearchBudget::default(), progress, allowed);
 
     let field = ClearanceField::new(&scene, &vehicle);
     let corridor = corridor_depth(&scene);
@@ -629,6 +640,60 @@ mod tests {
                 alternative.metres_overhanging,
                 alternative.distance
             );
+        }
+    }
+
+    /// A [`Progress`] that counts, standing in for the JavaScript callback.
+    #[derive(Default)]
+    struct Spy {
+        calls: u32,
+        last: (u8, u32),
+    }
+
+    impl Progress for Spy {
+        fn nodes_expanded(&mut self, moves: u8, expanded: u32) {
+            self.calls += 1;
+            self.last = (moves, expanded);
+        }
+    }
+
+    #[test]
+    fn a_search_reports_progress_while_it_plans() {
+        // A gateway narrow enough that the planner has real work to do; a
+        // generous one is answered by the exhaustive sweep alone, which says
+        // nothing by design.
+        let mut scene = scene_dto();
+        scene.left_post.inner_edge_x = -1.15;
+        scene.right_post.inner_edge_x = 1.15;
+        let mut spy = Spy::default();
+        run_solve_reporting(
+            SolveRequest {
+                scene,
+                vehicle: vehicle_dto(),
+                forward_only: None,
+            },
+            &mut spy,
+        )
+        .expect("valid dimensions");
+        assert!(spy.calls > 0, "the planner never reported a node");
+        assert!(spy.last.1 > 0, "reported a count of zero");
+    }
+
+    #[test]
+    fn a_silent_search_returns_what_a_reporting_one_does() {
+        // The callback must not change the answer, only observe it.
+        let request = SolveRequest {
+            scene: scene_dto(),
+            vehicle: vehicle_dto(),
+            forward_only: None,
+        };
+        let quiet = run_solve(request).expect("valid dimensions");
+        let mut spy = Spy::default();
+        let loud = run_solve_reporting(request, &mut spy).expect("valid dimensions");
+        assert_eq!(quiet.alternatives.len(), loud.alternatives.len());
+        for (a, b) in quiet.alternatives.iter().zip(&loud.alternatives) {
+            assert!((a.min_clearance - b.min_clearance).abs() < 1e-12);
+            assert_eq!(a.moves, b.moves);
         }
     }
 }

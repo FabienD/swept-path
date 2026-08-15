@@ -87,3 +87,48 @@ describe("solver client", () => {
     }).not.toThrow();
   });
 });
+
+describe("progress", () => {
+  it("reports progress without settling the search", async () => {
+    const worker = new SilentWorker();
+    const client = new SolverClient(() => worker as unknown as Worker);
+    const seen: Array<[number, number]> = [];
+
+    const pending = client.solve(request, (moves, expanded) => {
+      seen.push([moves, expanded]);
+    });
+    worker.reply({ kind: "progress", id: 1, moves: 2, expanded: 500 });
+    worker.reply({ kind: "progress", id: 1, moves: 3, expanded: 1000 });
+    worker.reply({
+      kind: "solved",
+      id: 1,
+      response: { alternatives: [], budget_exhausted: false },
+    });
+
+    await expect(pending).resolves.toEqual({
+      alternatives: [],
+      budget_exhausted: false,
+    });
+    expect(seen).toEqual([
+      [2, 500],
+      [3, 1000],
+    ]);
+  });
+
+  it("ignores progress from a search that was abandoned", async () => {
+    // A stale worker answering after cancellation must not drive the
+    // interface of the search that replaced it.
+    const worker = new SilentWorker();
+    const client = new SolverClient(() => worker as unknown as Worker);
+    const seen: number[] = [];
+
+    const pending = client.solve(request, (_m, expanded) => {
+      seen.push(expanded);
+    });
+    client.cancel();
+    worker.reply({ kind: "progress", id: 1, moves: 2, expanded: 500 });
+
+    await expect(pending).rejects.toMatchObject({ code: CANCELLED });
+    expect(seen).toEqual([]);
+  });
+});
