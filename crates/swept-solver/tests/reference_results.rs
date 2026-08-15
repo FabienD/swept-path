@@ -285,7 +285,17 @@ fn measured_gateway() -> Scene {
             leaf_length: 1.15,
             leaf_thickness: 0.04,
             hinge_offset: 0.035,
-            hinge_depth_ratio: 0.5,
+            // On the yard face of the post, not halfway through it. At
+            // mid-depth the leaves cannot pass 94 degrees — `max_open_angle`
+            // says so — and this scene declares 118, which described a gateway
+            // the model itself calls impossible. Every reference result rested
+            // on it.
+            //
+            // ASSUMED, pending a tape measure: the real gateway plainly opens
+            // past square, and only an axis carried back towards the yard face
+            // allows that. The figures move with it — the sweep returns 2.4 cm
+            // here against the 4.2 cm the impossible geometry claimed.
+            hinge_depth_ratio: 1.0,
             open_angle: Radians::from_degrees(118.0),
         },
     }
@@ -419,5 +429,33 @@ fn a_low_kerb_never_costs_room_and_may_buy_some() {
         ),
         (Some(_), None) => panic!("lowering the kerb removed an entry that existed"),
         (None, _) => { /* nothing to compare, and the batch is not at fault */ }
+    }
+}
+
+/// No reference scene may declare a gate its own geometry forbids.
+///
+/// `measured_gateway` did, for weeks: leaves at 118 degrees on hinges that
+/// `max_open_angle` caps at 94. It is a quiet kind of wrong — the sweep
+/// answers, the numbers look plausible, and every conclusion drawn from them
+/// describes a gateway that could not exist. Nothing else in the suite would
+/// have noticed, because nothing else asks.
+#[test]
+fn every_reference_scene_declares_a_gate_it_can_actually_open() {
+    for (name, scene) in [
+        ("measured_gateway", measured_gateway()),
+        (
+            "corridor_scene(2.40, 90 deg)",
+            corridor_scene(2.40, swinging(90.0)),
+        ),
+    ] {
+        if let GateKind::Swinging { open_angle, .. } = scene.gate {
+            let max = scene.max_open_angle();
+            assert!(
+                open_angle.get() <= max.get() + 1e-12,
+                "{name}: declares {:.0} degrees, hinges allow {:.0}",
+                open_angle.to_degrees(),
+                max.to_degrees()
+            );
+        }
     }
 }
