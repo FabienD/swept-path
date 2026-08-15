@@ -133,6 +133,13 @@ Réserve : selon le montage — jantes larges, déport différent — un pneu pe
 affleurer voire dépasser légèrement l'aile. L'erreur est petite mais pas
 garantie du côté sûr, et le doit dire.
 
+**Conséquence à connaître : seul un porte-à-faux peut surplomber.** Les roues
+étant aux coins de la caisse, le flanc se trouve au-dessus d'une bordure
+exactement quand un pneu y est. Ce qui peut passer au-dessus est donc ce qui
+dépasse d'un essieu — le porte-à-faux avant, ou l'arrière. C'est physiquement
+juste, et c'est bien le phénomène observé : c'est le nez qui balaie au-dessus
+du trottoir quand le véhicule braque, jamais la portière.
+
 ## L'évaluation
 
 ### Le pré-tri
@@ -201,9 +208,14 @@ le premier qui tombe dedans. Sur une scène dont la bordure est déclarée plein
 `overhung` est vide et le prédicat est toujours faux — les tests de référence
 n'ont donc rien à mesurer de neuf.
 
-`swept-wasm` en somme les distances entre poses successives, exactement comme
-il le fait déjà pour les bandes d'alerte, et `ManeuverDto` gagne
-`metres_overhanging: f64`. Coût nul pour le solveur.
+`swept-wasm` marque **chaque pose** d'un `overhanging: bool` et en somme les
+distances, exactement comme il le fait déjà pour les bandes d'alerte ;
+`ManeuverDto` gagne `metres_overhanging: f64`. Coût nul pour le solveur.
+
+Le drapeau par pose n'est pas une commodité : le rendu segmente le tracé en
+groupant les poses voisines qui partagent une clé, laquelle combine le sens de
+marche et la bande de marge. Sans drapeau par pose, un total ne permettrait pas
+de dessiner où le surplomb commence.
 
 ## L'interface
 
