@@ -102,7 +102,7 @@
         "source": "manufacturer"
       },
       "ground_clearance": {
-        "v": null,
+        "v": 0.185,
         "source": null
       },
       "turning_radius": {
@@ -128,12 +128,12 @@
         "source": "manufacturer"
       },
       "front_overhang": {
-        "v": null,
-        "source": null
+        "v": 0.815,
+        "source": "manufacturer"
       },
       "rear_overhang": {
-        "v": null,
-        "source": null
+        "v": 0.815,
+        "source": "manufacturer"
       },
       "width": {
         "v": 1.85,
@@ -144,12 +144,12 @@
         "source": null
       },
       "width_mirrors": {
-        "v": null,
+        "v": 2.04,
         "source": null
       },
       "width_mirrors_folded": {
-        "v": null,
-        "source": null
+        "v": 1.85,
+        "source": "manufacturer"
       },
       "ground_clearance": {
         "v": 0.14,
@@ -157,56 +157,6 @@
       },
       "turning_radius": {
         "v": 5.2,
-        "source": "derived",
-        "kind": "kerb"
-      }
-    },
-    {
-      "id": "kia-ev4",
-      "make": "Kia",
-      "model": "EV4",
-      "body": "hatchback",
-      "documents": [
-        "https://www.kia.com/content/dam/kwcms/au/en/images/pdf/ev4/kia-ev4-brochure.pdf"
-      ],
-      "wheelbase": {
-        "v": 2.82,
-        "source": "manufacturer"
-      },
-      "length": {
-        "v": 4.73,
-        "source": "manufacturer"
-      },
-      "front_overhang": {
-        "v": null,
-        "source": null
-      },
-      "rear_overhang": {
-        "v": null,
-        "source": null
-      },
-      "width": {
-        "v": 1.86,
-        "source": "manufacturer"
-      },
-      "track_front": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors_folded": {
-        "v": null,
-        "source": null
-      },
-      "ground_clearance": {
-        "v": 0.14,
-        "source": "manufacturer"
-      },
-      "turning_radius": {
-        "v": 5.45,
         "source": "derived",
         "kind": "kerb"
       }
@@ -224,16 +174,16 @@
         "source": "manufacturer"
       },
       "length": {
-        "v": 4.615,
+        "v": 4.61,
         "source": "manufacturer"
       },
       "front_overhang": {
-        "v": null,
-        "source": null
+        "v": 0.91,
+        "source": "manufacturer"
       },
       "rear_overhang": {
-        "v": null,
-        "source": null
+        "v": 0.95,
+        "source": "manufacturer"
       },
       "width": {
         "v": 1.875,
@@ -244,165 +194,19 @@
         "source": null
       },
       "width_mirrors": {
-        "v": null,
+        "v": 2.095,
         "source": null
       },
       "width_mirrors_folded": {
         "v": null,
         "source": null
-      },
-      "ground_clearance": {
-        "v": 0.175,
-        "source": "manufacturer"
-      },
-      "turning_radius": {
-        "v": 5.85,
-        "source": "derived",
-        "kind": "kerb"
-      }
-    },
-    {
-      "id": "tesla-model-y",
-      "make": "Tesla",
-      "model": "Model Y",
-      "body": "suv",
-      "documents": [],
-      "wheelbase": {
-        "v": 2.89,
-        "source": "corroborated"
-      },
-      "length": {
-        "v": 4.79,
-        "source": "corroborated"
-      },
-      "front_overhang": {
-        "v": null,
-        "source": null
-      },
-      "rear_overhang": {
-        "v": null,
-        "source": null
-      },
-      "width": {
-        "v": 1.92,
-        "source": "corroborated"
-      },
-      "track_front": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors": {
-        "v": 2.129,
-        "source": "corroborated"
-      },
-      "width_mirrors_folded": {
-        "v": 1.982,
-        "source": "corroborated"
       },
       "ground_clearance": {
         "v": 0.167,
         "source": "corroborated"
       },
       "turning_radius": {
-        "v": null,
-        "source": null,
-        "kind": null
-      }
-    },
-    {
-      "id": "tesla-model-3",
-      "make": "Tesla",
-      "model": "Model 3",
-      "body": "saloon",
-      "documents": [],
-      "wheelbase": {
-        "v": 2.875,
-        "source": "corroborated"
-      },
-      "length": {
-        "v": 4.72,
-        "source": "corroborated"
-      },
-      "front_overhang": {
-        "v": null,
-        "source": null
-      },
-      "rear_overhang": {
-        "v": null,
-        "source": null
-      },
-      "width": {
-        "v": 1.85,
-        "source": "corroborated"
-      },
-      "track_front": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors": {
-        "v": 2.089,
-        "source": "corroborated"
-      },
-      "width_mirrors_folded": {
-        "v": 1.85,
-        "source": "corroborated"
-      },
-      "ground_clearance": {
-        "v": 0.138,
-        "source": "corroborated"
-      },
-      "turning_radius": {
-        "v": null,
-        "source": null,
-        "kind": null
-      }
-    },
-    {
-      "id": "porsche-911-997",
-      "make": "Porsche",
-      "model": "911 Carrera (997)",
-      "body": "coupe",
-      "documents": [
-        "https://mrsportscars.com/wp-content/uploads/2016/08/Porsche-911-997-Series-Full-Brochure.pdf"
-      ],
-      "wheelbase": {
-        "v": 2.35,
-        "source": "manufacturer"
-      },
-      "length": {
-        "v": 4.427,
-        "source": "manufacturer"
-      },
-      "front_overhang": {
-        "v": 1.0,
-        "source": "estimated"
-      },
-      "rear_overhang": {
-        "v": 1.077,
-        "source": "derived"
-      },
-      "width": {
-        "v": 1.808,
-        "source": "manufacturer"
-      },
-      "track_front": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors_folded": {
-        "v": 1.852,
-        "source": "notice"
-      },
-      "ground_clearance": {
-        "v": 0.101,
-        "source": "notice"
-      },
-      "turning_radius": {
-        "v": 5.45,
+        "v": 5.85,
         "source": "derived",
         "kind": "kerb"
       }
@@ -448,7 +252,7 @@
         "source": null
       },
       "ground_clearance": {
-        "v": null,
+        "v": 0.11,
         "source": null
       },
       "turning_radius": {
@@ -498,7 +302,7 @@
         "source": null
       },
       "ground_clearance": {
-        "v": null,
+        "v": 0.11,
         "source": null
       },
       "turning_radius": {

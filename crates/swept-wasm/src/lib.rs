@@ -7,7 +7,7 @@
 pub mod dto;
 
 use dto::{ErrorDto, SceneDto, SolveRequest};
-use swept_solver::budget::Progress;
+use swept_solver::budget::{Progress, SearchBudget};
 use wasm_bindgen::prelude::*;
 
 /// Relays planner progress to a JavaScript callback.
@@ -16,14 +16,21 @@ use wasm_bindgen::prelude::*;
 /// a search it is only watching.
 struct JsProgress<'a> {
     callback: &'a js_sys::Function,
+    /// The ceiling the planner stops at, sent with every report.
+    ///
+    /// Passed rather than left for the interface to know, so the figure has
+    /// exactly one definition. Copy it into TypeScript and the two drift the
+    /// day the budget changes.
+    budget: u32,
 }
 
 impl Progress for JsProgress<'_> {
     fn nodes_expanded(&mut self, moves: u8, expanded: u32) {
-        let _ = self.callback.call2(
+        let _ = self.callback.call3(
             &JsValue::NULL,
             &JsValue::from(moves),
             &JsValue::from(expanded),
+            &JsValue::from(self.budget),
         );
     }
 }
@@ -37,7 +44,8 @@ pub fn start() {
 
 /// Finds every way in, one alternative per move count.
 ///
-/// `on_progress` is called as `(moves, expanded)` while the planner works.
+/// `on_progress` is called as `(moves, expanded, budget)` while the planner
+/// works, `budget` being the node ceiling it stops at.
 /// It may be omitted, and usually is outside the interface. Note that the
 /// exhaustive sweep runs first and reports nothing: **the first call is the
 /// signal that the sweep has finished** and planning has begun.
@@ -55,6 +63,7 @@ pub fn solve(request: JsValue, on_progress: Option<js_sys::Function>) -> Result<
             request,
             &mut JsProgress {
                 callback: &callback,
+                budget: SearchBudget::default().max_nodes,
             },
         ),
         None => dto::run_solve(request),

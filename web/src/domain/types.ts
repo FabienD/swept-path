@@ -109,7 +109,14 @@ export type WorkerOut =
    * The exhaustive sweep runs first and sends nothing, so the first of these
    * is what tells the interface the sweep is over and planning has begun.
    */
-  | { kind: "progress"; id: number; moves: number; expanded: number }
+  | {
+      kind: "progress";
+      id: number;
+      moves: number;
+      expanded: number;
+      /** Node ceiling the planner stops at, so the interface can say where it ends. */
+      budget: number;
+    }
   | { kind: "minRoad"; id: number; response: number | null }
   | { kind: "maxGateAngle"; id: number; radians: number }
   | { kind: "failed"; id: number; error: ErrorDto };

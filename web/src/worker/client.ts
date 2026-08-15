@@ -92,13 +92,15 @@ export class SolverClient {
   /** Runs a search, reporting planner progress if a watcher is given. */
   solve(
     request: SolveRequest,
-    onProgress?: (moves: number, expanded: number) => void,
+    onProgress?: (moves: number, expanded: number, budget: number) => void,
   ): Promise<SolveResponse> {
     return this.#exchange(
       (id) => ({ kind: "solve", id, request }),
       (out) => (out.kind === "solved" ? out.response : undefined),
       (out) => {
-        if (out.kind === "progress") onProgress?.(out.moves, out.expanded);
+        if (out.kind === "progress") {
+          onProgress?.(out.moves, out.expanded, out.budget);
+        }
       },
     );
   }

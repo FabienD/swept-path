@@ -92,13 +92,13 @@ describe("progress", () => {
   it("reports progress without settling the search", async () => {
     const worker = new SilentWorker();
     const client = new SolverClient(() => worker as unknown as Worker);
-    const seen: Array<[number, number]> = [];
+    const seen: Array<[number, number, number]> = [];
 
-    const pending = client.solve(request, (moves, expanded) => {
-      seen.push([moves, expanded]);
+    const pending = client.solve(request, (moves, expanded, budget) => {
+      seen.push([moves, expanded, budget]);
     });
-    worker.reply({ kind: "progress", id: 1, moves: 2, expanded: 500 });
-    worker.reply({ kind: "progress", id: 1, moves: 3, expanded: 1000 });
+    worker.reply({ kind: "progress", id: 1, moves: 2, expanded: 500, budget: 60000 });
+    worker.reply({ kind: "progress", id: 1, moves: 3, expanded: 1000, budget: 60000 });
     worker.reply({
       kind: "solved",
       id: 1,
@@ -109,9 +109,11 @@ describe("progress", () => {
       alternatives: [],
       budget_exhausted: false,
     });
+    // The ceiling rides along with every report, so the interface never has
+    // to carry its own copy of a figure the solver owns.
     expect(seen).toEqual([
-      [2, 500],
-      [3, 1000],
+      [2, 500, 60000],
+      [3, 1000, 60000],
     ]);
   });
 
@@ -126,7 +128,7 @@ describe("progress", () => {
       seen.push(expanded);
     });
     client.cancel();
-    worker.reply({ kind: "progress", id: 1, moves: 2, expanded: 500 });
+    worker.reply({ kind: "progress", id: 1, moves: 2, expanded: 500, budget: 60000 });
 
     await expect(pending).rejects.toMatchObject({ code: CANCELLED });
     expect(seen).toEqual([]);

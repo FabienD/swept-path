@@ -457,16 +457,25 @@ form?.addEventListener("submit", async (event) => {
   store.set({
     busy: true,
     verdict: "Calcul en cours…",
-    progress: "Balayage exhaustif des entrées à une manœuvre…",
+    progress: "Calcul des trajectoires en une manœuvre…",
     alternatives: [],
   });
 
   try {
-    const response = await client.solve(readRequest(), (moves, expanded) => {
-      store.set({
-        progress: `Planification à ${moves} manœuvres — ${expanded.toLocaleString("fr-FR")} nœuds explorés`,
-      });
-    });
+    const response = await client.solve(
+      readRequest(),
+      (moves, expanded, budget) => {
+        // "Situations" rather than nodes: what the planner counts is the
+        // vehicle placed somewhere, facing some way, in some gear. And the
+        // ceiling is named, because a running count without its scale says
+        // nothing about where this ends.
+        const count = expanded.toLocaleString("fr-FR");
+        const ceiling = budget.toLocaleString("fr-FR");
+        store.set({
+          progress: `Calcul des trajectoires en ${moves} manœuvres — ${count} situations essayées sur ${ceiling} au plus`,
+        });
+      },
+    );
     if (response.alternatives.length === 0) {
       // An exhaustive sweep proves absence; a heuristic one does not.
       store.set({

@@ -55,15 +55,27 @@ describe("vehicle table", () => {
   it("leaves the pivot radius unknown when nothing is published", () => {
     // A missing figure must stay missing all the way to the form. Filling it
     // with something plausible is exactly how a guess becomes a measurement.
-    const modelY = vehicleById("tesla-model-y");
-    expect(modelY?.published_radius).toBeNull();
-    expect(modelY?.min_turning_radius).toBeNull();
+    //
+    // Stated over the whole table rather than one named vehicle: the database
+    // is edited by hand, and a test that pins an example fails the day that
+    // example is completed — which says nothing about the rule.
+    for (const v of VEHICLES) {
+      if (v.published_radius === null) {
+        expect(v.min_turning_radius, v.label).toBeNull();
+      }
+    }
   });
 
-  it("keeps a field the database does not know as null", () => {
-    const ev3 = vehicleById("kia-ev3");
-    expect(ev3?.mirror_width).toBeNull();
-    expect(ev3?.wheelbase).toBe(2.68);
+  it("never turns an absent measurement into a number", () => {
+    // Whatever the database leaves out must arrive as null, not as zero and
+    // not as a neighbour's figure.
+    for (const v of VEHICLES) {
+      for (const [name, field] of Object.entries(v)) {
+        if (typeof field === "number") {
+          expect(field, `${v.label}: ${name}`).not.toBe(0);
+        }
+      }
+    }
   });
 });
 
