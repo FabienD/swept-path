@@ -15,7 +15,7 @@ use swept_solver::result::Outcome;
 use swept_solver::solve::alternatives;
 
 fn lbx() -> Vehicle {
-    Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 5.2).expect("valid vehicle")
+    Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).expect("valid vehicle")
 }
 
 fn scene(opening: f64, gate: GateKind) -> Scene {
@@ -34,6 +34,7 @@ fn scene(opening: f64, gate: GateKind) -> Scene {
         pavement_width: 1.20,
         dropped_kerb_width: opening + 0.80,
         road_width: 4.50,
+        kerb_height: f64::INFINITY,
         gate,
     }
 }
@@ -45,6 +46,7 @@ fn corridor_scene(opening: f64, gate: GateKind) -> Scene {
     Scene {
         pavement_width: 0.0,
         road_width: 12.0,
+        kerb_height: f64::INFINITY,
         ..scene(opening, gate)
     }
 }
@@ -70,8 +72,9 @@ fn corridor_depth(scene: &Scene) -> f64 {
     scene
         .obstacles()
         .iter()
-        .filter(|o| o.center.x.abs() < reach && o.center.y >= 0.0)
-        .map(|o| o.center.y + o.half_height.max(o.half_width))
+        .map(|o| o.shape)
+        .filter(|s| s.center.x.abs() < reach && s.center.y >= 0.0)
+        .map(|s| s.center.y + s.half_height.max(s.half_width))
         .fold(0.0_f64, f64::max)
 }
 
@@ -277,6 +280,7 @@ fn measured_gateway() -> Scene {
         pavement_width: 1.30,
         dropped_kerb_width: 3.20,
         road_width: 5.90,
+        kerb_height: f64::INFINITY,
         gate: GateKind::Swinging {
             leaf_length: 1.15,
             leaf_thickness: 0.04,
@@ -294,7 +298,8 @@ fn measured_gateway() -> Scene {
 /// came from the planner and was labelled heuristic — it proved nothing.
 #[test]
 fn the_measured_gateway_admits_a_proved_one_move_entry() {
-    let vehicle = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 3.59).expect("valid vehicle");
+    let vehicle =
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid vehicle");
     let scene = measured_gateway();
 
     let Outcome::Found(list) =
@@ -377,4 +382,42 @@ fn the_measured_gateway_admits_a_proved_one_move_entry() {
         "finished {:.1} degrees off square",
         off_square.to_degrees()
     );
+}
+
+/// What this batch was built for.
+///
+/// The pure 2D model treats a kerb as a wall of infinite height, so the only
+/// candidates the exhaustive sweep refused on this gateway were those whose
+/// front overhang swings over the pavement beside the dropped kerb. Declaring
+/// the kerb for what it is can only help — never hinder, since every candidate
+/// that was drivable before still is.
+///
+/// MEASURED, and worth knowing: on **this** gateway it buys nothing at all.
+/// A wall, a 12 cm kerb and no pavement whatsoever all return 4.15 cm, with
+/// the same tightest point and not one pose overhanging. What limits this
+/// entry is the opening, not the footway. The batch makes the model right
+/// where it was wrong; it does not make this gateway easier.
+#[test]
+fn a_low_kerb_never_costs_room_and_may_buy_some() {
+    let vehicle =
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid vehicle");
+
+    let walled = measured_gateway();
+    let mut low = measured_gateway();
+    // MEASURED — a standard French T2 kerb stands 12 cm above the gutter.
+    low.kerb_height = 0.12;
+
+    let walled_best = search(&vehicle, &walled, Approach::Forward, Grid::fine());
+    let low_best = search(&vehicle, &low, Approach::Forward, Grid::fine());
+
+    match (walled_best.best(), low_best.best()) {
+        (Some(w), Some(l)) => assert!(
+            l.min_clearance >= w.min_clearance - 1e-9,
+            "a wall gave {:.1} cm, a kerb gave {:.1} cm",
+            w.min_clearance * 100.0,
+            l.min_clearance * 100.0
+        ),
+        (Some(_), None) => panic!("lowering the kerb removed an entry that existed"),
+        (None, _) => { /* nothing to compare, and the batch is not at fault */ }
+    }
 }

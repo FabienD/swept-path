@@ -87,7 +87,7 @@ function renderLegend(show: boolean): void {
           ? `moins de ${BANDS[2] * 100} cm`
           : `${BANDS[i]! * 100} à ${BANDS[i - 1]! * 100} cm`;
     return `<span class="flex items-center gap-1"><i class="inline-block h-2 w-4 rounded" style="background:var(${BAND_TOKENS[i]})"></i>${name} (${range})</span>`;
-  }).join("")}<span class="ml-auto">trait plein : marche avant · pointillé : marche arrière</span>`;
+  }).join("")}<span class="flex items-center gap-1"><i class="inline-block h-2 w-4 rounded" style="background:var(--color-overhang)"></i>surplomb du trottoir</span><span class="ml-auto">trait plein : marche avant · pointillé : marche arrière</span>`;
 }
 
 function renderStats(maneuver: ManeuverDto): void {
@@ -108,6 +108,11 @@ function renderStats(maneuver: ManeuverDto): void {
     card("Distance parcourue", metres(maneuver.distance)),
     card("Sous 25 cm", metres(maneuver.metres_under_25cm)),
     card("Sous 10 cm", metres(maneuver.metres_under_10cm)),
+    // Shown only when it has something to say: a zero on every ordinary
+    // trajectory would teach nobody anything.
+    ...(maneuver.metres_overhanging > 0
+      ? [card("Surplomb du trottoir", metres(maneuver.metres_overhanging))]
+      : []),
   ].join("");
 }
 
@@ -195,6 +200,11 @@ function applyPreset(id: string): void {
   set("body-width", preset.width);
   set("mirror-width", preset.mirror_width);
   set("mirror-width-folded", preset.mirror_width_folded);
+  // Only when the database has it. Leaving the field alone is what tells the
+  // driver it is theirs to supply, rather than quietly asserting a figure.
+  if (preset.ground_clearance !== null) {
+    set("ground-clearance", preset.ground_clearance);
+  }
   set("radius", preset.min_turning_radius, 2);
   // Say where the number came from: it is not the one on the spec sheet, and
   // someone checking against the manufacturer would otherwise think it wrong.

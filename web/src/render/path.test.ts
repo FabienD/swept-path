@@ -8,26 +8,37 @@ const lbx: VehicleDto = {
   front_overhang: 0.85,
   width: 1.825,
   mirror_width: 2.029,
+  ground_clearance: 0.18,
   min_turning_radius: 5.2,
 };
 
-function poses(clearances: number[], reverses?: boolean[]): PoseDto[] {
+function poses(
+  clearances: number[],
+  reverses?: boolean[],
+  overhangs?: boolean[],
+): PoseDto[] {
   return clearances.map((clearance, i) => ({
     x: i * 0.2,
     y: 0,
     heading: 0,
     reverse: reverses?.[i] ?? false,
     clearance,
+    overhanging: overhangs?.[i] ?? false,
   }));
 }
 
-function maneuver(clearances: number[], reverses?: boolean[]): ManeuverDto {
+function maneuver(
+  clearances: number[],
+  reverses?: boolean[],
+  overhangs?: boolean[],
+): ManeuverDto {
   return {
-    poses: poses(clearances, reverses),
+    poses: poses(clearances, reverses, overhangs),
     min_clearance: Math.min(...clearances),
     min_clearance_in_gateway: Math.min(...clearances),
     metres_under_25cm: 0,
     metres_under_10cm: 0,
+    metres_overhanging: 0,
     distance: clearances.length * 0.2,
     moves: 1,
     confidence: "exact",
@@ -103,7 +114,7 @@ describe("path rendering", () => {
 
   it("draws a body spanning bumper to bumper", () => {
     const corners = bodyAt(
-      { x: 0, y: 0, heading: 0, reverse: false, clearance: 1 },
+      { x: 0, y: 0, heading: 0, reverse: false, clearance: 1, overhanging: false },
       lbx,
     );
     const xs = corners.map((c) => c.x);
@@ -113,5 +124,25 @@ describe("path rendering", () => {
 
   it("survives an empty manoeuvre", () => {
     expect(pathToPrimitives(maneuver([]), lbx)).toEqual([]);
+  });
+});
+
+describe("overhang", () => {
+  it("splits the path where the body starts overhanging", () => {
+    const roles = pathToPrimitives(
+      maneuver([1, 1, 1, 1], undefined, [false, false, true, true]),
+      lbx,
+    )
+      .filter((p) => p.type === "polyline")
+      .map((p) => p.role);
+    expect(roles).toContain("overhang");
+    expect(roles.filter((r) => r === "overhang")).toHaveLength(1);
+  });
+
+  it("marks nothing when nothing overhangs", () => {
+    const roles = pathToPrimitives(maneuver([1, 1, 1, 1]), lbx)
+      .filter((p) => p.type === "polyline")
+      .map((p) => p.role);
+    expect(roles).not.toContain("overhang");
   });
 });

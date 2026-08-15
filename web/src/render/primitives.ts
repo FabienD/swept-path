@@ -32,6 +32,7 @@ export type Role =
   | "band-watch"
   | "band-close"
   | "band-tight"
+  | "overhang"
   | "annotation";
 
 export type Primitive =

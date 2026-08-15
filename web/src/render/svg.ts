@@ -22,6 +22,7 @@ const STYLE: Record<Role, { fill?: string; stroke?: string; width?: number; opac
   "band-watch": { stroke: "var(--color-band-watch)", width: 3 },
   "band-close": { stroke: "var(--color-band-close)", width: 3 },
   "band-tight": { stroke: "var(--color-band-tight)", width: 3 },
+  overhang: { stroke: "var(--color-overhang)", width: 3 },
   annotation: { fill: "#57534e" },
 };
 

@@ -10,11 +10,20 @@ import type { VehicleDto } from "./types";
  * Two minutes with a tape measure across the mirrors would be worth more than
  * any of it: `CLAUDE.md` notes that 3 cm of error there inverts a conclusion.
  */
-export interface VehiclePreset extends VehicleDto {
+export interface VehiclePreset extends Omit<VehicleDto, "ground_clearance"> {
   id: string;
   label: string;
   /** Width over the mirrors once folded, in metres. */
   mirror_width_folded: number;
+  /**
+   * Lowest point of the bodywork, in metres — `null` until the figure is read
+   * off a manufacturer document.
+   *
+   * Nullable here and required in [`VehicleDto`], on purpose: the database is
+   * allowed not to know, the solver is not. What the database must never do is
+   * offer a zero, which would turn every kerb back into a wall.
+   */
+  ground_clearance: number | null;
   /** The radius as published, kerb to kerb, kept for display. */
   kerb_radius: number;
 }
@@ -75,6 +84,10 @@ function preset(
     width,
     mirror_width,
     mirror_width_folded: width + FOLDED_MARGIN_M,
+    // Null until the figure is taken off a manufacturer document. Never zero:
+    // a ground clearance of zero would turn every kerb back into a wall, which
+    // is precisely the state obstacle heights exist to leave.
+    ground_clearance: null,
     kerb_radius,
     min_turning_radius: pivotRadius(kerb_radius, wheelbase, width),
   };

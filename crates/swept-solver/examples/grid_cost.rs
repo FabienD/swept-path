@@ -38,12 +38,14 @@ fn scene(opening: f64) -> Scene {
         pavement_width: 1.20,
         dropped_kerb_width: opening + 0.80,
         road_width: 4.50,
+        kerb_height: f64::INFINITY,
         gate: GateKind::Sliding,
     }
 }
 
 fn main() {
-    let vehicle = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 5.2).expect("valid vehicle");
+    let vehicle =
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).expect("valid vehicle");
 
     println!(
         "{:<10} {:>8} {:>10} {:>11} {:>7}  note",

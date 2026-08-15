@@ -37,7 +37,7 @@ pub const BODY_STATIONS: usize = 5;
 /// use swept_core::vehicle::Vehicle;
 ///
 /// // Lexus LBX
-/// let v = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 5.2).unwrap();
+/// let v = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).unwrap();
 /// assert!((v.rear_overhang - 0.760).abs() < 1e-9);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -53,6 +53,19 @@ pub struct Vehicle {
     /// Width over the mirrors, in metres. This is almost always the critical
     /// dimension.
     pub mirror_width: f64,
+    /// Height of the lowest point of the bodywork, wheels excluded, in metres.
+    ///
+    /// What decides whether the vehicle can overhang a kerb rather than be
+    /// stopped by it. Manufacturers publish this figure, and three caveats
+    /// come with it: it is quoted **unladen** — a loaded vehicle settles two
+    /// to four centimetres — the measuring convention varies between makers,
+    /// and **deformable parts are usually excluded**, though the front bumper
+    /// lip is precisely what overhangs first when the vehicle turns.
+    ///
+    /// The bias therefore runs both ways: conservative on the flank, where a
+    /// figure taken under the whole vehicle underestimates the sill, and
+    /// possibly optimistic on the nose.
+    pub ground_clearance: f64,
     /// Radius traced by the **rear axle centre** at full lock, in metres.
     ///
     /// This is the pivot the bicycle model turns about, and it is *not* the
@@ -118,6 +131,7 @@ impl Vehicle {
         front_overhang: f64,
         width: f64,
         mirror_width: f64,
+        ground_clearance: f64,
         min_turning_radius: f64,
     ) -> Result<Self, VehicleError> {
         for (value, name) in [
@@ -126,6 +140,7 @@ impl Vehicle {
             (front_overhang, "front_overhang"),
             (width, "width"),
             (mirror_width, "mirror_width"),
+            (ground_clearance, "ground_clearance"),
             (min_turning_radius, "min_turning_radius"),
         ] {
             if !value.is_finite() || value <= 0.0 {
@@ -147,8 +162,33 @@ impl Vehicle {
             rear_overhang,
             width,
             mirror_width,
+            ground_clearance,
             min_turning_radius,
         })
+    }
+
+    /// The four contact patches, in the vehicle's own frame.
+    ///
+    /// At the corners of a `width × wheelbase` rectangle — the **body** width,
+    /// not the track. The track separates the wheels' median planes, so the
+    /// outer edge of a tyre sits half a tyre width further out: on the LBX,
+    /// 1.56 m of track and 225 mm tyres put that edge 0.893 m from the axis
+    /// against 0.913 m for half the body, because wheel arches follow tyres.
+    /// Using half the body width therefore costs about two centimetres and
+    /// spares the caller two measurements nobody has to hand — where the track
+    /// alone would have cost thirteen.
+    ///
+    /// The two centimetres are not guaranteed to fall on the safe side: wide
+    /// rims or a different offset can bring a tyre flush with the arch.
+    #[must_use]
+    pub fn wheels(&self) -> [Point; 4] {
+        let half = self.width / 2.0;
+        [
+            Point::new(0.0, half),
+            Point::new(0.0, -half),
+            Point::new(self.wheelbase, half),
+            Point::new(self.wheelbase, -half),
+        ]
     }
 
     /// The points sampled along the vehicle outline, in local coordinates.
@@ -187,7 +227,33 @@ mod tests {
 
     /// Lexus LBX, the prototype's default vehicle.
     fn lbx() -> Vehicle {
-        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 5.2).expect("valid vehicle")
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).expect("valid vehicle")
+    }
+
+    #[test]
+    fn the_wheels_sit_at_the_corners_of_the_body() {
+        let wheels = lbx().wheels();
+        let half = 1.825 / 2.0;
+        // Rear axle at the origin, front axle a wheelbase ahead, both at the
+        // body's own half-width — see `wheels` for why the body and not the
+        // track.
+        assert!((wheels[0].x - 0.0).abs() < EPS);
+        assert!((wheels[0].y - half).abs() < EPS);
+        assert!((wheels[1].x - 0.0).abs() < EPS);
+        assert!((wheels[1].y + half).abs() < EPS);
+        assert!((wheels[2].x - 2.580).abs() < EPS);
+        assert!((wheels[2].y - half).abs() < EPS);
+        assert!((wheels[3].x - 2.580).abs() < EPS);
+        assert!((wheels[3].y + half).abs() < EPS);
+    }
+
+    #[test]
+    fn rejects_a_ground_clearance_of_zero() {
+        // A vehicle flat on the ground overhangs nothing, which would silently
+        // turn every kerb back into a wall — the very state this batch leaves.
+        let error = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.0, 5.2)
+            .expect_err("zero is not a ground clearance");
+        assert_eq!(error, VehicleError::NonPositive("ground_clearance"));
     }
 
     #[test]
@@ -198,24 +264,24 @@ mod tests {
 
     #[test]
     fn rejects_a_front_overhang_that_leaves_no_rear() {
-        let err = Vehicle::new(2.580, 4.190, 1.700, 1.825, 2.029, 5.2).unwrap_err();
+        let err = Vehicle::new(2.580, 4.190, 1.700, 1.825, 2.029, 0.18, 5.2).unwrap_err();
         assert_eq!(err, VehicleError::FrontOverhangTooLarge);
     }
 
     #[test]
     fn rejects_mirrors_narrower_than_the_body() {
-        let err = Vehicle::new(2.580, 4.190, 0.850, 1.825, 1.700, 5.2).unwrap_err();
+        let err = Vehicle::new(2.580, 4.190, 0.850, 1.825, 1.700, 0.18, 5.2).unwrap_err();
         assert_eq!(err, VehicleError::MirrorsNarrowerThanBody);
     }
 
     #[test]
     fn rejects_non_positive_dimensions() {
         assert_eq!(
-            Vehicle::new(0.0, 4.190, 0.850, 1.825, 2.029, 5.2).unwrap_err(),
+            Vehicle::new(0.0, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).unwrap_err(),
             VehicleError::NonPositive("wheelbase")
         );
         assert_eq!(
-            Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, -1.0).unwrap_err(),
+            Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, -1.0).unwrap_err(),
             VehicleError::NonPositive("min_turning_radius")
         );
     }
