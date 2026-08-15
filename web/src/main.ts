@@ -194,15 +194,82 @@ function clearResult(): void {
   });
 }
 
+/**
+ * Every numeric input a simulation needs filled.
+ *
+ * `mirror-width-folded` is absent on purpose: it only matters when the
+ * mirrors are set to folded, and demanding it otherwise would flag a field
+ * the run does not read.
+ */
+const REQUIRED_INPUTS: readonly string[] = [
+  "opening",
+  "post-depth",
+  "post-width",
+  "wall",
+  "pavement",
+  "kerb",
+  "road",
+  "kerb-height",
+  "radius",
+  "wheelbase",
+  "length",
+  "front-overhang",
+  "body-width",
+  "ground-clearance",
+  "mirror-width",
+];
+
+/** Maps a field name the boundary rejects to the input that holds it. */
+const FIELD_INPUTS: Record<string, string> = {
+  wheelbase: "wheelbase",
+  length: "length",
+  front_overhang: "front-overhang",
+  width: "body-width",
+  mirror_width: "mirror-width",
+  ground_clearance: "ground-clearance",
+  min_turning_radius: "radius",
+};
+
+/** Marks or clears one input as needing attention. */
+function flag(id: string, missing: boolean): void {
+  const input = byId<HTMLInputElement>(id);
+  if (!input) return;
+  input.classList.toggle("border-red-500", missing);
+  input.classList.toggle("bg-red-50", missing);
+  input.setAttribute("aria-invalid", missing ? "true" : "false");
+}
+
+/**
+ * Flags every required input the vehicle table could not fill.
+ *
+ * An empty field is not an oversight to be papered over: the database has no
+ * figure for it, and the simulation cannot run without one. Saying so at the
+ * field is what turns "the button did nothing" into "this measurement is
+ * missing".
+ */
+function flagMissing(): number {
+  let missing = 0;
+  for (const id of REQUIRED_INPUTS) {
+    const input = byId<HTMLInputElement>(id);
+    const empty = !input || Number.isNaN(input.valueAsNumber);
+    if (empty) missing += 1;
+    flag(id, empty);
+  }
+  return missing;
+}
+
 function applyPreset(id: string): void {
   const preset = vehicleById(id);
   if (!preset) return;
-  // A field the database does not know is left exactly as it was. That is
-  // what tells the driver it is theirs to supply, rather than quietly
-  // asserting a default they would take for measured.
+  // A field the database does not know is **emptied**, not left alone.
+  // Leaving it would keep whatever the previously selected vehicle put there:
+  // pick the LBX then the EV3, and the Kia would show 2.029 m over its
+  // mirrors — the Lexus figure, wearing the Kia's name. An empty field reads
+  // as NaN, which the core rejects by name, so the driver is told which
+  // measurement is missing instead of being given someone else's.
   const set = (field: string, value: number | null, digits = 3) => {
     const input = byId<HTMLInputElement>(field);
-    if (input && value !== null) input.value = value.toFixed(digits);
+    if (input) input.value = value === null ? "" : value.toFixed(digits);
   };
   set("wheelbase", preset.wheelbase);
   set("length", preset.length);
@@ -221,6 +288,7 @@ function applyPreset(id: string): void {
         ? `— déduit de ${preset.published_radius.toFixed(1)} m entre trottoirs`
         : "— non publié pour ce modèle, à renseigner";
   }
+  flagMissing();
   clearResult();
 }
 
@@ -253,6 +321,12 @@ function fillPresets(): void {
   select.addEventListener("change", () => {
     applyPreset(select.value);
   });
+  for (const id of REQUIRED_INPUTS) {
+    byId<HTMLInputElement>(id)?.addEventListener("input", () => {
+      const input = byId<HTMLInputElement>(id);
+      flag(id, !input || Number.isNaN(input.valueAsNumber));
+    });
+  }
   byId<HTMLInputElement>("preset-search")?.addEventListener("input", (event) => {
     render((event.target as HTMLInputElement).value);
   });
@@ -362,6 +436,21 @@ form?.addEventListener("submit", async (event) => {
     }
   }
 
+  // Nothing to compute while a measurement is missing. Running anyway would
+  // send a NaN across the boundary and come back with one rejected field,
+  // naming only the first of them.
+  const missing = flagMissing();
+  if (missing > 0) {
+    store.set({
+      verdict:
+        missing === 1
+          ? "Une mesure manque, signalée en rouge dans le formulaire."
+          : `${missing} mesures manquent, signalées en rouge dans le formulaire.`,
+      alternatives: [],
+    });
+    return;
+  }
+
   // The exhaustive sweep runs first and reports nothing — it has no nodes to
   // count — so this is what the interface shows until the first progress
   // message says the planner has taken over.
@@ -404,7 +493,13 @@ form?.addEventListener("submit", async (event) => {
     });
   } catch (thrown) {
     const error = thrown as ErrorDto;
-    if (error.code !== CANCELLED) store.set({ verdict: errorMessage(error) });
+    if (error.code !== CANCELLED) {
+      // Point at the field the boundary named, so the sentence and the form
+      // say the same thing.
+      const input = error.field ? FIELD_INPUTS[error.field] : undefined;
+      if (input) flag(input, true);
+      store.set({ verdict: errorMessage(error) });
+    }
   } finally {
     // Only clear the flag if nothing took over in the meantime.
     store.set({ busy: client.busy, progress: "" });
@@ -412,6 +507,16 @@ form?.addEventListener("submit", async (event) => {
 });
 
 byId("run-min-road")?.addEventListener("click", async () => {
+  const absent = flagMissing();
+  if (absent > 0) {
+    store.set({
+      verdict:
+        absent === 1
+          ? "Une mesure manque, signalée en rouge dans le formulaire."
+          : `${absent} mesures manquent, signalées en rouge dans le formulaire.`,
+    });
+    return;
+  }
   store.set({ busy: true, verdict: "Recherche de la chaussée minimale…" });
   try {
     const width = await client.minRoad(readRequest());
@@ -423,7 +528,11 @@ byId("run-min-road")?.addEventListener("click", async () => {
     });
   } catch (thrown) {
     const error = thrown as ErrorDto;
-    if (error.code !== CANCELLED) store.set({ verdict: errorMessage(error) });
+    if (error.code !== CANCELLED) {
+      const input = error.field ? FIELD_INPUTS[error.field] : undefined;
+      if (input) flag(input, true);
+      store.set({ verdict: errorMessage(error) });
+    }
   } finally {
     store.set({ busy: client.busy });
   }
