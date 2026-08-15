@@ -20,10 +20,12 @@ résultat et on vérifie qu'il tombe sur le but.
 ## Global Constraints
 
 - Toolchain Rust **1.97.1**, **édition 2024**, épinglée par `rust-toolchain.toml`.
-- `swept-core` garde **zéro dépendance de production**. C'est ce qui lui permet
-  de rester `MIT OR Apache-2.0` à côté d'une application AGPL, et c'est
-  pourquoi la crate `reeds_shepp` de crates.io est écartée : sa licence
-  contaminerait le noyau.
+- `swept-core` garde **zéro dépendance de production**. C'est la propriété que
+  le README et `CLAUDE.md` revendiquent, et qu'une seule dépendance suffirait à
+  perdre. La crate `reeds_shepp` de crates.io est **sous licence MIT**, donc
+  compatible — la spec affirmait le contraire, à tort. Elle est écartée de la
+  production pour la contrainte ci-dessus, et employée en `[dev-dependencies]`
+  comme oracle de test (Task 10).
 - `#![deny(missing_docs)]`. La documentation manquante casse le build.
 - **Tout ce qui vit dans le dépôt est en anglais** : identifiants, rustdoc, noms
   de tests, noms de branches, messages de commit et descriptions de PR. Seuls
@@ -1647,7 +1649,172 @@ git commit -m "test(core): check Reeds-Shepp paths against generated pose pairs"
 
 ---
 
-### Task 10: Documentation
+### Task 10: L'oracle
+
+**Files:**
+- Modify: `crates/swept-core/Cargo.toml`
+- Create: `crates/swept-core/tests/reeds_shepp_oracle.rs`
+
+**Interfaces:**
+- Consumes: `swept_core::curves::reeds_shepp::shortest`
+- Produces: rien. Cette tâche confronte nos formules à une transcription qui
+  n'est pas la nôtre.
+
+**Pourquoi une seconde opinion.** Les huit formes closes sont transcrites de la
+littérature, et ce sont les **conditions de signe** dont on est le moins sûr —
+une comparaison `v <= 0` écrite `v >= 0` écarte une famille dans des cas où
+elle s'applique. Le code compile, les tests d'atterrissage passent puisqu'ils
+ne voient que les mots rendus, et le solveur rate simplement des trajectoires.
+C'est un défaut silencieux, celui contre lequel les tests d'atterrissage ne
+peuvent rien.
+
+Une seconde transcription le voit : si elle trouve un chemin plus court que le
+nôtre, c'est que nous avons écarté une famille à tort.
+
+- [ ] **Step 1: Write the failing test**
+
+Ajouter la dépendance de développement dans `crates/swept-core/Cargo.toml`,
+sous `[dev-dependencies]`, à côté de `proptest` :
+
+```toml
+# Oracle only — never a production dependency, which would cost this crate the
+# zero-dependency property the README claims. MIT licensed, so compatible with
+# `MIT OR Apache-2.0`, but that is not why it is here: it is here to disagree
+# with us when our sign conditions are wrong.
+reeds_shepp = "0.1.1"
+```
+
+Créer `crates/swept-core/tests/reeds_shepp_oracle.rs` :
+
+```rust
+//! Our Reeds-Shepp against somebody else's.
+//!
+//! The closed forms are transcribed from the literature, and the part hardest
+//! to be sure of is the sign conditions that decide whether a family applies.
+//! Getting one wrong does not produce a wrong path — it produces a **missing**
+//! one, which the landing tests cannot see because they only check the words
+//! that were returned.
+//!
+//! An independent transcription can see it: if it finds a shorter path than
+//! ours, we discarded a family we should have kept.
+//!
+//! This crate is a development dependency and must never become anything else.
+
+use proptest::prelude::*;
+use std::f64::consts::TAU;
+use swept_core::curves::reeds_shepp::shortest;
+use swept_core::kinematics::Pose;
+use swept_core::units::Radians;
+
+/// How far apart the generated poses may sit, in metres.
+///
+/// ARBITRARY, and the same spread the property tests use, so that a failure
+/// here can be reproduced there.
+const SPREAD_M: f64 = 15.0;
+
+/// How much longer than the oracle our answer may be, as a fraction.
+///
+/// ARBITRARY, and deliberately tight: the two are solving the same problem in
+/// closed form, so they should agree to floating-point noise. A tolerance is
+/// kept only because the two normalise lengths differently and a whole path
+/// accumulates a few ulps.
+const TOLERANCE: f64 = 1e-6;
+
+prop_compose! {
+    fn any_pose()(
+        x in -SPREAD_M..SPREAD_M,
+        y in -SPREAD_M..SPREAD_M,
+        heading in 0.0..TAU,
+    ) -> Pose {
+        Pose::new(x, y, Radians::new(heading))
+    }
+}
+
+proptest! {
+    /// We must never be longer than the oracle.
+    ///
+    /// Being longer means we discarded a family that applies. Being *shorter*
+    /// would be worse — it would mean we return a path that does not land —
+    /// but the property tests already cover that, so this one only guards the
+    /// direction they cannot see.
+    #[test]
+    fn our_shortest_is_never_longer_than_the_oracle(
+        from in any_pose(),
+        to in any_pose(),
+        radius in 1.0..8.0f64,
+    ) {
+        let ours = shortest(from, to, radius).map(|p| p.length());
+
+        // The oracle works in a unit-radius frame, so the problem is scaled
+        // down going in and the answer scaled back up coming out.
+        let start = reeds_shepp::Pose::new(from.x / radius, from.y / radius, from.heading.get());
+        let goal = reeds_shepp::Pose::new(to.x / radius, to.y / radius, to.heading.get());
+        let theirs = reeds_shepp::path_length(start, goal) * radius;
+
+        let Some(ours) = ours else {
+            prop_assert!(false, "we found nothing where the oracle found {theirs}");
+            return Ok(());
+        };
+        prop_assert!(
+            ours <= theirs * (1.0 + TOLERANCE) + TOLERANCE,
+            "ours {ours} against the oracle's {theirs} — a family was discarded",
+        );
+    }
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cargo test -p swept-core --test reeds_shepp_oracle`
+
+**Attendu : une erreur de compilation.** L'API réelle de la crate n'est pas
+connue au moment d'écrire ce plan, et les noms `reeds_shepp::Pose` et
+`reeds_shepp::path_length` sont une supposition. La corriger est la première
+partie du travail :
+
+```bash
+cargo doc -p reeds_shepp --open
+```
+
+Reprendre les noms exacts de la documentation générée, et n'adapter que la
+construction des poses et l'appel — **jamais l'assertion**, qui est ce que la
+tâche teste.
+
+Si la crate n'expose pas de longueur directement mais une liste de segments,
+en sommer les longueurs absolues : c'est la même grandeur.
+
+- [ ] **Step 3: Write minimal implementation**
+
+Aucun code de production **si l'oracle est d'accord**. S'il trouve plus court
+que nous, la démarche est celle de la Task 9 :
+
+1. Réduire le contre-exemple avec proptest, qui le fait tout seul.
+2. Reproduire le cas en test nommé dans `reeds_shepp.rs`, avec ses coordonnées.
+3. Chercher **quelle famille manque** : appeler `csc`, `ccc`, `cccc`, `ccsc`
+   et `ccscc` séparément sur le repère fautif, et voir laquelle rend un vecteur
+   vide là où l'oracle trouve un chemin plus court.
+4. Corriger la condition de signe de cette famille-là, et geler le cas.
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `PROPTEST_CASES=20000 cargo test --release -p swept-core --test reeds_shepp_oracle`
+Expected: PASS.
+
+Run: `cargo tree -p swept-core --edges normal`
+Expected: **la crate seule**. Si `reeds_shepp` y apparaît, elle a été ajoutée
+aux mauvaises dépendances et la propriété que le README revendique est perdue.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add crates/swept-core/Cargo.toml crates/swept-core/tests/reeds_shepp_oracle.rs
+git add crates/swept-core/src/curves/reeds_shepp.rs
+git commit -m "test(core): check our Reeds-Shepp against an independent transcription"
+```
+
+---
+
+### Task 11: Documentation
 
 **Files:**
 - Modify: `docs/ALGORITHME.md`
@@ -1751,5 +1918,9 @@ git commit -m "docs: describe the Reeds-Shepp families and what verifies them"
       `cargo tree -p swept-core --edges normal` ne montre que la crate.
 - [ ] Chaque famille a son test d'atterrissage, et aucun seuil n'a été relâché
       au-dessus de `1e-9`.
+- [ ] `cargo tree -p swept-core --edges normal` ne montre que la crate :
+      l'oracle est resté en dépendance de développement.
+- [ ] L'oracle est d'accord sur 20 000 tirages, ou chaque désaccord a été
+      expliqué et corrigé — jamais contourné en relâchant `TOLERANCE`.
 - [ ] Tout contre-exemple trouvé par proptest a été gelé en test nommé **et**
       dans le fichier `.proptest-regressions` commité.
