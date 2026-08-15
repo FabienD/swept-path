@@ -45,6 +45,7 @@ export class SolverClient {
   #exchange<T>(
     build: (id: number) => unknown,
     take: (out: WorkerOut) => T | undefined,
+    watch?: (out: WorkerOut) => void,
   ): Promise<T> {
     this.cancel();
     const worker = this.#factory();
@@ -67,6 +68,11 @@ export class SolverClient {
           });
           return;
         }
+        // Watched before taken: a message that settles nothing still says
+        // something. Only while this search is the current one — a terminated
+        // worker can still deliver what it had already queued, and that must
+        // not drive the interface of the search that replaced it.
+        if (this.#worker === worker) watch?.(out);
         const value = take(out);
         if (value !== undefined) {
           settle(() => {
@@ -83,11 +89,17 @@ export class SolverClient {
     });
   }
 
-  /** Runs a search. */
-  solve(request: SolveRequest): Promise<SolveResponse> {
+  /** Runs a search, reporting planner progress if a watcher is given. */
+  solve(
+    request: SolveRequest,
+    onProgress?: (moves: number, expanded: number) => void,
+  ): Promise<SolveResponse> {
     return this.#exchange(
       (id) => ({ kind: "solve", id, request }),
       (out) => (out.kind === "solved" ? out.response : undefined),
+      (out) => {
+        if (out.kind === "progress") onProgress?.(out.moves, out.expanded);
+      },
     );
   }
 

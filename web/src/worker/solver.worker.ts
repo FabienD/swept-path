@@ -40,7 +40,9 @@ self.onmessage = async (event: MessageEvent<WorkerIn>) => {
         post({
           kind: "solved",
           id: message.id,
-          response: solve(message.request),
+          response: solve(message.request, (moves: number, expanded: number) => {
+            post({ kind: "progress", id: message.id, moves, expanded });
+          }),
         });
         break;
       case "minRoad":
