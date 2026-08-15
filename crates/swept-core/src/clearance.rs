@@ -145,6 +145,31 @@ impl ClearanceField {
 
         Clearance::Clear(smallest)
     }
+
+    /// Does any part of the body sit over an obstacle it is passing above?
+    ///
+    /// Reported rather than penalised. A bumper crossing a pavement is legal
+    /// geometry and worth knowing about all the same: the model is flat, and
+    /// knows nothing of the bollard, sign or post that so often stands there.
+    ///
+    /// Measured on a finished trajectory, never inside a search — like the
+    /// alert distances, and for the same reason.
+    #[must_use]
+    pub fn overhangs(&self, pose: Pose) -> bool {
+        if self.overhung.is_empty() {
+            return false;
+        }
+        let (sin, cos) = pose.heading.sin_cos();
+        self.envelope.iter().any(|local| {
+            let point = Point::new(
+                pose.x + local.x * cos - local.y * sin,
+                pose.y + local.x * sin + local.y * cos,
+            );
+            self.overhung
+                .iter()
+                .any(|o| matches!(o.distance_to(point), PointDistance::Inside))
+        })
+    }
 }
 
 #[cfg(test)]
@@ -250,6 +275,26 @@ mod tests {
         scene.kerb_height = 0.18;
         let field = ClearanceField::new(&scene, &lbx());
         assert_ne!(field.at(overhanging_pose()), Clearance::Collision);
+    }
+
+    #[test]
+    fn a_pose_over_the_pavement_is_reported_as_overhanging() {
+        let field = ClearanceField::new(&low_kerb_scene(), &lbx());
+        assert!(field.overhangs(overhanging_pose()));
+    }
+
+    #[test]
+    fn a_pose_out_on_the_road_overhangs_nothing() {
+        let field = ClearanceField::new(&low_kerb_scene(), &lbx());
+        assert!(!field.overhangs(Pose::new(-6.0, -3.5, Radians::default())));
+    }
+
+    #[test]
+    fn nothing_overhangs_a_scene_whose_kerb_is_a_wall() {
+        // With no overhung obstacle there is nothing to overhang, so the
+        // reference tests have no new quantity to account for.
+        let field = ClearanceField::new(&wide_scene(), &lbx());
+        assert!(!field.overhangs(overhanging_pose()));
     }
 
     #[test]
