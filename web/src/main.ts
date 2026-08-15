@@ -6,7 +6,7 @@ import {
   moves,
 } from "./domain/labels";
 import type { ErrorDto, ManeuverDto, SceneDto, VehicleDto } from "./domain/types";
-import { VEHICLES, vehicleById } from "./domain/vehicles";
+import { VEHICLES, searchVehicles, vehicleById } from "./domain/vehicles";
 import { BANDS, pathToPrimitives } from "./render/path";
 import { projectionFor } from "./render/projection";
 import { boundsFor, sceneToPrimitives } from "./render/scene";
@@ -197,9 +197,12 @@ function clearResult(): void {
 function applyPreset(id: string): void {
   const preset = vehicleById(id);
   if (!preset) return;
-  const set = (field: string, value: number, digits = 3) => {
+  // A field the database does not know is left exactly as it was. That is
+  // what tells the driver it is theirs to supply, rather than quietly
+  // asserting a default they would take for measured.
+  const set = (field: string, value: number | null, digits = 3) => {
     const input = byId<HTMLInputElement>(field);
-    if (input) input.value = value.toFixed(digits);
+    if (input && value !== null) input.value = value.toFixed(digits);
   };
   set("wheelbase", preset.wheelbase);
   set("length", preset.length);
@@ -207,17 +210,16 @@ function applyPreset(id: string): void {
   set("body-width", preset.width);
   set("mirror-width", preset.mirror_width);
   set("mirror-width-folded", preset.mirror_width_folded);
-  // Only when the database has it. Leaving the field alone is what tells the
-  // driver it is theirs to supply, rather than quietly asserting a figure.
-  if (preset.ground_clearance !== null) {
-    set("ground-clearance", preset.ground_clearance);
-  }
+  set("ground-clearance", preset.ground_clearance);
   set("radius", preset.min_turning_radius, 2);
   // Say where the number came from: it is not the one on the spec sheet, and
   // someone checking against the manufacturer would otherwise think it wrong.
   const note = byId("radius-note");
   if (note) {
-    note.textContent = `— déduit de ${preset.kerb_radius.toFixed(1)} m entre trottoirs`;
+    note.textContent =
+      preset.min_turning_radius !== null && preset.published_radius !== null
+        ? `— déduit de ${preset.published_radius.toFixed(1)} m entre trottoirs`
+        : "— non publié pour ce modèle, à renseigner";
   }
   clearResult();
 }
@@ -225,13 +227,35 @@ function applyPreset(id: string): void {
 function fillPresets(): void {
   const select = byId<HTMLSelectElement>("preset");
   if (!select) return;
-  select.innerHTML = VEHICLES.map(
-    (v) => `<option value="${v.id}">${v.label}</option>`,
-  ).join("");
+
+  const render = (query: string) => {
+    const matches = searchVehicles(query);
+    select.innerHTML = matches
+      .map((v) => `<option value="${v.id}">${v.label}</option>`)
+      .join("");
+    select.disabled = matches.length === 0;
+    const note = byId("preset-note");
+    if (note) {
+      // Saying so beats an empty dropdown, which reads as a broken page
+      // rather than as a filter that matched nothing.
+      note.textContent =
+        matches.length === 0
+          ? "Aucun modèle ne correspond."
+          : matches.length < VEHICLES.length
+            ? `${matches.length} sur ${VEHICLES.length} modèles`
+            : "";
+    }
+    const first = matches[0];
+    if (first) applyPreset(first.id);
+  };
+
+  render("");
   select.addEventListener("change", () => {
     applyPreset(select.value);
   });
-  applyPreset(VEHICLES[0]!.id);
+  byId<HTMLInputElement>("preset-search")?.addEventListener("input", (event) => {
+    render((event.target as HTMLInputElement).value);
+  });
 }
 
 /** Shows the leaf controls only when they apply. */

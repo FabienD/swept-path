@@ -1,42 +1,16 @@
-import type { VehicleDto } from "./types";
-
 /**
- * The six vehicles the prototype shipped with (`index.html:158-165`).
+ * The vehicle table, read from `data/vehicles.json`.
  *
- * PROVISIONAL. Mirror width is derived rather than measured for most of
- * these, and front overhang is estimated — `data/vehicles.json` records the
- * provenance field by field and supersedes this table in batch 5.
+ * That file is the single source: it records provenance field by field, and
+ * says `null` where nobody has published a figure. This module only
+ * translates — it shapes the entries for the form and derives the one value
+ * the solver needs but no manufacturer prints, the rear-axle pivot radius.
  *
- * Two minutes with a tape measure across the mirrors would be worth more than
- * any of it: `CLAUDE.md` notes that 3 cm of error there inverts a conclusion.
+ * **Nothing here invents a number.** A field the database does not know stays
+ * `null` all the way to the form, which then leaves its input alone rather
+ * than asserting a default the driver would take for measured.
  */
-export interface VehiclePreset extends Omit<VehicleDto, "ground_clearance"> {
-  id: string;
-  label: string;
-  /** Width over the mirrors once folded, in metres. */
-  mirror_width_folded: number;
-  /**
-   * Lowest point of the bodywork, in metres — `null` until the figure is read
-   * off a manufacturer document.
-   *
-   * Nullable here and required in [`VehicleDto`], on purpose: the database is
-   * allowed not to know, the solver is not. What the database must never do is
-   * offer a zero, which would turn every kerb back into a wall.
-   */
-  ground_clearance: number | null;
-  /** The radius as published, kerb to kerb, kept for display. */
-  kerb_radius: number;
-}
-
-/**
- * Folded mirrors, when unmeasured, are assumed to add this much to the body.
- *
- * ARBITRARY — carried over from the prototype (`index.html:178`), which had
- * no measurement behind it either. It decides whether a passage impossible
- * with mirrors out becomes possible with them folded, so it deserves a real
- * measurement.
- */
-const FOLDED_MARGIN_M = 0.04;
+import table from "../../../data/vehicles.json";
 
 /**
  * How much narrower the track is than the body, in metres.
@@ -48,6 +22,28 @@ const FOLDED_MARGIN_M = 0.04;
  */
 const BODY_TO_TRACK_M = 0.26;
 
+/** What a published turning radius is measured on. */
+type RadiusKind = "kerb" | "wall" | "pivot" | null;
+
+/** One entry, with `null` wherever the database has no figure. */
+export interface VehiclePreset {
+  id: string;
+  label: string;
+  body: string;
+  wheelbase: number | null;
+  length: number | null;
+  front_overhang: number | null;
+  width: number | null;
+  mirror_width: number | null;
+  mirror_width_folded: number | null;
+  ground_clearance: number | null;
+  /** Radius traced by the rear axle centre, derived. `null` when it cannot be. */
+  min_turning_radius: number | null;
+  /** The figure as published, kept so the interface can say where its own came from. */
+  published_radius: number | null;
+  published_radius_kind: RadiusKind;
+}
+
 /**
  * Converts a kerb-to-kerb radius into the rear-axle pivot radius.
  *
@@ -57,52 +53,82 @@ const BODY_TO_TRACK_M = 0.26;
  * directly makes every vehicle turn about half again as wide as it really
  * can — and the simulator then invents manoeuvres to make up for it.
  */
-function pivotRadius(kerbRadius: number, wheelbase: number, width: number): number {
+function pivotRadius(kerbRadius: number, wheelbase: number, width: number): number | null {
   const track = width - BODY_TO_TRACK_M;
   const atFrontAxle = kerbRadius - track / 2;
   const squared = atFrontAxle * atFrontAxle - wheelbase * wheelbase;
-  return squared > 0 ? Math.sqrt(squared) : kerbRadius;
+  return squared > 0 ? Math.sqrt(squared) : null;
 }
 
-/** Builds a preset from the figures manufacturers actually publish. */
-function preset(
-  id: string,
-  label: string,
-  wheelbase: number,
-  length: number,
-  front_overhang: number,
-  width: number,
-  mirror_width: number,
-  kerb_radius: number,
-): VehiclePreset {
+/**
+ * The pivot radius, or `null` when the database cannot supply one.
+ *
+ * A `wall` radius is traced by the bodywork and needs a conversion this code
+ * does not have, so it yields nothing rather than a figure that would be
+ * quietly too large.
+ */
+function pivotFrom(
+  published: number | null,
+  kind: RadiusKind,
+  wheelbase: number | null,
+  width: number | null,
+): number | null {
+  if (published === null) return null;
+  if (kind === "pivot") return published;
+  if (kind !== "kerb" || wheelbase === null || width === null) return null;
+  return pivotRadius(published, wheelbase, width);
+}
+
+/** A field as the database stores it: a value that may be absent. */
+interface Field {
+  v: number | null;
+}
+
+const value = (field: Field | undefined): number | null => field?.v ?? null;
+
+export const VEHICLES: readonly VehiclePreset[] = table.vehicles.map((entry) => {
+  const wheelbase = value(entry.wheelbase);
+  const width = value(entry.width);
+  const published = value(entry.turning_radius);
+  const kind = (entry.turning_radius.kind ?? null) as RadiusKind;
   return {
-    id,
-    label,
+    id: entry.id,
+    label: `${entry.make} ${entry.model}`,
+    body: entry.body,
     wheelbase,
-    length,
-    front_overhang,
+    length: value(entry.length),
+    front_overhang: value(entry.front_overhang),
     width,
-    mirror_width,
-    mirror_width_folded: width + FOLDED_MARGIN_M,
-    // Null until the figure is taken off a manufacturer document. Never zero:
-    // a ground clearance of zero would turn every kerb back into a wall, which
-    // is precisely the state obstacle heights exist to leave.
-    ground_clearance: null,
-    kerb_radius,
-    min_turning_radius: pivotRadius(kerb_radius, wheelbase, width),
+    mirror_width: value(entry.width_mirrors),
+    mirror_width_folded: value(entry.width_mirrors_folded),
+    ground_clearance: value(entry.ground_clearance),
+    min_turning_radius: pivotFrom(published, kind, wheelbase, width),
+    published_radius: published,
+    published_radius_kind: kind,
   };
-}
-
-export const VEHICLES: readonly VehiclePreset[] = [
-  preset("lexus-lbx", "Lexus LBX", 2.58, 4.19, 0.85, 1.825, 2.029, 5.2),
-  preset("kia-ev3", "Kia EV3", 2.68, 4.3, 0.83, 1.85, 2.06, 5.2),
-  preset("renault-scenic-4", "Renault Scénic IV", 2.734, 4.406, 0.9, 1.866, 2.128, 5.6),
-  preset("lexus-nx-450h-plus", "Lexus NX 450h+", 2.69, 4.66, 0.99, 1.865, 2.15, 5.7),
-  preset("tesla-model-y", "Tesla Model Y", 2.89, 4.79, 0.94, 1.982, 2.129, 5.8),
-  preset("skoda-superb-combi", "Skoda Superb Combi", 2.841, 4.902, 0.94, 1.849, 2.12, 5.7),
-];
+});
 
 /** Looks a preset up by id. */
 export function vehicleById(id: string): VehiclePreset | undefined {
   return VEHICLES.find((v) => v.id === id);
+}
+
+/**
+ * The entries whose make or model matches `query`.
+ *
+ * Case- and accent-insensitive, so that "911", "lexus" and "ev" all work
+ * without the driver having to know how the table spells things.
+ */
+export function searchVehicles(query: string): readonly VehiclePreset[] {
+  const needle = fold(query);
+  if (needle === "") return VEHICLES;
+  return VEHICLES.filter((v) => fold(v.label).includes(needle));
+}
+
+function fold(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
 }
