@@ -13,6 +13,7 @@ const FIELDS: Record<string, string> = {
   front_overhang: "le porte-à-faux avant",
   width: "la largeur de caisse",
   mirror_width: "la largeur aux rétroviseurs",
+  ground_clearance: "la garde au sol",
   min_turning_radius: "le rayon de braquage",
 };
 
@@ -21,7 +22,10 @@ export function errorMessage(error: ErrorDto): string {
   const field = error.field ? (FIELDS[error.field] ?? error.field) : null;
   switch (error.code) {
     case "non_positive":
-      return `Renseigne ${field ?? "cette mesure"} : la valeur doit être supérieure à zéro.`;
+      // Covers both an empty field and a nonsensical one: the boundary
+      // reports the same code for a NaN and for a negative, and a field the
+      // vehicle table could not fill arrives here empty.
+      return `Renseigne ${field ?? "cette mesure"} : la mesure manque, ou n'est pas supérieure à zéro.`;
     case "front_overhang_too_large":
       return "Le porte-à-faux avant dépasse la longueur disponible : vérifie la longueur totale et l'empattement.";
     case "mirrors_narrower_than_body":

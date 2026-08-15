@@ -1,63 +1,508 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "units": "metres",
-  "note": "Provenance par champ. source: manufacturer | measured | derived | estimated. Valeurs reprises du prototype : a revalider sur documents constructeurs avant toute publication.",
+  "note": "Provenance par champ. source: manufacturer | measured | derived | corroborated | estimated | null. manufacturer = lu sur un document liste dans documents[]. corroborated = concordant sur plusieurs sources independantes, aucune constructeur. derived = calcule a partir d'une autre valeur, un diametre de braquage par exemple. null signifie inconnu, jamais zero.",
+  "caveats": {
+    "front_overhang": "Rarement publie. Lexus le donne, les autres non.",
+    "width_mirrors": "Le point le plus large, et presque toujours le critique. Porsche et Tesla le publient, Lexus et Kia non.",
+    "width": "Chez Lexus et Tesla, la largeur annoncee est celle mesuree retros replies, non la tole nue. C'est une borne haute de la caisse, a quelques millimetres pres.",
+    "ground_clearance": "Donnee a vide, convention de mesure variable, elements souples generalement exclus - or la levre de pare-chocs est ce qui surplombe en premier.",
+    "turning_radius": "kind dit ce que le chiffre mesure : kerb = roue avant exterieure, wall = carrosserie, pivot = centre de l'essieu arriere, seul directement utilisable par le modele. Les constructeurs publient souvent un diametre : il est divise par deux ici, ce qui vaut la source derived."
+  },
   "vehicles": [
     {
       "id": "lexus-lbx",
       "make": "Lexus",
       "model": "LBX",
       "body": "suv",
-      "wheelbase": { "v": 2.580, "source": "manufacturer" },
-      "length": { "v": 4.190, "source": "manufacturer" },
-      "front_overhang": { "v": 0.850, "source": "estimated" },
-      "width": { "v": 1.825, "source": "manufacturer" },
-      "width_mirrors": { "v": 2.029, "source": "derived" },
-      "width_mirrors_folded": { "v": null, "source": null },
-      "ground_clearance": { "v": null, "source": null },
-      "turning_radius": { "v": 5.20, "source": "manufacturer", "kind": "kerb" }
-    },
-    {
-      "id": "kia-ev3",
-      "make": "Kia",
-      "model": "EV3",
-      "body": "suv",
-      "wheelbase": { "v": 2.680, "source": "manufacturer" },
-      "length": { "v": 4.300, "source": "manufacturer" },
-      "front_overhang": { "v": 0.830, "source": "estimated" },
-      "width": { "v": 1.850, "source": "manufacturer" },
-      "width_mirrors": { "v": 2.060, "source": "estimated" },
-      "width_mirrors_folded": { "v": null, "source": null },
-      "ground_clearance": { "v": null, "source": null },
-      "turning_radius": { "v": 5.20, "source": "manufacturer", "kind": "kerb" }
+      "documents": [
+        "https://media.lexus.co.uk/wp-content/uploads/sites/3/pdf/240723-LBX-Tech-Specs.pdf"
+      ],
+      "wheelbase": {
+        "v": 2.58,
+        "source": "manufacturer"
+      },
+      "length": {
+        "v": 4.19,
+        "source": "manufacturer"
+      },
+      "front_overhang": {
+        "v": 0.86,
+        "source": "manufacturer"
+      },
+      "rear_overhang": {
+        "v": 0.74,
+        "source": "manufacturer"
+      },
+      "width": {
+        "v": 1.825,
+        "source": "manufacturer"
+      },
+      "track_front": {
+        "v": 1.57,
+        "source": "manufacturer"
+      },
+      "width_mirrors": {
+        "v": 2.029,
+        "source": "derived"
+      },
+      "width_mirrors_folded": {
+        "v": null,
+        "source": null
+      },
+      "ground_clearance": {
+        "v": 0.17,
+        "source": "manufacturer"
+      },
+      "turning_radius": {
+        "v": 5.2,
+        "source": "manufacturer",
+        "kind": "kerb"
+      }
     },
     {
       "id": "lexus-nx-450h-plus",
       "make": "Lexus",
       "model": "NX 450h+",
       "body": "suv",
-      "wheelbase": { "v": 2.690, "source": "manufacturer" },
-      "length": { "v": 4.660, "source": "manufacturer" },
-      "front_overhang": { "v": 0.990, "source": "estimated" },
-      "width": { "v": 1.865, "source": "manufacturer" },
-      "width_mirrors": { "v": 2.150, "source": "manufacturer" },
-      "width_mirrors_folded": { "v": null, "source": null },
-      "ground_clearance": { "v": null, "source": null },
-      "turning_radius": { "v": 5.70, "source": "estimated", "kind": "unknown" }
+      "documents": [
+        "https://media.lexus.co.uk/wp-content/uploads/sites/3/pdf/240809-NX-Tech-Specs.pdf"
+      ],
+      "wheelbase": {
+        "v": 2.69,
+        "source": "manufacturer"
+      },
+      "length": {
+        "v": 4.66,
+        "source": "manufacturer"
+      },
+      "front_overhang": {
+        "v": 1.007,
+        "source": "manufacturer"
+      },
+      "rear_overhang": {
+        "v": 0.963,
+        "source": "manufacturer"
+      },
+      "width": {
+        "v": 1.865,
+        "source": "manufacturer"
+      },
+      "track_front": {
+        "v": 1.605,
+        "source": "manufacturer"
+      },
+      "width_mirrors": {
+        "v": 2.15,
+        "source": "estimated"
+      },
+      "width_mirrors_folded": {
+        "v": 1.865,
+        "source": "manufacturer"
+      },
+      "ground_clearance": {
+        "v": null,
+        "source": null
+      },
+      "turning_radius": {
+        "v": 5.8,
+        "source": "manufacturer",
+        "kind": "kerb"
+      }
     },
     {
-      "id": "renault-scenic-4",
-      "make": "Renault",
-      "model": "Scenic IV",
-      "body": "mpv",
-      "wheelbase": { "v": 2.734, "source": "manufacturer" },
-      "length": { "v": 4.406, "source": "manufacturer" },
-      "front_overhang": { "v": 0.900, "source": "estimated" },
-      "width": { "v": 1.866, "source": "manufacturer" },
-      "width_mirrors": { "v": 2.128, "source": "manufacturer" },
-      "width_mirrors_folded": { "v": null, "source": null },
-      "ground_clearance": { "v": null, "source": null },
-      "turning_radius": { "v": 5.60, "source": "estimated", "kind": "unknown" }
+      "id": "kia-ev3",
+      "make": "Kia",
+      "model": "EV3",
+      "body": "suv",
+      "documents": [
+        "https://prod2-press.kia.com/eu/en/home/media-resouces/press-releases/2024/Kia-EV3.html"
+      ],
+      "wheelbase": {
+        "v": 2.68,
+        "source": "manufacturer"
+      },
+      "length": {
+        "v": 4.3,
+        "source": "manufacturer"
+      },
+      "front_overhang": {
+        "v": null,
+        "source": null
+      },
+      "rear_overhang": {
+        "v": null,
+        "source": null
+      },
+      "width": {
+        "v": 1.85,
+        "source": "manufacturer"
+      },
+      "track_front": {
+        "v": null,
+        "source": null
+      },
+      "width_mirrors": {
+        "v": null,
+        "source": null
+      },
+      "width_mirrors_folded": {
+        "v": null,
+        "source": null
+      },
+      "ground_clearance": {
+        "v": 0.14,
+        "source": "corroborated"
+      },
+      "turning_radius": {
+        "v": 5.2,
+        "source": "derived",
+        "kind": "kerb"
+      }
+    },
+    {
+      "id": "kia-ev4",
+      "make": "Kia",
+      "model": "EV4",
+      "body": "hatchback",
+      "documents": [
+        "https://www.kia.com/content/dam/kwcms/au/en/images/pdf/ev4/kia-ev4-brochure.pdf"
+      ],
+      "wheelbase": {
+        "v": 2.82,
+        "source": "manufacturer"
+      },
+      "length": {
+        "v": 4.73,
+        "source": "manufacturer"
+      },
+      "front_overhang": {
+        "v": null,
+        "source": null
+      },
+      "rear_overhang": {
+        "v": null,
+        "source": null
+      },
+      "width": {
+        "v": 1.86,
+        "source": "manufacturer"
+      },
+      "track_front": {
+        "v": null,
+        "source": null
+      },
+      "width_mirrors": {
+        "v": null,
+        "source": null
+      },
+      "width_mirrors_folded": {
+        "v": null,
+        "source": null
+      },
+      "ground_clearance": {
+        "v": 0.14,
+        "source": "manufacturer"
+      },
+      "turning_radius": {
+        "v": 5.45,
+        "source": "derived",
+        "kind": "kerb"
+      }
+    },
+    {
+      "id": "kia-ev5",
+      "make": "Kia",
+      "model": "EV5",
+      "body": "suv",
+      "documents": [
+        "https://www.kia.com/content/dam/kwcms/au/en/images/pdf/ev5/kia-ev5-brochure.pdf"
+      ],
+      "wheelbase": {
+        "v": 2.75,
+        "source": "manufacturer"
+      },
+      "length": {
+        "v": 4.615,
+        "source": "manufacturer"
+      },
+      "front_overhang": {
+        "v": null,
+        "source": null
+      },
+      "rear_overhang": {
+        "v": null,
+        "source": null
+      },
+      "width": {
+        "v": 1.875,
+        "source": "manufacturer"
+      },
+      "track_front": {
+        "v": null,
+        "source": null
+      },
+      "width_mirrors": {
+        "v": null,
+        "source": null
+      },
+      "width_mirrors_folded": {
+        "v": null,
+        "source": null
+      },
+      "ground_clearance": {
+        "v": 0.175,
+        "source": "manufacturer"
+      },
+      "turning_radius": {
+        "v": 5.85,
+        "source": "derived",
+        "kind": "kerb"
+      }
+    },
+    {
+      "id": "tesla-model-y",
+      "make": "Tesla",
+      "model": "Model Y",
+      "body": "suv",
+      "documents": [],
+      "wheelbase": {
+        "v": 2.89,
+        "source": "corroborated"
+      },
+      "length": {
+        "v": 4.79,
+        "source": "corroborated"
+      },
+      "front_overhang": {
+        "v": null,
+        "source": null
+      },
+      "rear_overhang": {
+        "v": null,
+        "source": null
+      },
+      "width": {
+        "v": 1.982,
+        "source": "corroborated"
+      },
+      "track_front": {
+        "v": null,
+        "source": null
+      },
+      "width_mirrors": {
+        "v": 2.129,
+        "source": "corroborated"
+      },
+      "width_mirrors_folded": {
+        "v": 1.982,
+        "source": "corroborated"
+      },
+      "ground_clearance": {
+        "v": 0.167,
+        "source": "corroborated"
+      },
+      "turning_radius": {
+        "v": null,
+        "source": null,
+        "kind": null
+      }
+    },
+    {
+      "id": "tesla-model-3",
+      "make": "Tesla",
+      "model": "Model 3",
+      "body": "saloon",
+      "documents": [],
+      "wheelbase": {
+        "v": 2.875,
+        "source": "corroborated"
+      },
+      "length": {
+        "v": 4.72,
+        "source": "corroborated"
+      },
+      "front_overhang": {
+        "v": null,
+        "source": null
+      },
+      "rear_overhang": {
+        "v": null,
+        "source": null
+      },
+      "width": {
+        "v": 1.849,
+        "source": "corroborated"
+      },
+      "track_front": {
+        "v": null,
+        "source": null
+      },
+      "width_mirrors": {
+        "v": 2.089,
+        "source": "corroborated"
+      },
+      "width_mirrors_folded": {
+        "v": 1.85,
+        "source": "corroborated"
+      },
+      "ground_clearance": {
+        "v": 0.138,
+        "source": "corroborated"
+      },
+      "turning_radius": {
+        "v": null,
+        "source": null,
+        "kind": null
+      }
+    },
+    {
+      "id": "porsche-911-997",
+      "make": "Porsche",
+      "model": "911 Carrera (997)",
+      "body": "coupe",
+      "documents": [],
+      "wheelbase": {
+        "v": 2.35,
+        "source": "corroborated"
+      },
+      "length": {
+        "v": 4.427,
+        "source": "corroborated"
+      },
+      "front_overhang": {
+        "v": null,
+        "source": null
+      },
+      "rear_overhang": {
+        "v": null,
+        "source": null
+      },
+      "width": {
+        "v": 1.808,
+        "source": "corroborated"
+      },
+      "track_front": {
+        "v": null,
+        "source": null
+      },
+      "width_mirrors": {
+        "v": null,
+        "source": null
+      },
+      "width_mirrors_folded": {
+        "v": null,
+        "source": null
+      },
+      "ground_clearance": {
+        "v": null,
+        "source": null
+      },
+      "turning_radius": {
+        "v": null,
+        "source": null,
+        "kind": null
+      }
+    },
+    {
+      "id": "porsche-911-991-carrera-4",
+      "make": "Porsche",
+      "model": "911 Carrera 4 (991)",
+      "body": "coupe",
+      "documents": [
+        "https://newsroom.porsche.com/dam/jcr:d2338198-9651-4795-ab47-81b54823a1be/2013_911_Carrera_4and_4S_Technical_Specifications.pdf"
+      ],
+      "wheelbase": {
+        "v": 2.451,
+        "source": "manufacturer"
+      },
+      "length": {
+        "v": 4.491,
+        "source": "manufacturer"
+      },
+      "front_overhang": {
+        "v": null,
+        "source": null
+      },
+      "rear_overhang": {
+        "v": null,
+        "source": null
+      },
+      "width": {
+        "v": 1.852,
+        "source": "manufacturer"
+      },
+      "track_front": {
+        "v": 1.532,
+        "source": "manufacturer"
+      },
+      "width_mirrors": {
+        "v": 1.978,
+        "source": "manufacturer"
+      },
+      "width_mirrors_folded": {
+        "v": null,
+        "source": null
+      },
+      "ground_clearance": {
+        "v": null,
+        "source": null
+      },
+      "turning_radius": {
+        "v": 5.55,
+        "source": "derived",
+        "kind": "kerb"
+      }
+    },
+    {
+      "id": "porsche-911-992",
+      "make": "Porsche",
+      "model": "911 Carrera (992.2)",
+      "body": "coupe",
+      "documents": [
+        "https://newsroom.porsche.com/dam/jcr:86fc9a9b-ece1-4cca-9930-39a78e89baf3/992.2%20911%20Carrera%20and%20Carrera%20Cabriolet%20Technical%20Specifications.pdf"
+      ],
+      "wheelbase": {
+        "v": 2.45,
+        "source": "manufacturer"
+      },
+      "length": {
+        "v": 4.542,
+        "source": "manufacturer"
+      },
+      "front_overhang": {
+        "v": null,
+        "source": null
+      },
+      "rear_overhang": {
+        "v": null,
+        "source": null
+      },
+      "width": {
+        "v": 1.852,
+        "source": "manufacturer"
+      },
+      "track_front": {
+        "v": 1.591,
+        "source": "manufacturer"
+      },
+      "width_mirrors": {
+        "v": 2.033,
+        "source": "manufacturer"
+      },
+      "width_mirrors_folded": {
+        "v": null,
+        "source": null
+      },
+      "ground_clearance": {
+        "v": null,
+        "source": null
+      },
+      "turning_radius": {
+        "v": 5.61,
+        "source": "derived",
+        "kind": "kerb"
+      }
     }
   ]
 }
