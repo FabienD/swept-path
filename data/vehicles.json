@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "units": "metres",
-  "note": "Provenance par champ. source: manufacturer | measured | derived | corroborated | estimated | null. manufacturer = lu sur un document liste dans documents[]. corroborated = concordant sur plusieurs sources independantes, aucune constructeur. derived = calcule a partir d'une autre valeur, un diametre de braquage par exemple. null signifie inconnu, jamais zero.",
+  "note": "Provenance par champ. source: manufacturer | notice | measured | derived | corroborated | estimated | null. manufacturer = lu sur un document liste dans documents[]. notice = lu dans la notice d'utilisation remise avec le vehicule, qui donne souvent ce que les fiches commerciales omettent. measured = releve au metre ruban sur le vehicule. derived = calcule a partir d'une autre valeur, un diametre de braquage par exemple. corroborated = concordant sur plusieurs sources independantes, aucune constructeur. null signifie inconnu, jamais zero.",
   "caveats": {
     "front_overhang": "Rarement publie. Lexus le donne, les autres non. Ou il manque, la somme PAF + PAR reste connue au millimetre (longueur moins empattement), ce qui borne l'erreur : se tromper de 5 cm a l'avant en retire 5 a l'arriere, la longueur totale reste juste et seule la position de l'essieu dans le vehicule se deplace.",
     "width_mirrors": "Le point le plus large, et presque toujours le critique. Porsche et Tesla le publient, Lexus et Kia non.",
