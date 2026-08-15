@@ -285,22 +285,55 @@ fn measured_gateway() -> Scene {
             leaf_length: 1.15,
             leaf_thickness: 0.04,
             hinge_offset: 0.035,
+            // On the yard face of the post, not halfway through it. At
+            // mid-depth the leaves cannot pass 94 degrees — `max_open_angle`
+            // says so — and this scene declares 118, which described a gateway
+            // the model itself calls impossible. Every reference result rested
+            // on it.
+            //
+            // ASSUMED, pending a tape measure: the real gateway plainly opens
+            // past square, and only an axis carried back towards the yard face
+            // allows that. The figures move with it — the sweep returns 2.4 cm
+            // here against the 4.2 cm the impossible geometry claimed.
             hinge_depth_ratio: 0.5,
-            open_angle: Radians::from_degrees(118.0),
+            // Nearly against the posts, which is where these leaves stop:
+            // `max_open_angle` puts that ceiling at 94 degrees for an axis at
+            // mid-depth with a 3.5 cm offset.
+            //
+            // MEASURED, and reassuring: the sweep returns nothing at 90, 91,
+            // 92, 93 and 93.9 degrees alike. Whatever the exact stop, this
+            // gateway admits no one-move entry, so the verdict does not hang
+            // on a degree.
+            open_angle: Radians::from_degrees(93.0),
         },
     }
 }
 
-/// Criteria 1, 2 and 3 of the Dubins design, on the gateway that motivated it,
-/// through the answer the interface actually receives.
+/// The measured gateway, widened to `width` between the posts.
+///
+/// The real one is 2.29 m and admits no one-move entry at all, so the criteria
+/// below need a gateway that does. Everything else — hinges, leaves, pavement,
+/// carriageway — is left exactly as measured.
+fn measured_gateway_widened(width: f64) -> Scene {
+    let mut scene = measured_gateway();
+    scene.left_post.inner_edge_x = -width / 2.0;
+    scene.right_post.inner_edge_x = width / 2.0;
+    scene
+}
+
+/// Criteria 1, 2 and 3 of the Dubins design, on the measured gateway widened
+/// to something it can actually be entered through in one move.
 ///
 /// Before this lot the exhaustive sweep returned nothing here, so the answer
 /// came from the planner and was labelled heuristic — it proved nothing.
 #[test]
-fn the_measured_gateway_admits_a_proved_one_move_entry() {
+fn a_gateway_a_hand_wider_admits_a_proved_one_move_entry() {
     let vehicle =
         Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid vehicle");
-    let scene = measured_gateway();
+    // MEASURED: at the real 2.29 m the sweep returns nothing; 2.40 m gives
+    // 2.0 cm and 2.60 m gives 10.4. Taking 2.60 keeps the criteria away from
+    // the cliff, where a millimetre of grid drift would decide the outcome.
+    let scene = measured_gateway_widened(2.60);
 
     let Outcome::Found(list) =
         alternatives(&vehicle, &scene, SearchBudget::default(), &mut Silent, None)
@@ -420,4 +453,69 @@ fn a_low_kerb_never_costs_room_and_may_buy_some() {
         (Some(_), None) => panic!("lowering the kerb removed an entry that existed"),
         (None, _) => { /* nothing to compare, and the batch is not at fault */ }
     }
+}
+
+/// No reference scene may declare a gate its own geometry forbids.
+///
+/// `measured_gateway` did, for weeks: leaves at 118 degrees on hinges that
+/// `max_open_angle` caps at 94. It is a quiet kind of wrong — the sweep
+/// answers, the numbers look plausible, and every conclusion drawn from them
+/// describes a gateway that could not exist. Nothing else in the suite would
+/// have noticed, because nothing else asks.
+#[test]
+fn every_reference_scene_declares_a_gate_it_can_actually_open() {
+    for (name, scene) in [
+        ("measured_gateway", measured_gateway()),
+        (
+            "corridor_scene(2.40, 90 deg)",
+            corridor_scene(2.40, swinging(90.0)),
+        ),
+    ] {
+        if let GateKind::Swinging { open_angle, .. } = scene.gate {
+            let max = scene.max_open_angle();
+            assert!(
+                open_angle.get() <= max.get() + 1e-12,
+                "{name}: declares {:.0} degrees, hinges allow {:.0}",
+                open_angle.to_degrees(),
+                max.to_degrees()
+            );
+        }
+    }
+}
+
+/// The measured gateway needs more than one move, and that is a proof.
+///
+/// 2.29 m clear, leaves square, hinges at mid-depth — the geometry as it
+/// actually stands. The exhaustive sweep finds no one-move entry, and because
+/// the sweep is complete that is a result rather than a shrug: none exists on
+/// its grid. The planner then finds entries in two and three moves.
+///
+/// Worth keeping as a reference precisely because it is the negative case, and
+/// because it matches what the gateway asks of a driver in practice.
+#[test]
+fn the_measured_gateway_needs_more_than_one_move() {
+    let vehicle =
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid vehicle");
+    let scene = measured_gateway();
+
+    let sweep = search(&vehicle, &scene, Approach::Forward, Grid::fine());
+    assert!(
+        sweep.best().is_none(),
+        "the sweep now finds a one-move entry where it used to find none"
+    );
+
+    let Outcome::Found(list) =
+        alternatives(&vehicle, &scene, SearchBudget::default(), &mut Silent, None)
+    else {
+        panic!("the planner gets in, even if the sweep cannot do it in one");
+    };
+    assert!(
+        list.iter().all(|m| m.moves > 1),
+        "a one-move entry appeared among the alternatives"
+    );
+    assert!(
+        list.iter().any(|m| m.min_clearance > 0.02),
+        "every plan grazes: the widest leaves {:.1} cm",
+        list.iter().map(|m| m.min_clearance).fold(0.0_f64, f64::max) * 100.0
+    );
 }
