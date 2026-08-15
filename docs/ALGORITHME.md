@@ -323,7 +323,51 @@ au tout début de l'approche**, loin du passage.
 `Discretisation::fine()` demeure disponible et documentée. Le correctif n'est
 pas un budget plus gros ni même le raffinement progressif — ceux-là traitent le
 nombre de nœuds, pas le problème. Il faut **une fonction de coût qui valorise
-la marge**, ou un filtre écartant les plans qui rasent. À porter au lot 2.
+la marge**, ou un filtre écartant les plans qui rasent.
+
+### Le correctif, et ce qu'il a donné
+
+Le coût porte désormais un quatrième terme :
+
+```
+score = manœuvres × 5,0 + distance × 0,18 + pire_manque × 16,0 + heuristique
+```
+
+où `pire_manque = max(0, 0,25 − marge)` sur **le point le plus serré du
+trajet**, et non la somme le long de celui-ci. Le pire ne peut que s'aggraver
+en avançant, donc le coût reste monotone et l'A\* reste correct ; et
+l'heuristique, qui ignore une pénalité future toujours positive, continue de
+sous-estimer.
+
+**La marge ne détrône jamais une manœuvre, par arithmétique.** Le manque est
+borné par le seuil lui-même — une marge nulle manque de 25 cm — donc la
+pénalité maximale d'un plan vaut `0,25 × 16 = 4,0`, contre 5,0 pour une
+manœuvre. Aucune scène ne peut faire échanger l'une contre l'autre, et c'est
+une propriété vérifiée par un test plutôt qu'un réglage à surveiller.
+
+La marge lue à chaque primitive ne coûte rien : le test de collision la
+calculait déjà et la jetait.
+
+Mesuré par `grid_cost`, grille par défaut :
+
+| ouverture | avant | après |
+|---|---|---|
+| 2,20 m | 11 mm, 4 manœuvres | **42 mm**, 4 manœuvres |
+| 2,60 m | 24 mm, 3 manœuvres | 21 mm, **2 manœuvres** |
+| 3,00 m | 41 mm, 1 manœuvre | 41 mm, 1 manœuvre |
+| 4,00 m | 26 mm, 1 manœuvre | **49 mm**, 1 manœuvre |
+
+Le cas à 2,60 m mérite un mot : le plan perd 3 mm mais gagne une manœuvre en
+moins. C'est exactement la décision prise — à choisir, on préfère manœuvrer une
+fois de moins.
+
+**Une régression assumée sur la grille fine.** Aux primitives de 20 cm, les
+ouvertures de 2,60 et 3,00 m passent de « trouvé » à *budget épuisé* : un A\*
+qui préfère les zones dégagées explore plus large, et les 60 000 nœuds
+partent plus vite. Ce qu'on perd est mince — ces plans rendaient 1 mm de marge,
+c'est-à-dire le symptôme même que cette section décrivait. Mais la perte est
+réelle : un résultat à 1 mm disait au moins qu'un chemin existait, alors que
+*budget épuisé* ne dit rien du tout.
 
 Le quota de solutions passe de 14 à 200, sur mesure : tester un atterrissage de
 plus est bon marché, c'est atteindre la zone qui coûte.
