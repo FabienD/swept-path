@@ -7,7 +7,8 @@
     "width_mirrors": "Le point le plus large, et presque toujours le critique. Porsche et Tesla le publient, Lexus et Kia non.",
     "width": "Chez Lexus et Tesla, la largeur annoncee est celle mesuree retros replies, non la tole nue. C'est une borne haute de la caisse, a quelques millimetres pres.",
     "ground_clearance": "Donnee a vide, convention de mesure variable, elements souples generalement exclus - or la levre de pare-chocs est ce qui surplombe en premier.",
-    "turning_radius": "kind dit ce que le chiffre mesure : kerb = roue avant exterieure, wall = carrosserie, pivot = centre de l'essieu arriere, seul directement utilisable par le modele. Les constructeurs publient souvent un diametre : il est divise par deux ici, ce qui vaut la source derived."
+    "turning_radius": "kind dit ce que le chiffre mesure : kerb = roue avant exterieure, wall = carrosserie, pivot = centre de l'essieu arriere, seul directement utilisable par le modele. Les constructeurs publient souvent un diametre : il est divise par deux ici, ce qui vaut la source derived.",
+    "documents": "Un lien peut pointer vers un catalogue Porsche d'epoque rehberge par un tiers : le document est celui du constructeur, seul l'hebergement ne l'est pas."
   },
   "vehicles": [
     {
@@ -361,14 +362,16 @@
       "make": "Porsche",
       "model": "911 Carrera (997)",
       "body": "coupe",
-      "documents": [],
+      "documents": [
+        "https://mrsportscars.com/wp-content/uploads/2016/08/Porsche-911-997-Series-Full-Brochure.pdf"
+      ],
       "wheelbase": {
         "v": 2.35,
-        "source": "corroborated"
+        "source": "manufacturer"
       },
       "length": {
         "v": 4.427,
-        "source": "corroborated"
+        "source": "manufacturer"
       },
       "front_overhang": {
         "v": null,
@@ -380,7 +383,7 @@
       },
       "width": {
         "v": 1.808,
-        "source": "corroborated"
+        "source": "manufacturer"
       },
       "track_front": {
         "v": null,
@@ -391,17 +394,17 @@
         "source": null
       },
       "width_mirrors_folded": {
-        "v": null,
-        "source": null
+        "v": 1.852,
+        "source": "notice"
       },
       "ground_clearance": {
-        "v": null,
-        "source": null
+        "v": 0.101,
+        "source": "notice"
       },
       "turning_radius": {
-        "v": null,
-        "source": null,
-        "kind": null
+        "v": 5.45,
+        "source": "derived",
+        "kind": "kerb"
       }
     },
     {
