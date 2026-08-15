@@ -1,13 +1,14 @@
 {
   "schema_version": 3,
   "units": "metres",
-  "note": "Provenance par champ. source: manufacturer | measured | derived | corroborated | estimated | null. manufacturer = lu sur un document liste dans documents[]. corroborated = concordant sur plusieurs sources independantes, aucune constructeur. derived = calcule a partir d'une autre valeur, un diametre de braquage par exemple. null signifie inconnu, jamais zero.",
+  "note": "Provenance par champ. source: manufacturer | notice | measured | derived | corroborated | estimated | null. manufacturer = lu sur un document liste dans documents[]. notice = lu dans la notice d'utilisation remise avec le vehicule, qui donne souvent ce que les fiches commerciales omettent. measured = releve au metre ruban sur le vehicule. derived = calcule a partir d'une autre valeur, un diametre de braquage par exemple. corroborated = concordant sur plusieurs sources independantes, aucune constructeur. null signifie inconnu, jamais zero.",
   "caveats": {
-    "front_overhang": "Rarement publie. Lexus le donne, les autres non.",
+    "front_overhang": "Rarement publie. Lexus le donne, les autres non. Ou il manque, la somme PAF + PAR reste connue au millimetre (longueur moins empattement), ce qui borne l'erreur : se tromper de 5 cm a l'avant en retire 5 a l'arriere, la longueur totale reste juste et seule la position de l'essieu dans le vehicule se deplace.",
     "width_mirrors": "Le point le plus large, et presque toujours le critique. Porsche et Tesla le publient, Lexus et Kia non.",
     "width": "Chez Lexus et Tesla, la largeur annoncee est celle mesuree retros replies, non la tole nue. C'est une borne haute de la caisse, a quelques millimetres pres.",
     "ground_clearance": "Donnee a vide, convention de mesure variable, elements souples generalement exclus - or la levre de pare-chocs est ce qui surplombe en premier.",
-    "turning_radius": "kind dit ce que le chiffre mesure : kerb = roue avant exterieure, wall = carrosserie, pivot = centre de l'essieu arriere, seul directement utilisable par le modele. Les constructeurs publient souvent un diametre : il est divise par deux ici, ce qui vaut la source derived."
+    "turning_radius": "kind dit ce que le chiffre mesure : kerb = roue avant exterieure, wall = carrosserie, pivot = centre de l'essieu arriere, seul directement utilisable par le modele. Les constructeurs publient souvent un diametre : il est divise par deux ici, ce qui vaut la source derived.",
+    "documents": "Un lien peut pointer vers un catalogue Porsche d'epoque rehberge par un tiers : le document est celui du constructeur, seul l'hebergement ne l'est pas."
   },
   "vehicles": [
     {
@@ -101,7 +102,7 @@
         "source": "manufacturer"
       },
       "ground_clearance": {
-        "v": null,
+        "v": 0.185,
         "source": null
       },
       "turning_radius": {
@@ -127,12 +128,12 @@
         "source": "manufacturer"
       },
       "front_overhang": {
-        "v": null,
-        "source": null
+        "v": 0.815,
+        "source": "manufacturer"
       },
       "rear_overhang": {
-        "v": null,
-        "source": null
+        "v": 0.815,
+        "source": "manufacturer"
       },
       "width": {
         "v": 1.85,
@@ -143,12 +144,12 @@
         "source": null
       },
       "width_mirrors": {
-        "v": null,
+        "v": 2.04,
         "source": null
       },
       "width_mirrors_folded": {
-        "v": null,
-        "source": null
+        "v": 1.85,
+        "source": "manufacturer"
       },
       "ground_clearance": {
         "v": 0.14,
@@ -156,56 +157,6 @@
       },
       "turning_radius": {
         "v": 5.2,
-        "source": "derived",
-        "kind": "kerb"
-      }
-    },
-    {
-      "id": "kia-ev4",
-      "make": "Kia",
-      "model": "EV4",
-      "body": "hatchback",
-      "documents": [
-        "https://www.kia.com/content/dam/kwcms/au/en/images/pdf/ev4/kia-ev4-brochure.pdf"
-      ],
-      "wheelbase": {
-        "v": 2.82,
-        "source": "manufacturer"
-      },
-      "length": {
-        "v": 4.73,
-        "source": "manufacturer"
-      },
-      "front_overhang": {
-        "v": null,
-        "source": null
-      },
-      "rear_overhang": {
-        "v": null,
-        "source": null
-      },
-      "width": {
-        "v": 1.86,
-        "source": "manufacturer"
-      },
-      "track_front": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors_folded": {
-        "v": null,
-        "source": null
-      },
-      "ground_clearance": {
-        "v": 0.14,
-        "source": "manufacturer"
-      },
-      "turning_radius": {
-        "v": 5.45,
         "source": "derived",
         "kind": "kerb"
       }
@@ -223,16 +174,16 @@
         "source": "manufacturer"
       },
       "length": {
-        "v": 4.615,
+        "v": 4.61,
         "source": "manufacturer"
       },
       "front_overhang": {
-        "v": null,
-        "source": null
+        "v": 0.91,
+        "source": "manufacturer"
       },
       "rear_overhang": {
-        "v": null,
-        "source": null
+        "v": 0.95,
+        "source": "manufacturer"
       },
       "width": {
         "v": 1.875,
@@ -243,165 +194,21 @@
         "source": null
       },
       "width_mirrors": {
-        "v": null,
+        "v": 2.095,
         "source": null
       },
       "width_mirrors_folded": {
         "v": null,
         "source": null
-      },
-      "ground_clearance": {
-        "v": 0.175,
-        "source": "manufacturer"
-      },
-      "turning_radius": {
-        "v": 5.85,
-        "source": "derived",
-        "kind": "kerb"
-      }
-    },
-    {
-      "id": "tesla-model-y",
-      "make": "Tesla",
-      "model": "Model Y",
-      "body": "suv",
-      "documents": [],
-      "wheelbase": {
-        "v": 2.89,
-        "source": "corroborated"
-      },
-      "length": {
-        "v": 4.79,
-        "source": "corroborated"
-      },
-      "front_overhang": {
-        "v": null,
-        "source": null
-      },
-      "rear_overhang": {
-        "v": null,
-        "source": null
-      },
-      "width": {
-        "v": 1.982,
-        "source": "corroborated"
-      },
-      "track_front": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors": {
-        "v": 2.129,
-        "source": "corroborated"
-      },
-      "width_mirrors_folded": {
-        "v": 1.982,
-        "source": "corroborated"
       },
       "ground_clearance": {
         "v": 0.167,
         "source": "corroborated"
       },
       "turning_radius": {
-        "v": null,
-        "source": null,
-        "kind": null
-      }
-    },
-    {
-      "id": "tesla-model-3",
-      "make": "Tesla",
-      "model": "Model 3",
-      "body": "saloon",
-      "documents": [],
-      "wheelbase": {
-        "v": 2.875,
-        "source": "corroborated"
-      },
-      "length": {
-        "v": 4.72,
-        "source": "corroborated"
-      },
-      "front_overhang": {
-        "v": null,
-        "source": null
-      },
-      "rear_overhang": {
-        "v": null,
-        "source": null
-      },
-      "width": {
-        "v": 1.849,
-        "source": "corroborated"
-      },
-      "track_front": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors": {
-        "v": 2.089,
-        "source": "corroborated"
-      },
-      "width_mirrors_folded": {
-        "v": 1.85,
-        "source": "corroborated"
-      },
-      "ground_clearance": {
-        "v": 0.138,
-        "source": "corroborated"
-      },
-      "turning_radius": {
-        "v": null,
-        "source": null,
-        "kind": null
-      }
-    },
-    {
-      "id": "porsche-911-997",
-      "make": "Porsche",
-      "model": "911 Carrera (997)",
-      "body": "coupe",
-      "documents": [],
-      "wheelbase": {
-        "v": 2.35,
-        "source": "corroborated"
-      },
-      "length": {
-        "v": 4.427,
-        "source": "corroborated"
-      },
-      "front_overhang": {
-        "v": null,
-        "source": null
-      },
-      "rear_overhang": {
-        "v": null,
-        "source": null
-      },
-      "width": {
-        "v": 1.808,
-        "source": "corroborated"
-      },
-      "track_front": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors": {
-        "v": null,
-        "source": null
-      },
-      "width_mirrors_folded": {
-        "v": null,
-        "source": null
-      },
-      "ground_clearance": {
-        "v": null,
-        "source": null
-      },
-      "turning_radius": {
-        "v": null,
-        "source": null,
-        "kind": null
+        "v": 5.85,
+        "source": "derived",
+        "kind": "kerb"
       }
     },
     {
@@ -421,12 +228,12 @@
         "source": "manufacturer"
       },
       "front_overhang": {
-        "v": null,
-        "source": null
+        "v": 1.0,
+        "source": "estimated"
       },
       "rear_overhang": {
-        "v": null,
-        "source": null
+        "v": 1.04,
+        "source": "derived"
       },
       "width": {
         "v": 1.852,
@@ -445,7 +252,7 @@
         "source": null
       },
       "ground_clearance": {
-        "v": null,
+        "v": 0.11,
         "source": null
       },
       "turning_radius": {
@@ -471,12 +278,12 @@
         "source": "manufacturer"
       },
       "front_overhang": {
-        "v": null,
-        "source": null
+        "v": 1.0,
+        "source": "estimated"
       },
       "rear_overhang": {
-        "v": null,
-        "source": null
+        "v": 1.092,
+        "source": "derived"
       },
       "width": {
         "v": 1.852,
@@ -495,7 +302,7 @@
         "source": null
       },
       "ground_clearance": {
-        "v": null,
+        "v": 0.11,
         "source": null
       },
       "turning_radius": {
