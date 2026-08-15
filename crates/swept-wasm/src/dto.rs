@@ -317,18 +317,24 @@ fn describe(
 
     // Which poses count as "in the gateway" is decided on the *vehicle*, not
     // on the pose. A pose is the rear axle; what threads the opening is the
-    // nose, up to a wheelbase and an overhang ahead of it, and the mirrors
-    // with it. Filtering on the axle alone got this backwards twice over: it
-    // dropped the moment the nose passes between the posts — the tightest of
-    // the whole entry — and it kept poses where the axle has reached the
-    // corridor but the vehicle is already out in the yard, which is roomy.
+    // whole body around it. Filtering on the axle alone got this backwards
+    // twice over: it dropped the moment the nose passes between the posts —
+    // the tightest of the whole entry — and it kept poses where the axle has
+    // reached the corridor but the vehicle is already out in the yard.
     //
-    // The figure that came out could therefore exceed `(W - w) / 2`, the room
-    // the opening physically has, and it is the figure the verdict leads with.
-    let ahead = vehicle.wheelbase + vehicle.front_overhang;
+    // The band is the corridor grown by the vehicle's **circumradius**: the
+    // furthest any part of it can sit from the rear axle, whichever way it
+    // points. Growing by the nose reach alone assumed the nose leads, which is
+    // false the moment a plan backs in — and a reversing entry then threaded
+    // the opening entirely outside the band, leaving the reported figure to
+    // come from somewhere roomier. It read 15.1 cm on a gateway holding 13.1.
+    let reach = vehicle
+        .rear_overhang
+        .max(vehicle.wheelbase + vehicle.front_overhang);
+    let circumradius = reach.hypot(vehicle.mirror_width / 2.0);
     let in_gateway = poses
         .iter()
-        .filter(|p| p.y >= -ahead && p.y <= corridor + vehicle.rear_overhang)
+        .filter(|p| p.y >= -circumradius && p.y <= corridor + circumradius)
         .map(|p| p.clearance)
         .fold(f64::INFINITY, f64::min);
 
