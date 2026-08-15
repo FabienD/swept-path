@@ -296,7 +296,15 @@ fn measured_gateway() -> Scene {
             // allows that. The figures move with it — the sweep returns 2.4 cm
             // here against the 4.2 cm the impossible geometry claimed.
             hinge_depth_ratio: 0.5,
-            open_angle: Radians::from_degrees(90.0),
+            // Nearly against the posts, which is where these leaves stop:
+            // `max_open_angle` puts that ceiling at 94 degrees for an axis at
+            // mid-depth with a 3.5 cm offset.
+            //
+            // MEASURED, and reassuring: the sweep returns nothing at 90, 91,
+            // 92, 93 and 93.9 degrees alike. Whatever the exact stop, this
+            // gateway admits no one-move entry, so the verdict does not hang
+            // on a degree.
+            open_angle: Radians::from_degrees(93.0),
         },
     }
 }
