@@ -123,11 +123,13 @@ wrong.
 ## Licence
 
 The application — `swept-solver`, `swept-wasm`, the web interface — is
-**AGPL-3.0-only**.
+**AGPL-3.0-only**, in [`LICENSE`](LICENSE).
 
-The geometric core, `swept-core`, is **MIT OR Apache-2.0**, so that it stays
-reusable on its own. Keeping it free of production dependencies is what makes
-that possible.
+The geometric core, `swept-core`, is **MIT OR Apache-2.0**, in
+[`crates/swept-core/LICENSE-MIT`](crates/swept-core/LICENSE-MIT) and
+[`LICENSE-APACHE`](crates/swept-core/LICENSE-APACHE), so that it stays reusable
+on its own. Keeping it free of production dependencies is what makes that
+possible.
 
 Vehicle data is licensed separately and is **not** covered by either. Figures
 come from manufacturer documents only, never from an aggregator: a compiled
