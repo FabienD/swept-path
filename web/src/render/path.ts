@@ -105,7 +105,9 @@ export function pathToPrimitives(
   if (poses.length === 0) return [];
 
   const out: Primitive[] = [];
-  const keyOf = (pose: PoseDto) => `${pose.reverse}|${bandOf(pose.clearance)}`;
+  // The overhang joins the key, which splits the path where it begins.
+  const keyOf = (pose: PoseDto) =>
+    `${pose.reverse}|${bandOf(pose.clearance)}|${pose.overhanging}`;
 
   let start = 0;
   while (start < poses.length - 1) {
@@ -116,7 +118,9 @@ export function pathToPrimitives(
     const last = poses[end]!;
     out.push({
       type: "polyline",
-      role: BAND_ROLES[bandOf(last.clearance)]!,
+      role: last.overhanging
+        ? "overhang"
+        : BAND_ROLES[bandOf(last.clearance)]!,
       dashed: last.reverse,
       points: poses.slice(start, end + 1).map((p) => ({ x: p.x, y: p.y })),
     });

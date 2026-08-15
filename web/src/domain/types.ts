@@ -32,6 +32,8 @@ export interface SceneDto {
   pavement_width: number;
   dropped_kerb_width: number;
   road_width: number;
+  /** Kerb height, in metres. Infinite for a kerb nothing passes over. */
+  kerb_height: number;
   gate: GateDto;
 }
 
@@ -41,6 +43,8 @@ export interface VehicleDto {
   front_overhang: number;
   width: number;
   mirror_width: number;
+  /** Lowest point of the bodywork, wheels excluded, in metres. */
+  ground_clearance: number;
   min_turning_radius: number;
 }
 
@@ -58,6 +62,8 @@ export interface PoseDto {
   heading: number;
   reverse: boolean;
   clearance: number;
+  /** True when part of the body sits over a low obstacle at this pose. */
+  overhanging: boolean;
 }
 
 export type ConfidenceDto = "exact" | "heuristic" | "heuristic_exhausted";
@@ -67,6 +73,8 @@ export interface ManeuverDto {
   min_clearance: number;
   /** Tightest point within the gateway, which is what a driver asked about. */
   min_clearance_in_gateway: number;
+  /** Distance travelled with part of the body over a low obstacle, in metres. */
+  metres_overhanging: number;
   metres_under_25cm: number;
   metres_under_10cm: number;
   distance: number;

@@ -10,6 +10,7 @@ function scene(opening: number, swinging = false): SceneDto {
     pavement_width: 1.2,
     dropped_kerb_width: opening + 0.8,
     road_width: 4.5,
+    kerb_height: 0.12,
     gate: swinging
       ? {
           kind: "swinging",

@@ -36,6 +36,7 @@ export function readScene(): SceneDto {
     pavement_width: num("pavement"),
     dropped_kerb_width: num("kerb"),
     road_width: num("road"),
+    kerb_height: num("kerb-height"),
     gate:
       choice("gate-kind") === "swinging"
         ? {
@@ -59,6 +60,7 @@ export function readVehicle(): VehicleDto {
     front_overhang: num("front-overhang"),
     width: num("body-width"),
     mirror_width: folded ? num("mirror-width-folded") : num("mirror-width"),
+    ground_clearance: num("ground-clearance"),
     min_turning_radius: num("radius"),
   };
 }
