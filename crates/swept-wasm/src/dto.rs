@@ -97,6 +97,7 @@ impl SceneDto {
             pavement_width: self.pavement_width,
             dropped_kerb_width: self.dropped_kerb_width,
             road_width: self.road_width,
+            kerb_height: f64::INFINITY,
             gate: match self.gate {
                 GateDto::Sliding => GateKind::Sliding,
                 GateDto::Swinging {

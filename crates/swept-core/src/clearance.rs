@@ -48,7 +48,8 @@ impl ClearanceField {
     /// Prepares the field for one scene and one vehicle.
     #[must_use]
     pub fn new(scene: &Scene, vehicle: &Vehicle) -> Self {
-        let obstacles = scene.obstacles();
+        // Heights are ignored for now: Task 3 turns this into the pre-tri.
+        let obstacles: Vec<Obb> = scene.obstacles().into_iter().map(|o| o.shape).collect();
         let corners = obstacles
             .iter()
             .filter(|o| {
@@ -127,6 +128,7 @@ mod tests {
             pavement_width: 1.20,
             dropped_kerb_width: 3.20,
             road_width: 4.50,
+            kerb_height: f64::INFINITY,
             gate: GateKind::Sliding,
         }
     }
@@ -179,6 +181,7 @@ mod tests {
             pavement_width: 1.20,
             dropped_kerb_width: 12.0,
             road_width: 4.50,
+            kerb_height: f64::INFINITY,
             gate: GateKind::Sliding,
         };
         let field = ClearanceField::new(&scene, &lbx());

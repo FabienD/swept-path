@@ -10,7 +10,8 @@
 pub mod gate;
 pub mod obstacles;
 
-use crate::geometry::Obb;
+pub use obstacles::Obstacle;
+
 use crate::units::Radians;
 
 /// One side of the opening.
@@ -64,6 +65,13 @@ pub struct Scene {
     pub dropped_kerb_width: f64,
     /// Width of the carriageway available to manoeuvre in, in metres.
     pub road_width: f64,
+    /// Height of the pavement kerb, in metres.
+    ///
+    /// The one thing in a scene a body can pass over. Set it to
+    /// `f64::INFINITY` to get the pre-height behaviour, where a kerb stops
+    /// everything — which is what the reference tests do, so that their
+    /// results keep describing the world they were established in.
+    pub kerb_height: f64,
     /// What closes the opening.
     pub gate: GateKind,
 }
@@ -81,6 +89,7 @@ impl Scene {
     ///     pavement_width: 1.2,
     ///     dropped_kerb_width: 3.2,
     ///     road_width: 4.5,
+    ///     kerb_height: 0.12,
     ///     gate: GateKind::Sliding,
     /// };
     /// assert!((scene.opening_width() - 2.4).abs() < 1e-12);
@@ -90,9 +99,9 @@ impl Scene {
         self.right_post.inner_edge_x - self.left_post.inner_edge_x
     }
 
-    /// Every obstacle in the scene, as oriented rectangles.
+    /// Every rectangle a vehicle can hit, with the height each one stands at.
     #[must_use]
-    pub fn obstacles(&self) -> Vec<Obb> {
+    pub fn obstacles(&self) -> Vec<Obstacle> {
         obstacles::build(self)
     }
 
@@ -129,6 +138,7 @@ mod tests {
             pavement_width: 1.20,
             dropped_kerb_width: 3.20,
             road_width: 4.50,
+            kerb_height: f64::INFINITY,
             gate: GateKind::Sliding,
         }
     }
@@ -174,15 +184,51 @@ mod tests {
     }
 
     #[test]
+    fn only_the_pavement_is_low() {
+        // Everything a scene contains is a wall except the two strips of
+        // pavement, which a body can overhang. Getting this wrong in either
+        // direction is invisible until a result is wrong.
+        let mut scene = symmetric();
+        scene.kerb_height = 0.12;
+        let obstacles = scene.obstacles();
+        let low: Vec<_> = obstacles.iter().filter(|o| o.height.is_finite()).collect();
+        assert_eq!(
+            low.len(),
+            2,
+            "the pavement is split either side of the kerb"
+        );
+        for obstacle in low {
+            assert!((obstacle.height - 0.12).abs() < EPS);
+        }
+    }
+
+    #[test]
+    fn a_scene_without_a_pavement_has_nothing_low() {
+        let mut scene = symmetric();
+        scene.pavement_width = 0.0;
+        scene.kerb_height = 0.12;
+        assert!(scene.obstacles().iter().all(|o| !o.height.is_finite()));
+    }
+
+    #[test]
+    fn a_kerb_declared_full_height_leaves_no_low_obstacle() {
+        // How every pre-existing test keeps its results: an infinite kerb is
+        // a wall, and the scene is exactly what it was before this batch.
+        let mut scene = symmetric();
+        scene.kerb_height = f64::INFINITY;
+        assert!(scene.obstacles().iter().all(|o| !o.height.is_finite()));
+    }
+
+    #[test]
     fn places_the_pillars_against_the_opening() {
         let scene = symmetric();
         let obstacles = scene.obstacles();
         // The right pillar spans from the opening edge outwards by its width.
         let right = obstacles
             .iter()
-            .find(|o| (o.center.x - (1.20 + 0.55 / 2.0)).abs() < EPS)
+            .find(|o| (o.shape.center.x - (1.20 + 0.55 / 2.0)).abs() < EPS)
             .expect("right pillar");
-        assert!((right.half_width - 0.55 / 2.0).abs() < EPS);
-        assert!((right.half_height - 0.55 / 2.0).abs() < EPS);
+        assert!((right.shape.half_width - 0.55 / 2.0).abs() < EPS);
+        assert!((right.shape.half_height - 0.55 / 2.0).abs() < EPS);
     }
 }

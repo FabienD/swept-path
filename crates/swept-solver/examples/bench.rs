@@ -31,6 +31,7 @@ fn scene(opening: f64) -> Scene {
         pavement_width: 1.30,
         dropped_kerb_width: 3.20,
         road_width: 5.90,
+        kerb_height: f64::INFINITY,
         gate: GateKind::Swinging {
             leaf_length: 1.15,
             leaf_thickness: 0.04,

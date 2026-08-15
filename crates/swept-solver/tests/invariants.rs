@@ -28,6 +28,7 @@ fn scene(opening: f64, post_depth: f64, road: f64) -> Scene {
         pavement_width: 1.20,
         dropped_kerb_width: opening + 0.80,
         road_width: road,
+        kerb_height: f64::INFINITY,
         gate: GateKind::Sliding,
     }
 }

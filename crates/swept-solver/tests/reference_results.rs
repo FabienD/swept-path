@@ -34,6 +34,7 @@ fn scene(opening: f64, gate: GateKind) -> Scene {
         pavement_width: 1.20,
         dropped_kerb_width: opening + 0.80,
         road_width: 4.50,
+        kerb_height: f64::INFINITY,
         gate,
     }
 }
@@ -45,6 +46,7 @@ fn corridor_scene(opening: f64, gate: GateKind) -> Scene {
     Scene {
         pavement_width: 0.0,
         road_width: 12.0,
+        kerb_height: f64::INFINITY,
         ..scene(opening, gate)
     }
 }
@@ -70,8 +72,9 @@ fn corridor_depth(scene: &Scene) -> f64 {
     scene
         .obstacles()
         .iter()
-        .filter(|o| o.center.x.abs() < reach && o.center.y >= 0.0)
-        .map(|o| o.center.y + o.half_height.max(o.half_width))
+        .map(|o| o.shape)
+        .filter(|s| s.center.x.abs() < reach && s.center.y >= 0.0)
+        .map(|s| s.center.y + s.half_height.max(s.half_width))
         .fold(0.0_f64, f64::max)
 }
 
@@ -277,6 +280,7 @@ fn measured_gateway() -> Scene {
         pavement_width: 1.30,
         dropped_kerb_width: 3.20,
         road_width: 5.90,
+        kerb_height: f64::INFINITY,
         gate: GateKind::Swinging {
             leaf_length: 1.15,
             leaf_thickness: 0.04,

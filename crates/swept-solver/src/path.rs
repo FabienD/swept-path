@@ -118,6 +118,7 @@ mod tests {
             pavement_width: 1.20,
             dropped_kerb_width: 3.20,
             road_width: 4.50,
+            kerb_height: f64::INFINITY,
             gate: GateKind::Sliding,
         }
     }
