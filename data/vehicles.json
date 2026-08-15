@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "units": "metres",
   "note": "Provenance par champ. source: manufacturer | measured | derived | estimated. Valeurs reprises du prototype : a revalider sur documents constructeurs avant toute publication.",
   "vehicles": [
@@ -14,6 +14,7 @@
       "width": { "v": 1.825, "source": "manufacturer" },
       "width_mirrors": { "v": 2.029, "source": "derived" },
       "width_mirrors_folded": { "v": null, "source": null },
+      "ground_clearance": { "v": null, "source": null },
       "turning_radius": { "v": 5.20, "source": "manufacturer", "kind": "kerb" }
     },
     {
@@ -27,6 +28,7 @@
       "width": { "v": 1.850, "source": "manufacturer" },
       "width_mirrors": { "v": 2.060, "source": "estimated" },
       "width_mirrors_folded": { "v": null, "source": null },
+      "ground_clearance": { "v": null, "source": null },
       "turning_radius": { "v": 5.20, "source": "manufacturer", "kind": "kerb" }
     },
     {
@@ -40,6 +42,7 @@
       "width": { "v": 1.865, "source": "manufacturer" },
       "width_mirrors": { "v": 2.150, "source": "manufacturer" },
       "width_mirrors_folded": { "v": null, "source": null },
+      "ground_clearance": { "v": null, "source": null },
       "turning_radius": { "v": 5.70, "source": "estimated", "kind": "unknown" }
     },
     {
@@ -53,6 +56,7 @@
       "width": { "v": 1.866, "source": "manufacturer" },
       "width_mirrors": { "v": 2.128, "source": "manufacturer" },
       "width_mirrors_folded": { "v": null, "source": null },
+      "ground_clearance": { "v": null, "source": null },
       "turning_radius": { "v": 5.60, "source": "estimated", "kind": "unknown" }
     }
   ]

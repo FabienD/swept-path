@@ -52,6 +52,53 @@ Les obstacles très étendus — les murs, la chaussée d'en face — sont exclu
 test inverse : leurs coins sont hors de la scène et ne servent qu'à gaspiller
 du calcul.
 
+## 3 bis. La hauteur des obstacles
+
+Un obstacle n'est plus un mur, mais un mur d'une certaine hauteur. Une bordure
+de trottoir de douze centimètres se surplombe ; un muret de quarante arrête le
+pare-chocs. La comparaison se fait entre cette hauteur et la **garde au sol**
+du véhicule — le point le plus bas de la carrosserie, roues exclues.
+
+Trois règles, et chacune existe pour un cas que les autres manquent :
+
+1. **La carrosserie** ne voit que ce qu'elle ne peut pas survoler. Un obstacle
+   surplombé est ignoré *entièrement* : ni collision, ni distance. Compter la
+   distance ferait tomber la marge à zéro dès qu'un pare-chocs déborde, ce qui
+   serait le même refus sous un autre masque.
+2. **Les quatre roues** voient tout, bordures comprises. Une carrosserie
+   surplombe, un pneu ne quitte pas ce sur quoi il roule.
+3. **Le test inverse des coins** ne porte que sur les obstacles bloquants : un
+   coin de trottoir à l'intérieur de la caisse est un surplomb.
+
+Les roues sont aux coins de la caisse, à la demi-largeur de caisse et non à la
+demi-voie : le bord extérieur d'un pneu affleure la tôle à deux centimètres
+près, parce que les passages de roue épousent les pneus. Cela épargne deux
+mesures que personne n'a sous la main — la voie et la largeur de pneu — pour
+une erreur bien moindre que celle qu'aurait causée la voie seule.
+
+Il en découle une conséquence qui n'est pas évidente : **seul un porte-à-faux
+peut surplomber**. Le flanc se trouve au-dessus d'une bordure exactement quand
+un pneu y est. Ce qui passe au-dessus est donc ce qui dépasse d'un essieu — le
+nez, ou l'arrière. C'est bien le phénomène réel : c'est le pare-chocs qui
+balaie au-dessus du trottoir quand le véhicule braque, jamais la portière.
+
+Les hauteurs ne sont jamais comparées dans la boucle chaude. Elles le sont une
+fois, à la construction du champ de marge, qui range les obstacles en deux
+listes disjointes. Le coût par pose est celui d'avant, plus quatre points.
+
+Le surplomb est **signalé, jamais pénalisé** : le résultat rapporte la distance
+parcourue au-dessus d'une bordure, et le solveur ne change pas de comportement.
+Le modèle reste plan — il ne connaît ni la borne, ni le panneau, ni le poteau
+qui se dresse si souvent sur un trottoir, et c'est précisément pourquoi cette
+distance est dite plutôt que tue.
+
+**Ce que cela change sur la scène de référence : rien.** Mesuré au moment de
+l'implémentation, sur le portail de 2,29 m — un mur, une bordure de 12 cm et
+l'absence totale de trottoir rendent tous les trois 4,15 cm de marge, au même
+point le plus serré, sans qu'une seule pose surplombe quoi que ce soit. Ce qui
+limite cette entrée est l'ouverture, pas le trottoir. Le lot corrige un modèle
+qui se trompait en silence ; il ne rend pas ce passage plus facile.
+
 ## 4. L'intégration cinématique
 
 Une manœuvre est une chaîne de segments à courbure constante. Chacun
