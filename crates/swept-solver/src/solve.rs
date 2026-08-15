@@ -147,7 +147,7 @@ mod tests {
     }
 
     fn lbx() -> Vehicle {
-        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 5.2).expect("valid vehicle")
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).expect("valid vehicle")
     }
 
     #[test]
@@ -250,7 +250,7 @@ mod tests {
     fn more_moves_must_buy_more_room_than_every_shorter_answer() {
         // Fabien's gateway, with the pivot radius rather than the published
         // one: swinging leaves at 90 degrees, 1.25 m pavement, 6.20 m road.
-        let vehicle = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 3.59).expect("valid");
+        let vehicle = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid");
         for opening in [2.30_f64, 2.40, 2.60, 3.00] {
             let mut sc = scene(opening);
             sc.pavement_width = 1.25;

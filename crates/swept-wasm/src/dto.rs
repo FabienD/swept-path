@@ -147,6 +147,8 @@ impl VehicleDto {
             self.front_overhang,
             self.width,
             self.mirror_width,
+            // Placeholder until Task 6 carries the field across the boundary.
+            0.18,
             self.min_turning_radius,
         )
         .map_err(|e| match e {

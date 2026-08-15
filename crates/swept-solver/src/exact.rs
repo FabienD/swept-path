@@ -303,7 +303,7 @@ mod tests {
     }
 
     fn lbx() -> Vehicle {
-        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 5.2).expect("valid vehicle")
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).expect("valid vehicle")
     }
 
     #[test]
@@ -422,7 +422,7 @@ mod tests {
     }
 
     fn lbx_pivot() -> Vehicle {
-        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 3.59).expect("valid vehicle")
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid vehicle")
     }
 
     #[test]

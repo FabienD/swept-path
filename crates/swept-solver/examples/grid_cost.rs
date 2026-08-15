@@ -43,7 +43,8 @@ fn scene(opening: f64) -> Scene {
 }
 
 fn main() {
-    let vehicle = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 5.2).expect("valid vehicle");
+    let vehicle =
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).expect("valid vehicle");
 
     println!(
         "{:<10} {:>8} {:>10} {:>11} {:>7}  note",

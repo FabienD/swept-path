@@ -15,7 +15,7 @@ use swept_solver::result::Outcome;
 use swept_solver::solve::alternatives;
 
 fn lbx() -> Vehicle {
-    Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 5.2).expect("valid vehicle")
+    Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).expect("valid vehicle")
 }
 
 fn scene(opening: f64, gate: GateKind) -> Scene {
@@ -294,7 +294,8 @@ fn measured_gateway() -> Scene {
 /// came from the planner and was labelled heuristic — it proved nothing.
 #[test]
 fn the_measured_gateway_admits_a_proved_one_move_entry() {
-    let vehicle = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 3.59).expect("valid vehicle");
+    let vehicle =
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid vehicle");
     let scene = measured_gateway();
 
     let Outcome::Found(list) =

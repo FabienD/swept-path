@@ -43,7 +43,8 @@ fn scene(opening: f64) -> Scene {
 
 fn main() {
     // The measured vehicle, with the pivot radius rather than the kerb radius.
-    let vehicle = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 3.59).expect("valid vehicle");
+    let vehicle =
+        Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid vehicle");
 
     println!(
         "fine grid:   {} pose pairs, up to {} curves",
