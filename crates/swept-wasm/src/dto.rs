@@ -74,6 +74,8 @@ pub struct SceneDto {
     pub dropped_kerb_width: f64,
     /// Carriageway width, in metres.
     pub road_width: f64,
+    /// Kerb height, in metres. Infinite for a kerb nothing passes over.
+    pub kerb_height: f64,
     /// What closes the opening.
     pub gate: GateDto,
 }
@@ -97,7 +99,7 @@ impl SceneDto {
             pavement_width: self.pavement_width,
             dropped_kerb_width: self.dropped_kerb_width,
             road_width: self.road_width,
-            kerb_height: f64::INFINITY,
+            kerb_height: self.kerb_height,
             gate: match self.gate {
                 GateDto::Sliding => GateKind::Sliding,
                 GateDto::Swinging {
@@ -131,6 +133,8 @@ pub struct VehicleDto {
     pub width: f64,
     /// Width over the mirrors, in metres.
     pub mirror_width: f64,
+    /// Lowest point of the bodywork, wheels excluded, in metres.
+    pub ground_clearance: f64,
     /// Tightest turning radius, in metres.
     pub min_turning_radius: f64,
 }
@@ -148,8 +152,7 @@ impl VehicleDto {
             self.front_overhang,
             self.width,
             self.mirror_width,
-            // Placeholder until Task 6 carries the field across the boundary.
-            0.18,
+            self.ground_clearance,
             self.min_turning_radius,
         )
         .map_err(|e| match e {
@@ -198,6 +201,8 @@ pub struct PoseDto {
     pub reverse: bool,
     /// Clearance at this pose, in metres.
     pub clearance: f64,
+    /// `true` when part of the body sits over a low obstacle at this pose.
+    pub overhanging: bool,
 }
 
 /// Where a result came from, flattened for the interface.
@@ -229,6 +234,11 @@ pub struct ManeuverDto {
     pub metres_under_25cm: f64,
     /// Distance travelled within 10 cm of an obstacle, in metres.
     pub metres_under_10cm: f64,
+    /// Distance travelled with part of the body over a low obstacle, in metres.
+    ///
+    /// Legal geometry, and worth reporting: the model is flat and knows
+    /// nothing of the bollard or sign that so often stands on a pavement.
+    pub metres_overhanging: f64,
     /// Total distance travelled, in metres.
     pub distance: f64,
     /// Number of moves.
@@ -281,6 +291,7 @@ fn describe(
                 Clearance::Clear(margin) => margin,
                 Clearance::Collision => 0.0,
             },
+            overhanging: field.overhangs(step.pose),
         })
         .collect();
 
@@ -289,6 +300,7 @@ fn describe(
     // which stopped being true once the sampling step became tunable.
     let mut distance = 0.0;
     let mut under = [0.0_f64; 2];
+    let mut overhanging = 0.0;
     for pair in poses.windows(2) {
         let (a, b) = (pair[0], pair[1]);
         let span = (b.x - a.x).hypot(b.y - a.y);
@@ -297,6 +309,9 @@ fn describe(
             if b.clearance < *threshold {
                 under[i] += span;
             }
+        }
+        if b.overhanging {
+            overhanging += span;
         }
     }
 
@@ -329,6 +344,7 @@ fn describe(
         },
         metres_under_25cm: under[0],
         metres_under_10cm: under[1],
+        metres_overhanging: overhanging,
         distance,
         moves: maneuver.moves,
         confidence: match maneuver.confidence {
@@ -405,6 +421,7 @@ mod tests {
             pavement_width: 1.20,
             dropped_kerb_width: 3.20,
             road_width: 4.50,
+            kerb_height: f64::INFINITY,
             gate: GateDto::Sliding,
         }
     }
@@ -416,6 +433,7 @@ mod tests {
             front_overhang: 0.850,
             width: 1.825,
             mirror_width: 2.029,
+            ground_clearance: 0.18,
             min_turning_radius: 5.2,
         }
     }
@@ -572,6 +590,44 @@ mod tests {
                 alternative.moves,
                 alternative.min_clearance_in_gateway * 100.0,
                 ceiling * 100.0
+            );
+        }
+    }
+
+    #[test]
+    fn a_walled_kerb_leaves_nothing_overhanging() {
+        let mut scene = scene_dto();
+        scene.kerb_height = f64::INFINITY;
+        let response = run_solve(SolveRequest {
+            scene,
+            vehicle: vehicle_dto(),
+            forward_only: None,
+        })
+        .expect("valid dimensions");
+        for alternative in &response.alternatives {
+            assert!(alternative.metres_overhanging.abs() < 1e-12);
+            assert!(alternative.poses.iter().all(|p| !p.overhanging));
+        }
+    }
+
+    #[test]
+    fn overhang_never_exceeds_the_distance_travelled() {
+        // The same guard the alert bands carry: a length summed from pose
+        // spacing cannot exceed the length it is summed from.
+        let mut scene = scene_dto();
+        scene.kerb_height = 0.12;
+        let response = run_solve(SolveRequest {
+            scene,
+            vehicle: vehicle_dto(),
+            forward_only: None,
+        })
+        .expect("valid dimensions");
+        for alternative in &response.alternatives {
+            assert!(
+                alternative.metres_overhanging <= alternative.distance + 1e-9,
+                "{} m overhanging out of {} m travelled",
+                alternative.metres_overhanging,
+                alternative.distance
             );
         }
     }
