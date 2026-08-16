@@ -9,7 +9,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  rust:
+  # Everything that only has to compile, not run. Measured: 11 s of build
+  # behind the cache, then a second each for clippy and rustdoc.
+  rust-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -18,16 +20,77 @@ jobs:
           toolchain: 1.97.1
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust
       - name: Format
         run: cargo fmt --check
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
-      - name: Tests
-        run: cargo test --workspace
       - name: Docs
         run: cargo doc --workspace --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
+
+  # Split across runners because the tests *run* for twelve minutes on two
+  # cores while compiling for eleven seconds. Measured on a full job: the
+  # solver's unit tests took 343 s and its integration tests 363 s, so the
+  # two of them alone were the whole wall clock. Splitting halves it; the
+  # solver's unit tests are the floor.
+  #
+  # Nothing is dropped by splitting: `cargo test -p X` covers a crate's lib,
+  # integration tests and doctests, and the solver's three flags partition
+  # exactly those. `--lib` and `--tests` between them do *not* include
+  # doctests, which is why the solver has a third entry.
+  #
+  # `shared-key` makes all of them share one cache entry rather than filling
+  # the cache with five copies of the same dependencies.
+  rust-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: solver units
+            args: -p swept-solver --lib
+          - name: solver integration
+            args: -p swept-solver --tests
+          - name: core
+            args: -p swept-core
+          - name: solver doctests
+            args: -p swept-solver --doc
+          - name: wasm
+            args: -p swept-wasm
+    name: rust-test (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust
+      - name: Tests
+        run: cargo test ${{ matrix.args }}
+
+  # One name for the whole Rust side, so the branch protection rule keeps
+  # working after the split — and so it keeps working through the next one.
+  # A required check that names a job is a check that breaks whenever the
+  # jobs are rearranged, which is how `fixtures` came to block every merge.
+  #
+  # `always()` with explicit result checks rather than plain `needs`: a
+  # skipped job is not a failed one to GitHub, and this gate must fail when
+  # anything upstream did not succeed.
+  rust:
+    needs: [rust-check, rust-test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate
+        run: |
+          echo "check: ${{ needs.rust-check.result }}"
+          echo "test:  ${{ needs.rust-test.result }}"
+          [ "${{ needs.rust-check.result }}" = "success" ] || exit 1
+          [ "${{ needs.rust-test.result }}" = "success" ] || exit 1
 
   web:
     runs-on: ubuntu-latest

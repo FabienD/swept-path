@@ -37,7 +37,6 @@ import { boundsFor, sceneToPrimitives } from "./render/scene";
 import { renderSvg } from "./render/svg";
 import { createStore } from "./state/store";
 import { arrivesFromTheRight, readRequest, readScene } from "./ui/form";
-import { startAnalytics } from "./analytics";
 import { CANCELLED, SolverClient } from "./worker/client";
 import { text } from "./i18n/dictionary";
 import { applyLanguage } from "./i18n/apply";
@@ -1181,5 +1180,3 @@ byId("run-min-road")?.addEventListener("click", async () => {
 }
 
 draw();
-
-startAnalytics();

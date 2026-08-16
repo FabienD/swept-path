@@ -154,7 +154,7 @@ const FR: PageTexts = {
 
   "dis.privacy.title": "Ce que ce site sait de vous",
   "dis.privacy.body":
-    "Le calcul se fait entièrement dans votre navigateur : les mesures que vous saisissez ne sont envoyées nulle part, et il n'y a aucun serveur pour les recevoir. Votre choix de langue et d'unités reste dans votre navigateur. Le site compte les pages consultées à l'aide de Vercel Web Analytics, sans cookie et sans rien déposer sur votre machine ; les paramètres d'adresse sont retirés avant l'envoi, pour qu'aucune dimension ne puisse partir par ce biais.",
+    "Rien. Le calcul se fait entièrement dans votre navigateur : les mesures que vous saisissez ne sont envoyées nulle part, et il n'existe aucun serveur pour les recevoir. Votre choix de langue et d'unités reste chez vous, dans la mémoire du navigateur. Il n'y a ni cookie, ni compte, ni mesure d'audience. L'hébergeur tient des journaux de connexion, comme tout hébergeur.",
 };
 
 const EN: PageTexts = {
@@ -241,7 +241,7 @@ const EN: PageTexts = {
 
   "dis.privacy.title": "What this site knows about you",
   "dis.privacy.body":
-    "The computation happens entirely in your browser: the measurements you enter are sent nowhere, and there is no server to receive them. Your language and unit choices stay in your browser. The site counts page views using Vercel Web Analytics, without cookies and without storing anything on your machine; query strings are stripped before an event is sent, so no dimension can leave that way.",
+    "Nothing. The computation happens entirely in your browser: the measurements you enter are sent nowhere, and no server exists to receive them. Your language and unit choices stay with you, in the browser's own storage. There are no cookies, no accounts and no analytics. The host keeps connection logs, as every host does.",
 };
 
 export const PAGE_TEXTS: Record<Locale, PageTexts> = { fr: FR, en: EN };
