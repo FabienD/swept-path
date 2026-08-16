@@ -6,6 +6,7 @@
  * here.
  */
 import type { ConfidenceDto, ErrorDto } from "./types";
+import type { Verdict } from "./verdict";
 
 const FIELDS: Record<string, string> = {
   wheelbase: "l'empattement",
@@ -64,4 +65,67 @@ export function metres(value: number): string {
 /** "1 manœuvre" / "3 manœuvres". */
 export function moves(count: number): string {
   return `${count} manœuvre${count > 1 ? "s" : ""}`;
+}
+
+/**
+ * The headline: the question the visitor came with, answered in three words.
+ *
+ * "Rien trouvé" rather than "Ça ne passe pas" for an exhausted budget, because
+ * the two are not the same claim and only one of them is proved.
+ */
+export function verdictHeadline(verdict: Verdict): string {
+  switch (verdict.outcome) {
+    case "passes":
+      return "Ça passe.";
+    case "blocked":
+      return "Ça ne passe pas.";
+    case "unproven":
+      return "Rien trouvé.";
+  }
+}
+
+/**
+ * The second half of the headline, set in the accent colour.
+ *
+ * Null is a real answer: a comfortable pass needs no qualifier, and inventing
+ * one would make every result sound like a warning.
+ */
+export function verdictNuance(verdict: Verdict): string | null {
+  if (verdict.outcome === "blocked") return null;
+  if (verdict.outcome === "unproven") return "Sans preuve.";
+  switch (verdict.tone) {
+    case "roomy":
+      return "Largement.";
+    case "fine":
+      return null;
+    case "snug":
+      return "Sans confort.";
+    case "hairline":
+      return "De justesse.";
+  }
+}
+
+/** The line under the headline: how many moves, how much room, and from where. */
+export function verdictDetail(verdict: Verdict): string {
+  switch (verdict.outcome) {
+    case "passes": {
+      const elsewhere =
+        verdict.tightestElsewhere === null
+          ? ""
+          : ` Ailleurs sur le trajet, la marge descend à ${centimetres(
+              verdict.tightestElsewhere,
+            )} — sur la voirie, pas dans le passage.`;
+      return (
+        `${moves(verdict.moves)}, ${centimetres(verdict.clearance)} de marge ` +
+        `dans le passage (${confidenceLabel(verdict.confidence)}).${elsewhere}`
+      );
+    }
+    case "blocked":
+      return "Aucune entrée n'est possible avec ces mesures.";
+    case "unproven":
+      return (
+        "Aucune entrée trouvée dans le budget imparti. La recherche est " +
+        "heuristique : cela ne prouve pas que l'entrée soit impossible."
+      );
+  }
 }
