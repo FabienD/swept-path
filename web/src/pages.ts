@@ -6,6 +6,7 @@
  * not share is the solver: neither page loads the Wasm module, because
  * neither needs it — the figures come from the pure renderer.
  */
+import { startAnalytics } from "./analytics";
 import { applyLanguage } from "./i18n/apply";
 import type { Preferences } from "./i18n/preferences";
 import { loadPreferences, savePreferences } from "./i18n/preferences";
@@ -94,3 +95,5 @@ start();
 // Referenced so the thresholds the legend describes come from the same table
 // the plan colours by; if BANDS ever changes, this file changes with it.
 export { BANDS };
+
+startAnalytics();
