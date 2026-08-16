@@ -11,16 +11,7 @@
  * than asserting a default the driver would take for measured.
  */
 import table from "../../../data/vehicles.json";
-
-/**
- * How much narrower the track is than the body, in metres.
- *
- * ESTIMATED. Wheels sit inboard of the bodywork; the gap is roughly a
- * handspan each side on a modern car. Only used to convert a published
- * turning radius, where an error of a few centimetres moves the result by
- * about as much.
- */
-const BODY_TO_TRACK_M = 0.26;
+import { BODY_TO_TRACK_M } from "./track";
 
 /** What a published turning radius is measured on. */
 type RadiusKind = "curb" | "wall" | "pivot" | null;

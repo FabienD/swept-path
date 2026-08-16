@@ -25,8 +25,16 @@ const STYLE: Record<Role, { fill?: string; stroke?: string; width?: number; opac
     width: 1.6,
   },
   ghost: { stroke: "var(--color-ghost)", width: 1, opacity: 0.5 },
-  mirror: { fill: "var(--color-accent)" },
-  nose: { fill: "var(--color-accent)" },
+  // The widest point on the car, so it is the one part drawn solid: on a plan
+  // where a centimetre is under half a pixel, what touches first has to be
+  // findable without hunting for it.
+  mirror: { fill: "var(--color-accent)", stroke: "var(--color-accent)", width: 1 },
+  // Planted and steered. The rear pair are the pivot the whole model turns
+  // about and are drawn filled; the front pair are hollow and follow the bend,
+  // which is what tells the two ends of the car apart at a glance.
+  "wheel-rear": { fill: "var(--color-accent)", opacity: 0.9 },
+  "wheel-front": { stroke: "var(--color-accent)", width: 1.4 },
+  chamfer: { stroke: "var(--color-accent)", width: 1.4 },
   // Hollow, so it reads as a marker on the path rather than a point of it.
   reversal: { fill: "var(--color-plan)", stroke: "var(--color-fg)", width: 1.4 },
   "band-clear": { stroke: "var(--color-band-clear)", width: 1.8 },
