@@ -223,7 +223,6 @@ fn shaped_landings(
     field: &ClearanceField,
     allowed: Option<Direction>,
 ) -> Vec<Landing> {
-    let needed = entry_depth(scene, vehicle);
     let step = Discretisation::default().sample_step;
     let mut found: Vec<Landing> = Vec::with_capacity(2);
 
@@ -232,6 +231,9 @@ fn shaped_landings(
         if allowed.is_some_and(|only| only != direction) {
             continue;
         }
+        // Which end of the vehicle clears the gateway last is what sets the
+        // depth, and it is not the same end driving in as backing in.
+        let needed = entry_depth(scene, vehicle, direction);
         let target = match direction {
             Direction::Forward => FRAC_PI_2,
             Direction::Reverse => -FRAC_PI_2,

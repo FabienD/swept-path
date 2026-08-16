@@ -204,15 +204,80 @@ fn heuristic(pose: &Pose, goal: f64) -> f64 {
 }
 
 /// Turns one finished search branch back into a manoeuvre.
+/// The first pose at which the whole vehicle is behind the posts, if any.
+///
+/// Every corner of the envelope, not the axle: being through is a property of
+/// the vehicle, not of the point the model happens to track. It therefore
+/// does not depend on which way the vehicle faces, nor on the depth whichever
+/// goal was aimed at.
+fn first_pose_fully_through(
+    poses: &[DirectedPose],
+    vehicle: &Vehicle,
+    scene: &Scene,
+) -> Option<usize> {
+    let behind = scene.left_post.depth.max(scene.right_post.depth);
+    let envelope = vehicle.envelope();
+    poses.iter().position(|p| {
+        let (sin, cos) = p.pose.heading.sin_cos();
+        envelope
+            .iter()
+            .map(|c| p.pose.y + c.x * sin + c.y * cos)
+            .fold(f64::MAX, f64::min)
+            > behind
+    })
+}
+
+/// The two tallies a search keeps, one slot per move count.
+///
+/// The roomiest landing found at each depth — one search answers every depth,
+/// instead of one search per depth re-exploring the same space — with the
+/// ground covered beside it, so two plans of equal depth can be compared on
+/// distance as well as on room.
+///
+/// Solutions are counted per move count rather than overall: a single quota
+/// would fill up with landings at one depth and stop the search before it
+/// ever reached the others.
+type Tallies = (Vec<Option<(usize, Landing, f64)>>, Vec<u16>);
+
+fn tallies(max_moves: u8) -> Tallies {
+    let slots = usize::from(max_moves) + 2;
+    (vec![None; slots], vec![0; slots])
+}
+
+/// The geometry a finished plan is measured against.
+///
+/// Grouped because they always travel together, and because a plan needs all
+/// three: the vehicle to know its envelope, the scene to know where the posts
+/// are, the field to know what room is left.
+struct Surroundings<'a> {
+    vehicle: &'a Vehicle,
+    scene: &'a Scene,
+    field: &'a ClearanceField,
+}
+
+impl<'a> Surroundings<'a> {
+    fn new(vehicle: &'a Vehicle, scene: &'a Scene, field: &'a ClearanceField) -> Self {
+        Self {
+            vehicle,
+            scene,
+            field,
+        }
+    }
+}
+
 fn assemble(
     arena: &[Node],
     goal_index: usize,
     landing: &Landing,
-    vehicle: &Vehicle,
-    field: &ClearanceField,
+    around: &Surroundings,
     exhausted: bool,
     moves: u8,
 ) -> Maneuver {
+    let Surroundings {
+        vehicle,
+        scene,
+        field,
+    } = *around;
     let mut chain: Vec<usize> = Vec::new();
     let mut cursor = Some(goal_index);
     while let Some(i) = cursor {
@@ -236,6 +301,19 @@ fn assemble(
             pose: *pose,
             direction: landing.direction,
         });
+    }
+
+    // The entry ends where it succeeds. Once every corner of the vehicle is
+    // behind the posts it is in, and whatever the search did afterwards to
+    // land on its chosen goal — drive on, turn, shunt — is not part of
+    // getting in and must not be charged to the driver as a manoeuvre.
+    //
+    // Reported: a plan that had entered straight and centred was made to
+    // drive on to a goal 2,4 m further, could not stay square doing it, and
+    // reversed two metres back to reach it — a shunt three metres clear of
+    // any obstacle, counted as a second manoeuvre.
+    if let Some(done) = first_pose_fully_through(&poses, vehicle, scene) {
+        poses.truncate(done + 1);
     }
 
     let min_clearance = poses
@@ -403,16 +481,7 @@ pub fn plan(
     };
 
     let mut expanded: u32 = 0;
-    // The roomiest landing found for each total move count. One search now
-    // answers every depth, instead of one search per depth re-exploring the
-    // same space — which cost three times over for nothing.
-    // The reach is kept beside the landing so that two plans of the same
-    // depth can be compared on ground covered as well as on room left.
-    let mut best: Vec<Option<(usize, Landing, f64)>> = vec![None; usize::from(max_moves) + 2];
-    // Counted per move count, not overall: a single quota would fill up with
-    // landings at one depth and stop the search before it ever reached the
-    // others.
-    let mut solutions: Vec<u16> = vec![0; usize::from(max_moves) + 2];
+    let (mut best, mut solutions) = tallies(max_moves);
     let mut exhausted = false;
 
     while let Some(Ranked { index, .. }) = heap.pop() {
@@ -425,16 +494,15 @@ pub fn plan(
             progress.nodes_expanded(max_moves, expanded);
         }
 
-        let (pose, direction, moves, travelled, worst_shortfall) = {
-            let node = &arena[index];
-            (
-                node.pose,
-                node.direction,
-                node.moves,
-                node.travelled,
-                node.worst_shortfall,
-            )
-        };
+        // Copied out before the arena is borrowed again below.
+        let &Node {
+            pose,
+            direction,
+            moves,
+            travelled,
+            worst_shortfall,
+            ..
+        } = &arena[index];
 
         let heading_error = (FRAC_PI_2 - pose.heading.get())
             .abs()
@@ -516,15 +584,19 @@ pub fn plan(
         }
     }
 
-    collect(&arena, &best, vehicle, &field, exhausted)
+    collect(
+        &arena,
+        &best,
+        &Surroundings::new(vehicle, scene, &field),
+        exhausted,
+    )
 }
 
 /// Turns the best landing of each move count into an outcome.
 fn collect(
     arena: &[Node],
     best: &[Option<(usize, Landing, f64)>],
-    vehicle: &Vehicle,
-    field: &ClearanceField,
+    around: &Surroundings,
     exhausted: bool,
 ) -> Outcome {
     let found: Vec<Maneuver> = best
@@ -537,8 +609,7 @@ fn collect(
                 arena,
                 *index,
                 landing,
-                vehicle,
-                field,
+                around,
                 exhausted,
                 total as u8,
             ))

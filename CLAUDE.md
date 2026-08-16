@@ -95,6 +95,20 @@ portage. Chacune est désormais marquée *vérifié* ou *corrigé*.
   118°. Mais chaque centimètre d'écartement coûte deux centimètres de
   passage libre : au-delà de ~120° d'ouverture le gain est nul et la perte
   de largeur devient dominante.
+- **La profondeur d'entrée dépend du sens — corrigé.** `entry_depth`
+  additionnait empattement et porte-à-faux avant, c'est-à-dire la distance de
+  l'essieu arrière au nez. C'est juste en marche arrière, où le nez sort en
+  dernier, et faux d'une longueur de voiture en marche avant, où c'est le
+  pare-chocs arrière qui dégage en dernier. Sur le portail mesuré : 4,60 m
+  exigés au lieu de 2,24 m.
+
+  Conséquence, et elle change une conclusion du projet : **le portail mesuré
+  admet une entrée en un seul mouvement.** 2,0 cm avec le trottoir en mur
+  infini, 4,7 cm avec la bordure réelle de 12 cm. La note qui précède
+  attribuait cet écart au seul modèle 2D ; il venait au moins autant d'une
+  profondeur exigée d'une longueur de voiture de trop, et d'une arrivée
+  contrainte à être perpendiculaire à cette profondeur-là.
+
 - **Conclusion principale du projet** : la largeur du passage domine tout.
   Multiplier les manœuvres n'achète pas de marge, parce que le plafond
   théorique vaut `(W − w) / 2` quelle que soit la trajectoire.
@@ -114,8 +128,8 @@ portage. Chacune est désormais marquée *vérifié* ou *corrigé*.
    propriété : **le multi ne doit jamais être moins bon que le simple**.
 4. La scène est supposée symétrique autour de `x = 0`. À généraliser : les
    deux montants doivent être positionnés indépendamment.
-5. Modèle 2D pur : une portière s'ouvre au-dessus d'une bordure basse. Il
-   faut un attribut de hauteur sur les obstacles (`full` / `low`).
+5. ~~Modèle 2D pur~~ — **fait.** Les obstacles portent une hauteur, comparée
+   à la garde au sol : la caisse survole une bordure basse, les roues non.
 
 ## Conventions
 
