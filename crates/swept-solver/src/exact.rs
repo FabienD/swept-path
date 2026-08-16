@@ -25,9 +25,9 @@
 //! cannot get in. It may still get in over several moves, which is what
 //! `multi` is for. And the sweep only knows the geometry it is given: a
 //! gateway this search refuses may well be one a driver threads daily, if the
-//! model charges for something reality does not. The pavement is the standing
+//! model charges for something reality does not. The sidewalk is the standing
 //! example — modelled as a wall of infinite height, when a mirror a metre up
-//! clears a fifteen-centimetre kerb without noticing it.
+//! clears a fifteen-centimetre curb without noticing it.
 
 use crate::budget::Discretisation;
 use crate::path::evaluate_at_least;
@@ -280,8 +280,8 @@ mod tests {
     use swept_core::clearance::Clearance;
     use swept_core::scene::{GateKind, Post};
 
-    /// A scene whose dropped kerb is wider than the opening, as a real one is:
-    /// the kerb has to be dropped at least across the gateway.
+    /// A scene whose curb cut is wider than the opening, as a real one is:
+    /// the curb has to be dropped at least across the gateway.
     fn scene_with_opening(width: f64) -> Scene {
         Scene {
             left_post: Post {
@@ -295,10 +295,10 @@ mod tests {
                 depth: 0.55,
             },
             wall_thickness: 0.30,
-            pavement_width: 1.20,
-            dropped_kerb_width: width + 0.80,
+            sidewalk_width: 1.20,
+            curb_cut_width: width + 0.80,
             road_width: 4.50,
-            kerb_height: f64::INFINITY,
+            curb_height: f64::INFINITY,
             gate: GateKind::Sliding,
         }
     }
@@ -405,13 +405,13 @@ mod tests {
         );
     }
 
-    /// The measured gateway: 2.29 m clear, 1.30 m pavement, 5.90 m
-    /// carriageway, and the pivot radius rather than the kerb radius.
+    /// The measured gateway: 2.29 m clear, 1.30 m sidewalk, 5.90 m
+    /// carriageway, and the pivot radius rather than the curb radius.
     fn measured_gateway(open_degrees: f64) -> Scene {
         let mut sc = scene_with_opening(2.29);
-        sc.pavement_width = 1.30;
+        sc.sidewalk_width = 1.30;
         sc.road_width = 5.90;
-        sc.dropped_kerb_width = 3.20;
+        sc.curb_cut_width = 3.20;
         sc.gate = GateKind::Swinging {
             leaf_length: 1.15,
             leaf_thickness: 0.04,

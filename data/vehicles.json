@@ -7,7 +7,7 @@
     "width_mirrors": "Le point le plus large, et presque toujours le critique. Porsche et Tesla le publient, Lexus et Kia non.",
     "width": "Chez Lexus et Tesla, la largeur annoncee est celle mesuree retros replies, non la tole nue. C'est une borne haute de la caisse, a quelques millimetres pres.",
     "ground_clearance": "Donnee a vide, convention de mesure variable, elements souples generalement exclus - or la levre de pare-chocs est ce qui surplombe en premier.",
-    "turning_radius": "kind dit ce que le chiffre mesure : kerb = roue avant exterieure, wall = carrosserie, pivot = centre de l'essieu arriere, seul directement utilisable par le modele. Les constructeurs publient souvent un diametre : il est divise par deux ici, ce qui vaut la source derived.",
+    "turning_radius": "kind dit ce que le chiffre mesure : curb = roue avant exterieure, wall = carrosserie, pivot = centre de l'essieu arriere, seul directement utilisable par le modele. Les constructeurs publient souvent un diametre : il est divise par deux ici, ce qui vaut la source derived.",
     "documents": "Un lien peut pointer vers un catalogue Porsche d'epoque rehberge par un tiers : le document est celui du constructeur, seul l'hebergement ne l'est pas."
   },
   "vehicles": [
@@ -58,7 +58,7 @@
       "turning_radius": {
         "v": 5.2,
         "source": "manufacturer",
-        "kind": "kerb"
+        "kind": "curb"
       }
     },
     {
@@ -108,7 +108,7 @@
       "turning_radius": {
         "v": 5.8,
         "source": "manufacturer",
-        "kind": "kerb"
+        "kind": "curb"
       }
     },
     {
@@ -158,7 +158,7 @@
       "turning_radius": {
         "v": 5.2,
         "source": "derived",
-        "kind": "kerb"
+        "kind": "curb"
       }
     },
     {
@@ -208,7 +208,7 @@
       "turning_radius": {
         "v": 5.85,
         "source": "derived",
-        "kind": "kerb"
+        "kind": "curb"
       }
     },
     {
@@ -258,7 +258,7 @@
       "turning_radius": {
         "v": 5.55,
         "source": "derived",
-        "kind": "kerb"
+        "kind": "curb"
       }
     },
     {
@@ -308,7 +308,7 @@
       "turning_radius": {
         "v": 5.61,
         "source": "derived",
-        "kind": "kerb"
+        "kind": "curb"
       }
     }
   ]

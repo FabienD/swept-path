@@ -10,7 +10,7 @@ const STYLE: Record<Role, { fill?: string; stroke?: string; width?: number; opac
   wall: { fill: "#d6d3d1", stroke: "#78716c" },
   post: { fill: "#c7c2be", stroke: "#57534e" },
   leaf: { fill: "#a8a29e", stroke: "#44403c" },
-  pavement: { fill: "#ebe9e7", stroke: "#a8a29e" },
+  sidewalk: { fill: "#ebe9e7", stroke: "#a8a29e" },
   "road-edge": { stroke: "#44403c", width: 2 },
   "road-centre": { stroke: "#a8a29e", width: 1.5 },
   vehicle: { fill: "#1e40af22", stroke: "#1e40af", width: 1.6 },

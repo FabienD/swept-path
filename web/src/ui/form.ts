@@ -33,10 +33,10 @@ export function readScene(): SceneDto {
     left_post: { inner_edge_x: -opening / 2, width: postWidth, depth: postDepth },
     right_post: { inner_edge_x: opening / 2, width: postWidth, depth: postDepth },
     wall_thickness: num("wall"),
-    pavement_width: num("pavement"),
-    dropped_kerb_width: num("kerb"),
+    sidewalk_width: num("sidewalk"),
+    curb_cut_width: num("curb"),
     road_width: num("road"),
-    kerb_height: num("kerb-height"),
+    curb_height: num("curb-height"),
     gate:
       choice("gate-kind") === "swinging"
         ? {

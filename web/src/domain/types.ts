@@ -29,11 +29,11 @@ export interface SceneDto {
   left_post: PostDto;
   right_post: PostDto;
   wall_thickness: number;
-  pavement_width: number;
-  dropped_kerb_width: number;
+  sidewalk_width: number;
+  curb_cut_width: number;
   road_width: number;
-  /** Kerb height, in metres. Infinite for a kerb nothing passes over. */
-  kerb_height: number;
+  /** Curb height, in metres. Infinite for a curb nothing passes over. */
+  curb_height: number;
   gate: GateDto;
 }
 

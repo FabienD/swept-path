@@ -66,11 +66,11 @@ fn spread(low: f64, high: f64, steps: u16) -> Vec<f64> {
 /// Returns an empty vector when the carriageway is too narrow for the vehicle
 /// to sit in at all — a result, not an error.
 ///
-/// The lane runs from the far kerb to the near one, and the near kerb is the
-/// pavement edge, not the wall. The prototype bounded this at `y = 0` and so
+/// The lane runs from the far curb to the near one, and the near curb is the
+/// sidewalk edge, not the wall. The prototype bounded this at `y = 0` and so
 /// offered start poses with the mirrors out over the footway — poses the
-/// clearance field rejects on the spot, since the pavement is a solid obstacle
-/// everywhere but across the dropped kerb.
+/// clearance field rejects on the spot, since the sidewalk is a solid obstacle
+/// everywhere but across the curb cut.
 #[must_use]
 pub fn start_poses(
     vehicle: &Vehicle,
@@ -79,8 +79,8 @@ pub fn start_poses(
     lateral_steps: u16,
 ) -> Vec<Pose> {
     let half_width = vehicle.mirror_width / 2.0;
-    let low = -scene.pavement_width - scene.road_width + half_width + LANE_MARGIN_M;
-    let high = -scene.pavement_width - half_width - LANE_MARGIN_M;
+    let low = -scene.sidewalk_width - scene.road_width + half_width + LANE_MARGIN_M;
+    let high = -scene.sidewalk_width - half_width - LANE_MARGIN_M;
     if low > high {
         return Vec::new();
     }
@@ -133,10 +133,10 @@ mod tests {
                 depth: 0.55,
             },
             wall_thickness: 0.30,
-            pavement_width: 1.20,
-            dropped_kerb_width: opening + 0.80,
+            sidewalk_width: 1.20,
+            curb_cut_width: opening + 0.80,
             road_width: 4.50,
-            kerb_height: f64::INFINITY,
+            curb_height: f64::INFINITY,
             gate: GateKind::Sliding,
         }
     }
@@ -157,7 +157,7 @@ mod tests {
                 pose.y
             );
             assert!(
-                pose.y > -sc.pavement_width - sc.road_width,
+                pose.y > -sc.sidewalk_width - sc.road_width,
                 "a start belongs on the carriageway, got y={}",
                 pose.y
             );
@@ -175,21 +175,21 @@ mod tests {
 
     #[test]
     fn the_lateral_sweep_keeps_the_mirrors_inside_the_lane() {
-        // A start pose whose mirrors already overhang the kerb is not a start
+        // A start pose whose mirrors already overhang the curb is not a start
         // at all: the sweep would spend its budget on candidates that collide
-        // before they move. The pavement is a solid obstacle everywhere but
-        // across the dropped kerb, so the lane ends at its edge, not at the
+        // before they move. The sidewalk is a solid obstacle everywhere but
+        // across the curb cut, so the lane ends at its edge, not at the
         // wall.
         let (vehicle, sc) = (lbx(), scene(3.0));
         let half = vehicle.mirror_width / 2.0;
         for pose in start_poses(&vehicle, &sc, 4, 6) {
             assert!(
-                pose.y + half <= -sc.pavement_width - LANE_MARGIN_M + 1e-12,
+                pose.y + half <= -sc.sidewalk_width - LANE_MARGIN_M + 1e-12,
                 "got y={}",
                 pose.y
             );
             assert!(
-                pose.y - half >= -sc.pavement_width - sc.road_width + LANE_MARGIN_M - 1e-12,
+                pose.y - half >= -sc.sidewalk_width - sc.road_width + LANE_MARGIN_M - 1e-12,
                 "got y={}",
                 pose.y
             );

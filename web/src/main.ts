@@ -101,7 +101,7 @@ function renderStats(maneuver: ManeuverDto): void {
      </div>`;
 
   // Two clearances, because they answer different questions: the gateway is
-  // what the driver asked about, the overall figure may be a kerb metres away.
+  // what the driver asked about, the overall figure may be a curb metres away.
   stats.innerHTML = [
     card("Manœuvres", String(maneuver.moves)),
     card("Marge dans le passage", centimetres(maneuver.min_clearance_in_gateway)),
@@ -206,10 +206,10 @@ const REQUIRED_INPUTS: readonly string[] = [
   "post-depth",
   "post-width",
   "wall",
-  "pavement",
-  "kerb",
+  "sidewalk",
+  "curb",
   "road",
-  "kerb-height",
+  "curb-height",
   "radius",
   "wheelbase",
   "length",
