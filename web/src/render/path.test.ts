@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ManeuverDto, PoseDto, VehicleDto } from "../domain/types";
-import { bandOf, bodyAt, pathToPrimitives } from "./path";
+import { bodyAt, pathToPrimitives } from "./path";
 
 const lbx: VehicleDto = {
   wheelbase: 2.58,
@@ -44,21 +44,6 @@ function maneuver(
     confidence: "exact",
   };
 }
-
-describe("proximity bands", () => {
-  it("classifies clearances into the four bands", () => {
-    expect(bandOf(0.8)).toBe(0);
-    expect(bandOf(0.3)).toBe(1);
-    expect(bandOf(0.15)).toBe(2);
-    expect(bandOf(0.02)).toBe(3);
-  });
-
-  it("puts the thresholds themselves in the roomier band", () => {
-    expect(bandOf(0.5)).toBe(0);
-    expect(bandOf(0.25)).toBe(1);
-    expect(bandOf(0.1)).toBe(2);
-  });
-});
 
 describe("path rendering", () => {
   const lines = (m: ManeuverDto) =>

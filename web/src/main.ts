@@ -1,3 +1,4 @@
+import { BANDS } from "./domain/bands";
 import {
   centimetres,
   confidenceLabel,
@@ -7,7 +8,7 @@ import {
 } from "./domain/labels";
 import type { ErrorDto, ManeuverDto, SceneDto, VehicleDto } from "./domain/types";
 import { VEHICLES, searchVehicles, vehicleById } from "./domain/vehicles";
-import { BANDS, pathToPrimitives } from "./render/path";
+import { pathToPrimitives } from "./render/path";
 import { projectionFor } from "./render/projection";
 import { boundsFor, sceneToPrimitives } from "./render/scene";
 import { renderSvg } from "./render/svg";

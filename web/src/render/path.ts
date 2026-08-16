@@ -1,14 +1,6 @@
+import { bandOf } from "../domain/bands";
 import type { ManeuverDto, PoseDto, VehicleDto } from "../domain/types";
 import type { Point, Primitive, Role } from "./primitives";
-
-/**
- * Clearance thresholds separating the proximity bands, in metres.
- *
- * Carried over from the prototype (`index.html:604`): beyond 50 cm, 25 to 50,
- * 10 to 25, under 10. Reading a path by colour is what tells a driver *where*
- * it gets tight, which a single minimum never says.
- */
-export const BANDS = [0.5, 0.25, 0.1] as const;
 
 const BAND_ROLES: readonly Role[] = [
   "band-clear",
@@ -19,14 +11,6 @@ const BAND_ROLES: readonly Role[] = [
 
 /** How many ghost vehicles are drawn along the path. */
 const GHOSTS = 4;
-
-/** Which band a clearance falls into, 0 being the roomiest. */
-export function bandOf(clearance: number): number {
-  if (clearance >= BANDS[0]) return 0;
-  if (clearance >= BANDS[1]) return 1;
-  if (clearance >= BANDS[2]) return 2;
-  return 3;
-}
 
 /** The four corners of the body at a given pose, in world coordinates. */
 export function bodyAt(pose: PoseDto, vehicle: VehicleDto): Point[] {
