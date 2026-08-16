@@ -36,6 +36,11 @@ export type Verdict =
        */
       tightestElsewhere: number | null;
     }
+  /**
+   * The vehicle is at least as wide as the opening. Settled before any
+   * search, and settled for good — see [`refuseOnWidth`].
+   */
+  | { outcome: "too-narrow"; opening: number; vehicleWidth: number }
   /** Searched exhaustively and found nothing: no entry exists. */
   | { outcome: "blocked" }
   /** Ran out of budget. Nothing found, and nothing proved either. */
@@ -83,4 +88,23 @@ export function verdictOf(response: SolveResponse): Verdict {
     confidence: best.confidence,
     tightestElsewhere: tighter ? best.min_clearance : null,
   };
+}
+
+/**
+ * Refuses, before any search, a gateway the vehicle cannot fit through.
+ *
+ * The ceiling `(W − w) / 2` is nil or negative here, and it is a ceiling: no
+ * trajectory, no number of manoeuvres and no angle of approach beats it. So
+ * the impossibility is *proved*, and proved more strongly than a search could
+ * — the planner is heuristic, and its finding nothing proves nothing.
+ *
+ * Running the search anyway would spend a budget to reach a weaker
+ * conclusion. Pass the mirror width the run would actually use, folded or
+ * not: a car that does not fit with its mirrors out may well fit with them in.
+ */
+export function refuseOnWidth(opening: number, mirrorWidth: number): Verdict | null {
+  // Equality refuses too. Fitting with exactly nothing to spare is not
+  // fitting: it is touching both posts at once, for the whole depth.
+  if (mirrorWidth < opening) return null;
+  return { outcome: "too-narrow", opening, vehicleWidth: mirrorWidth };
 }

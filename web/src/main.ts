@@ -12,7 +12,12 @@ import {
 import type { ErrorDto, ManeuverDto, SceneDto, VehicleDto } from "./domain/types";
 import { VEHICLES, searchVehicles, vehicleById } from "./domain/vehicles";
 import type { Verdict } from "./domain/verdict";
-import { clearanceCeiling, gaugeFraction, verdictOf } from "./domain/verdict";
+import {
+  clearanceCeiling,
+  gaugeFraction,
+  refuseOnWidth,
+  verdictOf,
+} from "./domain/verdict";
 import { pathToPrimitives } from "./render/path";
 import {
   elapsedFor,
@@ -693,6 +698,21 @@ form?.addEventListener("submit", async (event) => {
           : `${missing} mesures manquent, signalées en rouge dans le formulaire.`,
       alternatives: [],
     });
+    return;
+  }
+
+  // Some answers need no search. A vehicle at least as wide as its opening
+  // cannot pass, and that is *proved* — `(W − w) / 2` is a ceiling no
+  // trajectory beats — where a search would only fail to find something. So
+  // refuse here, and refuse on the mirror width this run would actually use:
+  // folding the mirrors is precisely what gets a car through a gate it does
+  // not otherwise fit.
+  const refusal = refuseOnWidth(
+    requested.right_post.inner_edge_x - requested.left_post.inner_edge_x,
+    readRequest().vehicle.mirror_width,
+  );
+  if (refusal) {
+    store.set({ outcome: refusal, message: "", alternatives: [], busy: false });
     return;
   }
 

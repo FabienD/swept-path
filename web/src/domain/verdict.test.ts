@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ManeuverDto, SolveResponse } from "./types";
-import { clearanceCeiling, gaugeFraction, verdictOf } from "./verdict";
+import {
+  clearanceCeiling,
+  gaugeFraction,
+  refuseOnWidth,
+  verdictOf,
+} from "./verdict";
 
 function maneuver(patch: Partial<ManeuverDto> = {}): ManeuverDto {
   return {
@@ -104,5 +109,55 @@ describe("the verdict on a search that found nothing", () => {
     expect(verdictOf({ alternatives: [], budget_exhausted: true }).outcome).toBe(
       "unproven",
     );
+  });
+});
+
+describe("refusing before any search", () => {
+  it("refuses a vehicle wider than the opening", () => {
+    // The reference gateway narrowed below the LBX across its mirrors.
+    const refusal = refuseOnWidth(1.9, 2.029);
+    expect(refusal?.outcome).toBe("too-narrow");
+  });
+
+  it("refuses a vehicle that fits with nothing at all to spare", () => {
+    // Equality is not fitting: it is touching both posts at once, for the
+    // whole depth of the passage.
+    expect(refuseOnWidth(2.029, 2.029)?.outcome).toBe("too-narrow");
+  });
+
+  it("lets a vehicle that fits through be searched for", () => {
+    expect(refuseOnWidth(2.29, 2.029)).toBeNull();
+  });
+
+  it("judges on the width the run would actually use", () => {
+    // Folding the mirrors is exactly what gets a car through a gate it does
+    // not otherwise fit, so the refusal must not be made on the wider figure
+    // when the run is set to folded.
+    const opening = 1.95;
+    expect(refuseOnWidth(opening, 2.029)?.outcome).toBe("too-narrow");
+    expect(refuseOnWidth(opening, 1.865)).toBeNull();
+  });
+
+  it("carries both widths, so the refusal can say why", () => {
+    const refusal = refuseOnWidth(1.9, 2.029);
+    expect(refusal).toEqual({
+      outcome: "too-narrow",
+      opening: 1.9,
+      vehicleWidth: 2.029,
+    });
+  });
+
+  it("agrees with the ceiling it is derived from", () => {
+    // The refusal is exactly the case where the ceiling has nothing left to
+    // give. Two ways of saying the same geometry; they must not drift.
+    for (const [opening, width] of [
+      [1.9, 2.029],
+      [2.029, 2.029],
+      [2.29, 2.029],
+      [3.0, 2.029],
+    ] as const) {
+      const refused = refuseOnWidth(opening, width) !== null;
+      expect(refused).toBe(clearanceCeiling(opening, width) <= 0);
+    }
   });
 });

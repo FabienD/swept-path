@@ -77,6 +77,7 @@ export function verdictHeadline(verdict: Verdict): string {
   switch (verdict.outcome) {
     case "passes":
       return "Ça passe.";
+    case "too-narrow":
     case "blocked":
       return "Ça ne passe pas.";
     case "unproven":
@@ -91,6 +92,7 @@ export function verdictHeadline(verdict: Verdict): string {
  * one would make every result sound like a warning.
  */
 export function verdictNuance(verdict: Verdict): string | null {
+  if (verdict.outcome === "too-narrow") return "Le véhicule est trop large.";
   if (verdict.outcome === "blocked") return null;
   if (verdict.outcome === "unproven") return "Sans preuve.";
   switch (verdict.tone) {
@@ -120,6 +122,13 @@ export function verdictDetail(verdict: Verdict): string {
         `dans le passage (${confidenceLabel(verdict.confidence)}).${elsewhere}`
       );
     }
+    case "too-narrow":
+      return (
+        `Le véhicule mesure ${metres(verdict.vehicleWidth)} à son point le ` +
+        `plus large, pour un passage de ${metres(verdict.opening)}. Aucune ` +
+        "manœuvre n'y change rien : la marge maximale est (passage − " +
+        "véhicule) ÷ 2, quelle que soit la trajectoire. Inutile de chercher."
+      );
     case "blocked":
       return "Aucune entrée n'est possible avec ces mesures.";
     case "unproven":
