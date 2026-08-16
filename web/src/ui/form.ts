@@ -1,4 +1,5 @@
 import type { SceneDto, SolveRequest, VehicleDto } from "../domain/types";
+import { pivotRadius } from "../domain/vehicles";
 import type { Magnitude, UnitSystem } from "../domain/units";
 import { fromDisplay } from "../domain/units";
 
@@ -85,7 +86,16 @@ export function readVehicle(units: UnitSystem): VehicleDto {
     width: num("body-width", units),
     mirror_width: folded ? num("mirror-width-folded", units) : num("mirror-width", units),
     ground_clearance: num("ground-clearance", units),
-    min_turning_radius: num("radius", units),
+    // The form holds the curb-to-curb radius, which is the one every spec
+    // sheet prints. The core wants the rear-axle pivot radius, which none of
+    // them do. NaN when the conversion does not close, so the boundary
+    // rejects it by name rather than the solver working on a wrong circle.
+    min_turning_radius:
+      pivotRadius(
+        num("radius", units),
+        num("wheelbase", units),
+        num("body-width", units),
+      ) ?? Number.NaN,
   };
 }
 

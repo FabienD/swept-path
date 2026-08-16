@@ -90,14 +90,27 @@
               <span class="text-xs text-dim"><span data-i18n="field.groundClearance"></span> <span data-unit="dimension"></span></span>
               <input id="ground-clearance" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
             </label>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim">
-                    <span data-i18n="field.radius"></span>
-                    <span data-unit="dimension"></span>
-                    <span id="radius-note" class="text-dim"></span>
-                  </span>
-                  <input id="radius" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
+              <!-- The published figure, not the one the model needs. Every
+                   spec sheet prints a curb-to-curb radius; none prints the
+                   rear-axle pivot radius, so asking for the latter asks for
+                   something nobody can look up. It is derived and shown
+                   below instead. -->
+              <label class="col-span-2 grid gap-1">
+                <span class="text-xs text-dim">
+                  <span data-i18n="field.radius"></span>
+                  <span data-unit="dimension"></span>
+                </span>
+                <input id="radius" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                <span id="radius-note" class="text-xs text-dim"></span>
+              </label>
+
+              <div class="col-span-2 flex items-baseline justify-between">
+                <span class="text-xs text-dim">
+                  <span data-i18n="field.pivot"></span>
+                  <span class="opacity-70">— <span data-i18n="field.derived"></span></span>
+                </span>
+                <output id="pivot-radius" class="text-sm tabular-nums"></output>
+              </div>
 
                 <!-- Derived, not entered: length minus wheelbase minus front
                      overhang. A fourth field would be a fourth number for three

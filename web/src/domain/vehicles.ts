@@ -47,13 +47,24 @@ export interface VehiclePreset {
 /**
  * Converts a curb-to-curb radius into the rear-axle pivot radius.
  *
- * Mirrors `swept_core::vehicle::pivot_radius_from_curb`. Manufacturers
- * publish the circle traced by the outer front wheel; the bicycle model turns
- * about the rear axle, which runs well inside it. Using the published figure
+ * Mirrors `swept_core::vehicle::pivot_radius_from_curb`. Manufacturers publish
+ * the circle traced by the outer front wheel; the bicycle model turns about
+ * the rear axle, which runs well inside it. Using the published figure
  * directly makes every vehicle turn about half again as wide as it really
  * can — and the simulator then invents manoeuvres to make up for it.
+ *
+ * This is what the form asks for and converts, rather than asking for the
+ * pivot radius: the curb-to-curb figure is on every spec sheet, and the pivot
+ * radius is on none of them.
+ *
+ * Returns null when the geometry does not close — a radius smaller than the
+ * wheelbase describes no circle a vehicle can trace.
  */
-function pivotRadius(curbRadius: number, wheelbase: number, width: number): number | null {
+export function pivotRadius(
+  curbRadius: number,
+  wheelbase: number,
+  width: number,
+): number | null {
   const track = width - BODY_TO_TRACK_M;
   const atFrontAxle = curbRadius - track / 2;
   const squared = atFrontAxle * atFrontAxle - wheelbase * wheelbase;
