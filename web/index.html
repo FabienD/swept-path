@@ -173,6 +173,28 @@
             </select>
           </label>
 
+          <!-- Not measurements but the situation: which way you come down the
+               street, and which gear you mean to cross in. They change the
+               answer as much as any width does, so they are not folded away
+               with the millimetres. -->
+          <div class="grid gap-2.5">
+            <label class="grid gap-1">
+              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="field.side"></span>
+              <select id="side" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
+                <option value="1" data-i18n="side.fromLeft"></option>
+                <option value="-1" data-i18n="side.fromRight"></option>
+              </select>
+            </label>
+            <label class="grid gap-1">
+              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="field.direction"></span>
+              <select id="direction" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
+                <option value="any" data-i18n="direction.any"></option>
+                <option value="forward" data-i18n="direction.forward"></option>
+                <option value="reverse" data-i18n="direction.reverse"></option>
+              </select>
+            </label>
+          </div>
+
           <button id="run" type="submit" class="mt-1 rounded bg-accent px-4 py-2 text-sm font-bold text-ink" data-i18n="action.compute"></button>
 
           <!-- Everything you do not measure with a tape on your own gate. It
@@ -233,25 +255,10 @@
                   <span class="text-xs text-dim"><span data-i18n="field.curbHeight"></span> <span data-unit="dimension"></span></span>
                   <input id="curb-height" data-magnitude="dimension" type="number" min="0" step="0.01" value="0.12" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
                 </label>
-                <label class="col-span-2 grid gap-1">
-                  <span class="text-xs text-dim" data-i18n="field.side"></span>
-                  <select id="side" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
-                    <option value="1" data-i18n="side.fromLeft"></option>
-                    <option value="-1" data-i18n="side.fromRight"></option>
-                  </select>
-                </label>
               </fieldset>
 
               <fieldset class="grid gap-2.5">
                 <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="group.search"></legend>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim" data-i18n="field.direction"></span>
-                  <select id="direction" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
-                    <option value="any" data-i18n="direction.any"></option>
-                    <option value="forward" data-i18n="direction.forward"></option>
-                    <option value="reverse" data-i18n="direction.reverse"></option>
-                  </select>
-                </label>
                 <button id="run-min-road" type="button" class="rounded border border-line px-3 py-1.5 text-xs text-dim" data-i18n="action.minRoad"></button>
               </div>
           </details>
