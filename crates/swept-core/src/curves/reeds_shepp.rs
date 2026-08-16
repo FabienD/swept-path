@@ -348,6 +348,94 @@ pub fn ccc(frame: Frame) -> Vec<Word> {
     out
 }
 
+/// Solves the two outer arcs once the two inner ones are known.
+///
+/// Shared by both four-arc families, which differ only in how they choose the
+/// inner pair.
+fn tau_omega(u: f64, v: f64, xi: f64, eta: f64, phi: f64) -> (f64, f64) {
+    let delta = wrap_pi(u - v);
+    let a = u.sin() - delta.sin();
+    let b = u.cos() - delta.cos() - 1.0;
+    let t1 = eta.mul_add(a, -(xi * b)).atan2(xi.mul_add(a, eta * b));
+    let t2 = 2.0f64.mul_add(delta.cos() - v.cos() - u.cos(), 3.0);
+    let tau = if t2 < 0.0 {
+        wrap_pi(t1 + PI)
+    } else {
+        wrap_pi(t1)
+    };
+    let omega = wrap_pi(tau - u + v - phi);
+    (tau, omega)
+}
+
+/// `L⁺R⁺L⁻R⁻` — the inner arcs turn the same way for the same length.
+fn lp_rup_lum_rm(f: Frame) -> Option<(f64, f64, f64, f64)> {
+    let xi = f.x + f.phi.sin();
+    let eta = f.y - 1.0 - f.phi.cos();
+    let rho = 0.25 * (2.0 + xi.hypot(eta));
+    if rho > 1.0 {
+        return None;
+    }
+    let u = rho.acos();
+    let (t, v) = tau_omega(u, -u, xi, eta, f.phi);
+    Some((t, u, -u, v))
+}
+
+/// `L⁺R⁻L⁻R⁺` — the inner arcs turn opposite ways for the same length.
+fn lp_rum_lum_rp(f: Frame) -> Option<(f64, f64, f64, f64)> {
+    let xi = f.x + f.phi.sin();
+    let eta = f.y - 1.0 - f.phi.cos();
+    let rho = (20.0 - xi.mul_add(xi, eta * eta)) / 16.0;
+    if !(0.0..=1.0).contains(&rho) {
+        return None;
+    }
+    let u = -rho.acos();
+    if u < -PI / 2.0 {
+        return None;
+    }
+    let (t, v) = tau_omega(u, u, xi, eta, f.phi);
+    Some((t, u, u, v))
+}
+
+/// Every four-arc word between the frame's two poses.
+///
+/// These are the families that manoeuvre on the spot: they appear when the
+/// goal is close but badly oriented, which is exactly a narrow gateway.
+#[must_use]
+pub fn cccc(frame: Frame) -> Vec<Word> {
+    use Steering::{Left, Right};
+    let mut out = Vec::new();
+
+    for (transform, flip, mirror) in VARIANTS {
+        let f = transform(frame);
+        let sign = if flip { -1.0 } else { 1.0 };
+        let (a, b) = if mirror { (Right, Left) } else { (Left, Right) };
+        for (t, u, w, v) in [lp_rup_lum_rm(f), lp_rum_lum_rp(f)].into_iter().flatten() {
+            {
+                out.push(Word(vec![
+                    Element {
+                        steering: a,
+                        length: sign * t,
+                    },
+                    Element {
+                        steering: b,
+                        length: sign * u,
+                    },
+                    Element {
+                        steering: a,
+                        length: sign * w,
+                    },
+                    Element {
+                        steering: b,
+                        length: sign * v,
+                    },
+                ]));
+            }
+        }
+    }
+    out.retain(Word::is_valid);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -382,6 +470,29 @@ mod tests {
     }
 
     #[test]
+    fn four_arcs_land_on_a_near_goal() {
+        let frame = Frame {
+            x: 0.4,
+            y: 1.1,
+            phi: 0.3,
+        };
+        // `assert_all_land` rather than a bare loop: a landing test over an
+        // empty vector passes without proving anything, which is precisely the
+        // failure mode of a family whose sign condition is too strict.
+        assert_all_land(&cccc(frame), frame);
+    }
+
+    #[test]
+    fn four_arcs_are_absent_when_the_goal_is_far() {
+        let frame = Frame {
+            x: 9.0,
+            y: 0.0,
+            phi: 0.0,
+        };
+        assert!(cccc(frame).is_empty());
+    }
+
+    #[test]
     fn three_arcs_land_on_a_near_goal() {
         // Close together and turned: exactly where the three-arc families
         // live, and where the straight-run ones give long detours.
@@ -412,10 +523,7 @@ mod tests {
             y: 0.4,
             phi: -0.9,
         };
-        for word in &ccc(frame) {
-            let error = landing_error(word, frame);
-            assert!(error < 1e-9, "{word:?} misses by {error}");
-        }
+        assert_all_land(&ccc(frame), frame);
     }
 
     #[test]
