@@ -436,6 +436,156 @@ pub fn cccc(frame: Frame) -> Vec<Word> {
     out
 }
 
+/// `L⁺R⁻S⁻L⁻` — the straight run leaves the second arc on the same side.
+fn lp_rm_sm_lm(f: Frame) -> Option<(f64, f64, f64)> {
+    let xi = f.x - f.phi.sin();
+    let eta = f.y - 1.0 + f.phi.cos();
+    let (rho, theta) = polar(xi, eta);
+    if rho < 2.0 {
+        return None;
+    }
+    let leg = rho.mul_add(rho, -4.0).sqrt();
+    let u = 2.0 - leg;
+    let t = wrap_pi(theta + leg.atan2(-2.0));
+    let v = wrap_pi(f.phi - PI / 2.0 - t);
+    (t >= 0.0 && u <= 0.0 && v <= 0.0).then_some((t, u, v))
+}
+
+/// `L⁺R⁻S⁻R⁻` — the straight run leaves the second arc on the other side.
+fn lp_rm_sm_rm(f: Frame) -> Option<(f64, f64, f64)> {
+    let xi = f.x + f.phi.sin();
+    let eta = f.y - 1.0 - f.phi.cos();
+    let (rho, theta) = polar(-eta, xi);
+    if rho < 2.0 {
+        return None;
+    }
+    let t = theta;
+    let u = 2.0 - rho;
+    let v = wrap_pi(t + PI / 2.0 - f.phi);
+    (t >= 0.0 && u <= 0.0 && v <= 0.0).then_some((t, u, v))
+}
+
+/// Every arc-arc-straight-arc word between the frame's two poses.
+///
+/// The middle arc turns exactly a quarter, which is what these families are
+/// defined by and what makes their closed form so short.
+#[must_use]
+pub fn ccsc(frame: Frame) -> Vec<Word> {
+    use Steering::{Left, Right, Straight};
+    let quarter = -PI / 2.0;
+    let mut out = Vec::new();
+
+    for (transform, flip, mirror) in VARIANTS {
+        let f = transform(frame);
+        let sign = if flip { -1.0 } else { 1.0 };
+        let (a, b) = if mirror { (Right, Left) } else { (Left, Right) };
+
+        if let Some((t, u, v)) = lp_rm_sm_lm(f) {
+            out.push(Word(vec![
+                Element {
+                    steering: a,
+                    length: sign * t,
+                },
+                Element {
+                    steering: b,
+                    length: sign * quarter,
+                },
+                Element {
+                    steering: Straight,
+                    length: sign * u,
+                },
+                Element {
+                    steering: a,
+                    length: sign * v,
+                },
+            ]));
+        }
+        if let Some((t, u, v)) = lp_rm_sm_rm(f) {
+            out.push(Word(vec![
+                Element {
+                    steering: a,
+                    length: sign * t,
+                },
+                Element {
+                    steering: b,
+                    length: sign * quarter,
+                },
+                Element {
+                    steering: Straight,
+                    length: sign * u,
+                },
+                Element {
+                    steering: b,
+                    length: sign * v,
+                },
+            ]));
+        }
+    }
+    out.retain(Word::is_valid);
+    out
+}
+
+/// `L⁺R⁻S⁻L⁻R⁺` — the only five-element family.
+fn lp_rm_sm_lm_rp(f: Frame) -> Option<(f64, f64, f64)> {
+    let xi = f.x + f.phi.sin();
+    let eta = f.y - 1.0 - f.phi.cos();
+    let (rho, _) = polar(xi, eta);
+    if rho < 2.0 {
+        return None;
+    }
+    let u = 4.0 - rho.mul_add(rho, -4.0).sqrt();
+    if u > 0.0 {
+        return None;
+    }
+    let t = wrap_pi(
+        (4.0 - u)
+            .mul_add(xi, -(2.0 * eta))
+            .atan2((-2.0f64).mul_add(xi, (u - 4.0) * eta)),
+    );
+    let v = wrap_pi(t - f.phi);
+    (t >= 0.0 && v >= 0.0).then_some((t, u, v))
+}
+
+/// Every five-element word between the frame's two poses.
+#[must_use]
+pub fn ccscc(frame: Frame) -> Vec<Word> {
+    use Steering::{Left, Right, Straight};
+    let quarter = -PI / 2.0;
+    let mut out = Vec::new();
+
+    for (transform, flip, mirror) in VARIANTS {
+        let f = transform(frame);
+        let sign = if flip { -1.0 } else { 1.0 };
+        let (a, b) = if mirror { (Right, Left) } else { (Left, Right) };
+        if let Some((t, u, v)) = lp_rm_sm_lm_rp(f) {
+            out.push(Word(vec![
+                Element {
+                    steering: a,
+                    length: sign * t,
+                },
+                Element {
+                    steering: b,
+                    length: sign * quarter,
+                },
+                Element {
+                    steering: Straight,
+                    length: sign * u,
+                },
+                Element {
+                    steering: a,
+                    length: sign * quarter,
+                },
+                Element {
+                    steering: b,
+                    length: sign * v,
+                },
+            ]));
+        }
+    }
+    out.retain(Word::is_valid);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,6 +617,46 @@ mod tests {
             let error = landing_error(word, frame);
             assert!(error < 1e-9, "{word:?} misses by {error} on {frame:?}");
         }
+    }
+
+    #[test]
+    fn the_five_element_family_lands_on_its_goal() {
+        let frame = Frame {
+            x: 3.5,
+            y: 3.0,
+            phi: 0.4,
+        };
+        assert_all_land(&ccscc(frame), frame);
+    }
+
+    #[test]
+    fn the_five_element_family_is_absent_when_the_goal_is_close() {
+        let frame = Frame {
+            x: 0.1,
+            y: 0.1,
+            phi: 0.0,
+        };
+        assert!(ccscc(frame).is_empty());
+    }
+
+    #[test]
+    fn arc_arc_straight_arc_lands_on_a_turned_goal() {
+        let frame = Frame {
+            x: 2.5,
+            y: 2.0,
+            phi: 2.2,
+        };
+        assert_all_land(&ccsc(frame), frame);
+    }
+
+    #[test]
+    fn arc_arc_straight_arc_is_absent_when_the_goal_is_too_close() {
+        let frame = Frame {
+            x: 0.05,
+            y: 0.02,
+            phi: 0.01,
+        };
+        assert!(ccsc(frame).is_empty());
     }
 
     #[test]
