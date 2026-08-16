@@ -171,6 +171,101 @@ impl Word {
     }
 }
 
+/// One reading of a base family: how to transform the frame going in, whether
+/// the lengths come back negated, and whether left and right swap.
+type Variant = (fn(Frame) -> Frame, bool, bool);
+
+/// The four ways to read a base family: as written, driven backwards,
+/// mirrored, and both.
+const VARIANTS: [Variant; 4] = [
+    (|f| f, false, false),
+    (Frame::time_flipped, true, false),
+    (Frame::reflected, false, true),
+    (|f| f.time_flipped().reflected(), true, true),
+];
+
+/// `L⁺S⁺L⁺` — two arcs the same way, joined by a straight run.
+///
+/// Reading it: the goal's turning centre sits at `(x − sin φ, y − 1 + cos φ)`
+/// relative to the start's own centre. The polar form of that offset gives the
+/// straight run directly, and its bearing gives the first arc.
+fn lp_sp_lp(f: Frame) -> Option<(f64, f64, f64)> {
+    let (u, t) = polar(f.x - f.phi.sin(), f.y - 1.0 + f.phi.cos());
+    let v = wrap_pi(f.phi - t);
+    (t >= 0.0 && v >= 0.0).then_some((t, u, v))
+}
+
+/// `L⁺S⁺R⁺` — two arcs opposite ways, joined by a straight run.
+///
+/// The two turning centres are two radii apart across the straight run, which
+/// is where the `− 4` comes from: below that separation the run cannot exist
+/// and the family does not apply.
+fn lp_sp_rp(f: Frame) -> Option<(f64, f64, f64)> {
+    let (u1, t1) = polar(f.x + f.phi.sin(), f.y - 1.0 - f.phi.cos());
+    let squared = u1.mul_add(u1, -4.0);
+    if squared < 0.0 {
+        return None;
+    }
+    let u = squared.sqrt();
+    let t = wrap_pi(t1 + 2.0_f64.atan2(u));
+    let v = wrap_pi(t - f.phi);
+    (t >= 0.0 && v >= 0.0).then_some((t, u, v))
+}
+
+/// Every arc-straight-arc word between the frame's two poses.
+///
+/// The four variants come from the two involutions: as written the arcs turn
+/// left first and every segment is forward; time-flipping gives the reverse
+/// gears, reflecting gives the right-first mirror.
+#[must_use]
+pub fn csc(frame: Frame) -> Vec<Word> {
+    use Steering::{Left, Right, Straight};
+    let mut out = Vec::new();
+
+    for (transform, flip, mirror) in VARIANTS {
+        let f = transform(frame);
+        let sign = if flip { -1.0 } else { 1.0 };
+
+        let same = if mirror { Right } else { Left };
+        if let Some((t, u, v)) = lp_sp_lp(f) {
+            out.push(Word(vec![
+                Element {
+                    steering: same,
+                    length: sign * t,
+                },
+                Element {
+                    steering: Straight,
+                    length: sign * u,
+                },
+                Element {
+                    steering: same,
+                    length: sign * v,
+                },
+            ]));
+        }
+
+        let (first, last) = if mirror { (Right, Left) } else { (Left, Right) };
+        if let Some((t, u, v)) = lp_sp_rp(f) {
+            out.push(Word(vec![
+                Element {
+                    steering: first,
+                    length: sign * t,
+                },
+                Element {
+                    steering: Straight,
+                    length: sign * u,
+                },
+                Element {
+                    steering: last,
+                    length: sign * v,
+                },
+            ]));
+        }
+    }
+    out.retain(Word::is_valid);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,6 +273,66 @@ mod tests {
     use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
     const EPS: f64 = 1e-12;
+
+    /// Integrates a word and returns how far its end misses the frame's goal.
+    ///
+    /// This is the arbiter of the whole module: it depends on no publication,
+    /// only on [`Pose::advance`]. A family that transcribes wrongly lands
+    /// somewhere else, and this says by how much.
+    fn landing_error(word: &Word, frame: Frame) -> f64 {
+        let end = word.path(1.0).end(Pose::default());
+        let heading = (end.heading.get() - frame.phi).rem_euclid(TAU);
+        let heading = heading.min(TAU - heading);
+        (end.x - frame.x)
+            .abs()
+            .max((end.y - frame.y).abs())
+            .max(heading)
+    }
+
+    /// Every word a family returns must land on the goal.
+    fn assert_all_land(words: &[Word], frame: Frame) {
+        assert!(!words.is_empty(), "no word for {frame:?}");
+        for word in words {
+            assert!(word.is_valid(), "invalid word {word:?}");
+            let error = landing_error(word, frame);
+            assert!(error < 1e-9, "{word:?} misses by {error} on {frame:?}");
+        }
+    }
+
+    #[test]
+    fn arc_straight_arc_lands_on_the_goal() {
+        // A goal ahead, offset and turned: the bread-and-butter case where
+        // both same-side and opposed families apply.
+        let frame = Frame {
+            x: 3.0,
+            y: 1.2,
+            phi: 0.7,
+        };
+        assert_all_land(&csc(frame), frame);
+    }
+
+    #[test]
+    fn arc_straight_arc_handles_a_goal_straight_ahead() {
+        let frame = Frame {
+            x: 4.0,
+            y: 0.0,
+            phi: 0.0,
+        };
+        assert_all_land(&csc(frame), frame);
+    }
+
+    #[test]
+    fn arc_straight_arc_handles_a_goal_behind() {
+        // Reverse is the whole point of Reeds-Shepp: a goal behind the start
+        // must still be reachable, which Dubins could only manage by driving
+        // right round.
+        let frame = Frame {
+            x: -3.0,
+            y: 0.5,
+            phi: 0.2,
+        };
+        assert_all_land(&csc(frame), frame);
+    }
 
     #[test]
     fn a_negative_length_becomes_a_reverse_segment() {
