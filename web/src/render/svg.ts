@@ -6,24 +6,39 @@ const NS = "http://www.w3.org/2000/svg";
 /** How each role is painted. The backend maps roles to styles; the primitive
  *  producers never choose a colour. */
 const STYLE: Record<Role, { fill?: string; stroke?: string; width?: number; opacity?: number }> = {
-  grid: { stroke: "#e7e5e4", width: 1 },
-  wall: { fill: "#d6d3d1", stroke: "#78716c" },
-  post: { fill: "#c7c2be", stroke: "#57534e" },
-  leaf: { fill: "#a8a29e", stroke: "#44403c" },
-  sidewalk: { fill: "#ebe9e7", stroke: "#a8a29e" },
-  "road-edge": { stroke: "#44403c", width: 2 },
-  "road-centre": { stroke: "#a8a29e", width: 1.5 },
-  vehicle: { fill: "#1e40af22", stroke: "#1e40af", width: 1.6 },
-  ghost: { fill: "#1e40af11", stroke: "#1e40af", width: 1, opacity: 0.35 },
-  mirror: { fill: "#c42b1c" },
-  nose: { fill: "#1e40af" },
-  reversal: { fill: "#fafaf9", stroke: "#1c1917", width: 1.4 },
+  grid: { stroke: "var(--color-plan-grid)", width: 1 },
+  wall: { fill: "var(--color-wall)", stroke: "var(--color-wall-edge)" },
+  post: { fill: "var(--color-post)", stroke: "var(--color-post-edge)" },
+  leaf: { fill: "var(--color-leaf)", stroke: "var(--color-leaf-edge)" },
+  sidewalk: {
+    fill: "var(--color-sidewalk)",
+    stroke: "var(--color-sidewalk-edge)",
+  },
+  "road-edge": { stroke: "var(--color-road-edge)", width: 2 },
+  "road-centre": { stroke: "var(--color-road-centre)", width: 1.5 },
+  // The vehicle wears the accent: it is the one thing on the plan that is
+  // neither scenery nor a measurement, and the trace beside it carries the
+  // proximity colours, so the two never compete.
+  vehicle: {
+    fill: "color-mix(in srgb, var(--color-accent) 13%, transparent)",
+    stroke: "var(--color-accent)",
+    width: 1.6,
+  },
+  ghost: { stroke: "var(--color-ghost)", width: 1, opacity: 0.5 },
+  mirror: { fill: "var(--color-accent)" },
+  nose: { fill: "var(--color-accent)" },
+  // Hollow, so it reads as a marker on the path rather than a point of it.
+  reversal: { fill: "var(--color-plan)", stroke: "var(--color-fg)", width: 1.4 },
   "band-clear": { stroke: "var(--color-band-clear)", width: 1.8 },
   "band-watch": { stroke: "var(--color-band-watch)", width: 3 },
   "band-close": { stroke: "var(--color-band-close)", width: 3 },
   "band-tight": { stroke: "var(--color-band-tight)", width: 3 },
   overhang: { stroke: "var(--color-overhang)", width: 3 },
-  annotation: { fill: "#57534e" },
+  // Where the trip goes, drawn once under everything else. Quiet enough not
+  // to be mistaken for a proximity band, present enough that the destination
+  // is visible before playback reaches it.
+  upcoming: { stroke: "var(--color-ghost)", width: 1.5, opacity: 0.55 },
+  annotation: { fill: "var(--color-annotation)" },
 };
 
 function element(name: string, attributes: Record<string, string | number>) {

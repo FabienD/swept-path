@@ -19,3 +19,6 @@ crates/swept-wasm/pkg/
 web/src/generated/
 web/dist/
 .env*
+
+# Visual brainstorming mockups, local only.
+.superpowers/

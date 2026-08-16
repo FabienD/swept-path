@@ -1,14 +1,7 @@
+import { bandOf } from "../domain/bands";
+import { poseAt, timelineOf } from "./playback";
 import type { ManeuverDto, PoseDto, VehicleDto } from "../domain/types";
 import type { Point, Primitive, Role } from "./primitives";
-
-/**
- * Clearance thresholds separating the proximity bands, in metres.
- *
- * Carried over from the prototype (`index.html:604`): beyond 50 cm, 25 to 50,
- * 10 to 25, under 10. Reading a path by colour is what tells a driver *where*
- * it gets tight, which a single minimum never says.
- */
-export const BANDS = [0.5, 0.25, 0.1] as const;
 
 const BAND_ROLES: readonly Role[] = [
   "band-clear",
@@ -17,16 +10,14 @@ const BAND_ROLES: readonly Role[] = [
   "band-tight",
 ];
 
-/** How many ghost vehicles are drawn along the path. */
-const GHOSTS = 4;
-
-/** Which band a clearance falls into, 0 being the roomiest. */
-export function bandOf(clearance: number): number {
-  if (clearance >= BANDS[0]) return 0;
-  if (clearance >= BANDS[1]) return 1;
-  if (clearance >= BANDS[2]) return 2;
-  return 3;
-}
+/**
+ * How many ghost vehicles the playback leaves behind.
+ *
+ * ARBITRARY. Enough that what remains at the end reads as a swept envelope
+ * rather than as scattered outlines, few enough that they do not fill the
+ * gateway they are meant to show the vehicle passing through.
+ */
+const GHOSTS = 6;
 
 /** The four corners of the body at a given pose, in world coordinates. */
 export function bodyAt(pose: PoseDto, vehicle: VehicleDto): Point[] {
@@ -104,23 +95,39 @@ export function pathToPrimitives(
   const poses = maneuver.poses;
   if (poses.length === 0) return [];
 
+  // Distance, not pose index: see `playback.ts` for why the two differ.
+  const timeline = timelineOf(poses);
+  const reached = poseAt(timeline, position);
+
   const out: Primitive[] = [];
+
+  // Where the trip goes, under everything else. Drawn whole and in one piece:
+  // a trace that stopped at the vehicle would leave a paused playback saying
+  // nothing about where it was heading, and this line is not split by band
+  // because it carries no clearance information — only a destination.
+  out.push({
+    type: "polyline",
+    role: "upcoming",
+    points: poses.map((p) => ({ x: p.x, y: p.y })),
+  });
+
   // The overhang joins the key, which splits the path where it begins.
   const keyOf = (pose: PoseDto) =>
     `${pose.reverse}|${bandOf(pose.clearance)}|${pose.overhanging}`;
 
+  // Only as far as the vehicle has got. The coloured stretches carry the
+  // proximity bands, and a red one drawn ahead of the vehicle would report a
+  // danger that has not happened yet.
   let start = 0;
-  while (start < poses.length - 1) {
+  while (start < reached) {
     const key = keyOf(poses[start + 1]!);
     let end = start + 1;
-    while (end < poses.length - 1 && keyOf(poses[end + 1]!) === key) end++;
+    while (end < reached && keyOf(poses[end + 1]!) === key) end++;
 
     const last = poses[end]!;
     out.push({
       type: "polyline",
-      role: last.overhanging
-        ? "overhang"
-        : BAND_ROLES[bandOf(last.clearance)]!,
+      role: last.overhanging ? "overhang" : BAND_ROLES[bandOf(last.clearance)]!,
       dashed: last.reverse,
       points: poses.slice(start, end + 1).map((p) => ({ x: p.x, y: p.y })),
     });
@@ -137,13 +144,16 @@ export function pathToPrimitives(
     start = end;
   }
 
-  // Ghosts along the way, then the vehicle at the requested position.
+  // Ghosts at fixed points along the trip, revealed as they are passed, so
+  // that what remains once playback ends is the épure itself — built by the
+  // animation rather than drawn beside it.
   for (let i = 0; i < GHOSTS; i++) {
-    const at = Math.round((i / (GHOSTS - 1)) * (poses.length - 1));
-    out.push(...vehicleAt(poses[at]!, vehicle, "ghost"));
+    const fraction = i / (GHOSTS - 1);
+    if (fraction > position) break;
+    out.push(...vehicleAt(poses[poseAt(timeline, fraction)]!, vehicle, "ghost"));
   }
-  const index = Math.round(Math.min(Math.max(position, 0), 1) * (poses.length - 1));
-  out.push(...vehicleAt(poses[index]!, vehicle, "vehicle"));
+
+  out.push(...vehicleAt(poses[reached]!, vehicle, "vehicle"));
 
   return out;
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Preferences } from "../i18n/preferences";
 import type { SceneDto } from "../domain/types";
 import { boundsFor, clearWidth, sceneToPrimitives } from "./scene";
 
@@ -25,7 +26,10 @@ function scene(opening: number, swinging = false): SceneDto {
 }
 
 const shapes = (s: SceneDto) =>
-  sceneToPrimitives(s).filter((p) => p.type === "polygon");
+  sceneToPrimitives(s, FR).filter((p) => p.type === "polygon");
+
+const FR: Preferences = { locale: "fr", units: "metric" };
+const US: Preferences = { locale: "en", units: "us" };
 
 describe("scene rendering", () => {
   it("draws the wall, the posts and the split sidewalk", () => {
@@ -62,8 +66,20 @@ describe("scene rendering", () => {
   });
 
   it("annotates the plan with the figures that matter", () => {
-    const labels = sceneToPrimitives(scene(2.4)).filter((p) => p.type === "label");
+    const labels = sceneToPrimitives(scene(2.4), FR).filter((p) => p.type === "label");
     expect(labels.some((l) => l.text.includes("passage libre"))).toBe(true);
     expect(labels.some((l) => l.text.includes("chaussée"))).toBe(true);
+  });
+
+  it("annotates in the reader's language and unit", () => {
+    // The plan is read by whoever set the language, so its own figures have
+    // to follow it — a French annotation on an English page would be the one
+    // thing left untranslated, and the most visible.
+    const labels = sceneToPrimitives(scene(2.4), US).filter((p) => p.type === "label");
+    expect(labels.some((l) => l.text.includes("clear opening"))).toBe(true);
+    // A roadway is a distance, so it is feet; the opening is a dimension, so
+    // it is inches.
+    expect(labels.some((l) => l.text.includes("ft"))).toBe(true);
+    expect(labels.some((l) => l.text.includes("in"))).toBe(true);
   });
 });

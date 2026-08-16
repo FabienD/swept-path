@@ -33,6 +33,8 @@ export type Role =
   | "band-close"
   | "band-tight"
   | "overhang"
+  /** The whole trip, drawn behind the part already played. */
+  | "upcoming"
   | "annotation";
 
 export type Primitive =
