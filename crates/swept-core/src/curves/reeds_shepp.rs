@@ -586,6 +586,49 @@ pub fn ccscc(frame: Frame) -> Vec<Word> {
     out
 }
 
+/// Every Reeds-Shepp path between two poses, at this radius.
+///
+/// This — and not [`shortest`] — is what a clearance-seeking caller wants. The
+/// shortest path is the one that grazes most, a point the whole of this crate
+/// turns on.
+///
+/// An empty vector means the radius is unusable; between two real poses at a
+/// real radius, Reeds-Shepp always finds something.
+#[must_use]
+pub fn all(from: Pose, to: Pose, radius: f64) -> Vec<CurvePath> {
+    let Some(frame) = Frame::between(from, to, radius) else {
+        return Vec::new();
+    };
+    let mut words = csc(frame);
+    words.extend(ccc(frame));
+    words.extend(cccc(frame));
+    words.extend(ccsc(frame));
+    words.extend(ccscc(frame));
+    words.iter().map(|w| w.path(radius)).collect()
+}
+
+/// The shortest of [`all`], by distance travelled.
+#[must_use]
+pub fn shortest(from: Pose, to: Pose, radius: f64) -> Option<CurvePath> {
+    all(from, to, radius)
+        .into_iter()
+        .min_by(|a, b| a.length().total_cmp(&b.length()))
+}
+
+/// The path of [`all`] with the fewest direction changes, length breaking ties.
+///
+/// A reversal is what a driver counts as a manoeuvre, and Reeds-Shepp minimises
+/// that as well as length — but not with the same word. Where the two disagree,
+/// this is the one to show a driver.
+#[must_use]
+pub fn fewest_reversals(from: Pose, to: Pose, radius: f64) -> Option<CurvePath> {
+    all(from, to, radius).into_iter().min_by(|a, b| {
+        a.reversals()
+            .cmp(&b.reversals())
+            .then_with(|| a.length().total_cmp(&b.length()))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -616,6 +659,61 @@ mod tests {
             assert!(word.is_valid(), "invalid word {word:?}");
             let error = landing_error(word, frame);
             assert!(error < 1e-9, "{word:?} misses by {error} on {frame:?}");
+        }
+    }
+
+    #[test]
+    fn all_returns_paths_that_land_on_the_goal() {
+        let from = Pose::new(-2.0, 1.0, Radians::new(0.3));
+        let to = Pose::new(3.0, 2.5, Radians::new(1.9));
+        let radius = 4.0;
+        let paths = all(from, to, radius);
+        assert!(!paths.is_empty());
+        for path in &paths {
+            let end = path.end(from);
+            assert!((end.x - to.x).abs() < 1e-6, "x off by {}", end.x - to.x);
+            assert!((end.y - to.y).abs() < 1e-6, "y off by {}", end.y - to.y);
+            let error = (end.heading.get() - to.heading.get()).rem_euclid(TAU);
+            assert!(error.min(TAU - error) < 1e-6, "heading off by {error}");
+        }
+    }
+
+    #[test]
+    fn a_goal_behind_the_start_is_reachable() {
+        // What Reeds-Shepp buys over Dubins. Backing up in a straight line is
+        // the obvious answer, and Dubins cannot express it at all.
+        let from = Pose::default();
+        let to = Pose::new(-5.0, 0.0, Radians::default());
+        let best = shortest(from, to, 3.0).expect("reversing gets there");
+        assert!(
+            best.length() < 5.5,
+            "took {} m to back up 5 m",
+            best.length()
+        );
+        assert!(best.reversals() <= 1);
+    }
+
+    #[test]
+    fn the_shortest_is_the_shortest_of_all() {
+        let from = Pose::new(1.0, 1.0, Radians::new(0.5));
+        let to = Pose::new(-2.0, 3.0, Radians::new(2.0));
+        let paths = all(from, to, 2.5);
+        let best = shortest(from, to, 2.5).expect("some family applies");
+        for path in &paths {
+            assert!(best.length() <= path.length() + 1e-12);
+        }
+    }
+
+    #[test]
+    fn fewest_reversals_is_never_beaten_on_reversals() {
+        // The distinction the interface counts: a driver counts shunts, not
+        // metres, and the shortest word is not always the smoothest.
+        let from = Pose::default();
+        let to = Pose::new(6.0, 3.0, Radians::new(0.4));
+        let radius = 3.0;
+        let smooth = fewest_reversals(from, to, radius).expect("some family applies");
+        for path in all(from, to, radius) {
+            assert!(smooth.reversals() <= path.reversals());
         }
     }
 
