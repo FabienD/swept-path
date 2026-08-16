@@ -21,32 +21,6 @@
         </h1>
         <p class="mt-3 text-sm text-dim" data-i18n="app.tagline"></p>
 
-        <!-- Two selectors, not one. The pairings that look odd are real: a
-             French driver measuring an imported car wants inches in French.
-             Choosing English moves the units once, as a first guess. -->
-        <div class="mt-4 grid grid-cols-2 gap-2.5 border-b border-line pb-4">
-          <label class="grid gap-1">
-            <span
-              class="text-[0.65rem] tracking-[0.13em] text-dim uppercase"
-              data-i18n="settings.language"
-            ></span>
-            <select id="locale" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
-              <option value="fr">Français</option>
-              <option value="en">English</option>
-            </select>
-          </label>
-          <label class="grid gap-1">
-            <span
-              class="text-[0.65rem] tracking-[0.13em] text-dim uppercase"
-              data-i18n="settings.units"
-            ></span>
-            <select id="units" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
-              <option value="metric" data-i18n="units.metric"></option>
-              <option value="us" data-i18n="units.us"></option>
-            </select>
-          </label>
-        </div>
-
         <form id="params" class="mt-5 grid gap-5">
           <!-- Three subjects, and nothing after the button. Each one shows what
                you are asked for and folds away what it can work out or assume:
@@ -265,6 +239,36 @@
 
       <!-- ───────────────────────────── plan ───────────────────────────── -->
       <section class="order-1 min-w-0 p-5 lg:order-2">
+        <!-- How the answer is written, not what is being asked: these belong
+             with the result rather than among the measurements. Bare and
+             right-aligned, so they never compete with the verdict below. -->
+        <div class="mb-4 flex justify-end gap-2 text-xs">
+          <label class="flex items-center gap-1.5 text-dim">
+            <span class="sr-only" data-i18n="settings.language"></span>
+            <select
+              id="locale"
+              aria-label="Langue"
+              data-i18n-aria="settings.language"
+              class="rounded border border-line bg-transparent px-1.5 py-1 text-dim hover:text-fg"
+            >
+              <option value="fr">Français</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <label class="flex items-center gap-1.5 text-dim">
+            <span class="sr-only" data-i18n="settings.units"></span>
+            <select
+              id="units"
+              aria-label="Unités"
+              data-i18n-aria="settings.units"
+              class="rounded border border-line bg-transparent px-1.5 py-1 text-dim hover:text-fg"
+            >
+              <option value="metric" data-i18n="units.metric"></option>
+              <option value="us" data-i18n="units.us"></option>
+            </select>
+          </label>
+        </div>
+
         <div class="flex flex-wrap items-end gap-x-10 gap-y-4">
           <output id="verdict" class="block">
             <span id="verdict-headline" class="block text-3xl leading-none font-extrabold tracking-tight"></span>
