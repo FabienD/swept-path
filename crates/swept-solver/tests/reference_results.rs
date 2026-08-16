@@ -293,17 +293,17 @@ fn measured_gateway() -> Scene {
             //
             // ASSUMED, pending a tape measure: the real gateway plainly opens
             // past square, and only an axis carried back towards the yard face
-            // allows that. The figures move with it — the sweep returns 2.4 cm
-            // here against the 4.2 cm the impossible geometry claimed.
+            // allows that. The figures move with it.
             hinge_depth_ratio: 0.5,
             // Nearly against the posts, which is where these leaves stop:
             // `max_open_angle` puts that ceiling at 94 degrees for an axis at
             // mid-depth with a 3.5 cm offset.
             //
-            // MEASURED, and reassuring: the sweep returns nothing at 90, 91,
-            // 92, 93 and 93.9 degrees alike. Whatever the exact stop, this
-            // gateway admits no one-move entry, so the verdict does not hang
-            // on a degree.
+            // MEASURED: the sweep used to return nothing at 90, 91, 92, 93
+            // and 93.9 degrees alike, so the verdict never hung on a degree.
+            // It now finds a one-move entry here — the leaves were never what
+            // forbade it. `entry_depth` was, by demanding a depth set by the
+            // nose whichever way the vehicle was travelling.
             open_angle: Radians::from_degrees(93.0),
         },
     }
@@ -483,39 +483,57 @@ fn every_reference_scene_declares_a_gate_it_can_actually_open() {
     }
 }
 
-/// The measured gateway needs more than one move, and that is a proof.
+/// The measured gateway admits a one-move entry — which it did not.
 ///
-/// 2.29 m clear, leaves square, hinges at mid-depth — the geometry as it
-/// actually stands. The exhaustive sweep finds no one-move entry, and because
-/// the sweep is complete that is a result rather than a shrug: none exists on
-/// its grid. The planner then finds entries in two and three moves.
+/// 2.29 m clear, leaves square, hinges at mid-depth: the geometry as it
+/// actually stands, and the vehicle that uses it daily.
 ///
-/// Worth keeping as a reference precisely because it is the negative case, and
-/// because it matches what the gateway asks of a driver in practice.
+/// This test used to assert the opposite, and `CLAUDE.md` recorded the gap as
+/// the model's most expensive debt: the sweep found nothing in one move where
+/// the owner drives in every day, blamed on the sidewalk being modelled as a
+/// wall of infinite height. That was not the whole story. `entry_depth`
+/// demanded the vehicle reach a depth set by its **nose** whichever way it was
+/// going, so driving in nose-first it had to travel a further wheelbase and
+/// front overhang past the posts — and be square on arrival. Nothing about
+/// getting in requires that.
+///
+/// With the depth set by whichever end clears last, and goals offered at more
+/// than one depth, the sweep finds the entry: 2.0 cm here, and this scene
+/// still models the sidewalk as a wall of infinite height. With the real
+/// 12 cm curb, which the body can overhang, the same sweep returns 4.7 cm.
+/// Deeper plans still buy room, because the ceiling is 13.05 cm and one move
+/// does not reach it.
+///
+/// Kept as a reference for what it now is: the case where the model and the
+/// driveway finally agree.
 #[test]
-fn the_measured_gateway_needs_more_than_one_move() {
+fn the_measured_gateway_admits_a_one_move_entry() {
     let vehicle =
         Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid vehicle");
     let scene = measured_gateway();
 
     let sweep = search(&vehicle, &scene, Approach::Forward, Grid::fine());
+    let best = sweep
+        .best()
+        .expect("the sweep finds the entry the owner drives every day");
+    assert_eq!(best.moves, 1);
     assert!(
-        sweep.best().is_none(),
-        "the sweep now finds a one-move entry where it used to find none"
+        best.min_clearance > 0.015,
+        "a one-move entry, but only {:.1} cm of it",
+        best.min_clearance * 100.0
     );
 
+    // The ceiling is (2.29 - 2.029) / 2 = 13.05 cm, so there is room left for
+    // a second move to buy — and it does, which is the honest reason to show
+    // a deeper alternative at all.
     let Outcome::Found(list) =
         alternatives(&vehicle, &scene, SearchBudget::default(), &mut Silent, None)
     else {
-        panic!("the planner gets in, even if the sweep cannot do it in one");
+        panic!("the gateway admits an entry");
     };
+    let deeper = list.iter().filter(|m| m.moves > 1).map(|m| m.min_clearance);
     assert!(
-        list.iter().all(|m| m.moves > 1),
-        "a one-move entry appeared among the alternatives"
-    );
-    assert!(
-        list.iter().any(|m| m.min_clearance > 0.02),
-        "every plan grazes: the widest leaves {:.1} cm",
-        list.iter().map(|m| m.min_clearance).fold(0.0_f64, f64::max) * 100.0
+        deeper.fold(0.0_f64, f64::max) > best.min_clearance,
+        "no deeper plan improves on the one-move answer"
     );
 }

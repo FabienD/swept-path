@@ -116,6 +116,7 @@ mod tests {
     use super::*;
     use crate::budget::Silent;
     use swept_core::scene::{GateKind, Post};
+    use swept_core::vehicle::pivot_radius_from_curb;
 
     /// The seeding logic under test does not depend on how deep the planner
     /// gets to dig, so the tests do not pay for a full-depth search.
@@ -157,6 +158,76 @@ mod tests {
     /// about how the gateway is crossed, not about how the street is driven.
     fn arrives_in(maneuver: &Maneuver) -> Direction {
         maneuver.poses.last().expect("a path has poses").direction
+    }
+
+    /// Reported from production, with a screenshot: the vehicle is through
+    /// the gateway, straight and centred, and the plan goes on manoeuvring.
+    ///
+    /// Measured on that scene rather than judged from the picture. The
+    /// two-move answer drove straight past the opening to `y = 5.64` while
+    /// turning away from square, then reversed two metres back to `y = 4.60`
+    /// — a shunt three metres clear of anything, made when the vehicle had
+    /// been entirely in the yard for four metres. What a driver is told to do
+    /// after they are in is not part of getting in.
+    #[test]
+    fn no_alternative_shunts_once_the_vehicle_is_through() {
+        let pivot = pivot_radius_from_curb(5.61, 2.45, 1.591).expect("plausible");
+        let porsche = Vehicle::new(2.45, 4.542, 1.0, 1.852, 2.033, 0.11, pivot).expect("valid");
+        let scene = Scene {
+            left_post: Post {
+                inner_edge_x: -1.225,
+                width: 0.55,
+                depth: 0.55,
+            },
+            right_post: Post {
+                inner_edge_x: 1.225,
+                width: 0.55,
+                depth: 0.55,
+            },
+            wall_thickness: 0.30,
+            sidewalk_width: 1.30,
+            curb_cut_width: 3.60,
+            road_width: 5.90,
+            curb_height: 0.12,
+            gate: GateKind::Sliding,
+        };
+
+        let Outcome::Found(list) =
+            alternatives(&porsche, &scene, SearchBudget::default(), &mut Silent, None)
+        else {
+            panic!("this gateway admits an entry");
+        };
+
+        // Behind the posts, every corner of the vehicle: that is what being
+        // through means, and it does not depend on which way the vehicle
+        // faces or on the depth the goal happens to be set at.
+        let behind = scene.left_post.depth.max(scene.right_post.depth);
+        let envelope = porsche.envelope();
+        let through = |pose: &swept_core::kinematics::Pose| {
+            let (sin, cos) = pose.heading.sin_cos();
+            envelope
+                .iter()
+                .map(|p| pose.y + p.x * sin + p.y * cos)
+                .fold(f64::MAX, f64::min)
+                > behind
+        };
+
+        for m in &list {
+            let Some(in_at) = m.poses.iter().position(|p| through(&p.pose)) else {
+                continue;
+            };
+            let shunts = m.poses[in_at..]
+                .windows(2)
+                .filter(|w| w[0].direction != w[1].direction)
+                .count();
+            assert_eq!(
+                shunts,
+                0,
+                "{} moves: {shunts} gear change(s) after the vehicle was already through, at pose {in_at} of {}",
+                m.moves,
+                m.poses.len()
+            );
+        }
     }
 
     /// Reported from production: the trace wanders once through the gateway.

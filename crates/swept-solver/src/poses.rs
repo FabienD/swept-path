@@ -40,6 +40,23 @@ pub const ENTRY_SPAN_M: f64 = 0.9;
 /// costs every candidate the poses to sample it.
 pub const APPROACH_REACH_M: f64 = 10.0;
 
+/// How many depths beyond the first a goal is offered at.
+///
+/// Being through the gateway and being square to it do not happen at the same
+/// moment. `entry_depth` says when the vehicle is through — the earliest an
+/// entry can be called finished — but nothing obliges it to be straight by
+/// then: it can keep going into the yard and finish lining up further in.
+///
+/// Aiming only at the earliest depth is what made a sliding gateway the
+/// exact sweep used to solve come back empty, because the vehicle was
+/// required to be square metres before it had room to become square. Aiming
+/// only at the deepest is what made the planner shunt once already inside,
+/// driving on to reach a goal it had no reason to reach.
+///
+/// Two extra depths, so the cost is three times the goals rather than ten:
+/// the sweep is already the slowest thing in CI.
+pub const GOAL_DEPTH_STEPS: u16 = 2;
+
 /// How far the final heading may sit from square to the opening, in degrees.
 ///
 /// Criterion 3 of the design: the vehicle must end within five degrees of the
@@ -113,17 +130,25 @@ pub fn goal_poses(
     heading_steps: u16,
     arriving: Direction,
 ) -> Vec<Pose> {
-    let depth = entry_depth(scene, vehicle);
+    let depth = entry_depth(scene, vehicle, arriving);
     let span = GOAL_HEADING_SPAN_DEGREES.to_radians();
     let square = match arriving {
         Direction::Forward => FRAC_PI_2,
         Direction::Reverse => -FRAC_PI_2,
     };
 
+    // Room to finish straightening further in. The far end is where the other
+    // end of the vehicle would have had to reach under the old rule, so
+    // everything the sweep used to find is still within reach.
+    let reach = vehicle.wheelbase + vehicle.front_overhang - vehicle.rear_overhang;
+    let deepest = depth + reach.max(0.0);
+
     let mut out = Vec::new();
-    for x in spread(-ENTRY_SPAN_M, ENTRY_SPAN_M, entry_steps) {
-        for heading in spread(square - span, square + span, heading_steps) {
-            out.push(Pose::new(x, depth, Radians::new(heading)));
+    for y in spread(depth, deepest, GOAL_DEPTH_STEPS) {
+        for x in spread(-ENTRY_SPAN_M, ENTRY_SPAN_M, entry_steps) {
+            for heading in spread(square - span, square + span, heading_steps) {
+                out.push(Pose::new(x, y, Radians::new(heading)));
+            }
         }
     }
     out
@@ -223,13 +248,16 @@ mod tests {
     }
 
     #[test]
-    fn the_two_directions_face_opposite_ways_from_the_same_spot() {
+    fn the_two_directions_face_opposite_ways_from_the_same_point_of_the_opening() {
         let (vehicle, sc) = (lbx(), scene(3.0));
         let forward = goal_poses(&vehicle, &sc, 0, 0, Direction::Forward);
         let reverse = goal_poses(&vehicle, &sc, 0, 0, Direction::Reverse);
         assert!((forward[0].heading.get() + reverse[0].heading.get()).abs() < 1e-12);
         assert!((forward[0].x - reverse[0].x).abs() < 1e-12);
-        assert!((forward[0].y - reverse[0].y).abs() < 1e-12);
+        // Not the same depth, though, and deliberately: the rear axle is the
+        // pose, and the end that clears the gateway last is the rear bumper
+        // driving in and the nose backing in. See `path::entry_depth`.
+        assert!(reverse[0].y > forward[0].y);
     }
 
     #[test]
@@ -237,11 +265,12 @@ mod tests {
         let (vehicle, sc) = (lbx(), scene(3.0));
         let goals = goal_poses(&vehicle, &sc, 8, 2, Direction::Forward);
         assert!(!goals.is_empty());
-        let depth = crate::path::entry_depth(&sc, &vehicle);
+        let depth = crate::path::entry_depth(&sc, &vehicle, Direction::Forward);
         for pose in &goals {
             assert!(
-                (pose.y - depth).abs() < 1e-12,
-                "a goal sits at the entry depth"
+                pose.y >= depth - 1e-12,
+                "a goal sits at the entry depth or beyond it, got y={}",
+                pose.y
             );
             assert!(pose.x.abs() <= ENTRY_SPAN_M + 1e-12, "got x={}", pose.x);
         }
@@ -269,10 +298,14 @@ mod tests {
         // runs the coarse grid a dozen times over and would otherwise start
         // returning nothing at all.
         let (vehicle, sc) = (lbx(), scene(3.0));
+        // One per depth, and no fewer: the bisection in `min_road` runs the
+        // coarse grid a dozen times over and must not start finding nothing.
         let goals = goal_poses(&vehicle, &sc, 0, 0, Direction::Forward);
-        assert_eq!(goals.len(), 1);
-        assert!(goals[0].x.abs() < 1e-12);
-        assert!((goals[0].heading.get() - FRAC_PI_2).abs() < 1e-12);
+        assert_eq!(goals.len(), usize::from(GOAL_DEPTH_STEPS) + 1);
+        for goal in &goals {
+            assert!(goal.x.abs() < 1e-12);
+            assert!((goal.heading.get() - FRAC_PI_2).abs() < 1e-12);
+        }
     }
 
     #[test]

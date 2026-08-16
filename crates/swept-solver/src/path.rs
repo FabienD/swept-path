@@ -6,7 +6,7 @@
 //! is judged on — is it in far enough, and how much room did it leave.
 
 use swept_core::clearance::{Clearance, ClearanceField};
-use swept_core::kinematics::Pose;
+use swept_core::kinematics::{Direction, Pose};
 use swept_core::scene::{GateKind, Scene};
 use swept_core::vehicle::Vehicle;
 
@@ -30,16 +30,38 @@ const RECONNAISSANCE_PROBES: usize = 8;
 ///
 /// Behind the posts, behind the gate leaves when they swing into the way, and
 /// far enough that the whole vehicle is through.
+///
+/// # Which end has to clear
+///
+/// The pose is the rear axle, so the depth it must reach is set by whichever
+/// end of the vehicle passes the gateway **last**, and that is not the same
+/// end for the two approaches. Driving in nose first, the rear bumper is last
+/// through and the axle need only be a rear overhang past the posts. Backing
+/// in, the vehicle is nose-out and it is the nose that is last through, a
+/// whole wheelbase and front overhang ahead of the axle.
+///
+/// Using the nose for both is what this used to do, and it cost a manoeuvre.
+/// Reported from production on a 2,45 m gateway and a Porsche 911: the depth
+/// asked for was 4,60 m where the vehicle was fully in the yard at 2,24 m, so
+/// a plan that had entered straight and centred was made to drive 2,4 m
+/// further to reach it. It could not do that and stay square, so it turned
+/// away from square on the way and reversed two metres back to land on the
+/// goal — a shunt three metres clear of any obstacle, charged to the driver
+/// as a second manoeuvre. See
+/// `solve::tests::no_alternative_shunts_once_the_vehicle_is_through`.
 #[must_use]
-pub fn entry_depth(scene: &Scene, vehicle: &Vehicle) -> f64 {
+pub fn entry_depth(scene: &Scene, vehicle: &Vehicle, arriving: Direction) -> f64 {
     let gate_depth = match scene.gate {
         GateKind::Sliding => 0.0,
         GateKind::Swinging { leaf_length, .. } => leaf_length,
     };
+    let last_through = match arriving {
+        Direction::Forward => vehicle.rear_overhang,
+        Direction::Reverse => vehicle.wheelbase + vehicle.front_overhang,
+    };
     scene.left_post.depth.max(scene.right_post.depth)
         + gate_depth
-        + vehicle.wheelbase
-        + vehicle.front_overhang
+        + last_through
         + ENTRY_CLEARANCE_M
 }
 
@@ -129,15 +151,44 @@ mod tests {
 
     #[test]
     fn the_entry_depth_clears_the_posts_and_the_whole_vehicle() {
-        let depth = entry_depth(&wide_scene(), &lbx());
-        // Post depth, plus the vehicle ahead of its rear axle, plus a margin.
-        assert!(depth > 0.55 + 2.580 + 0.850, "got {depth}");
+        // Whichever way it is driven in, no part of the vehicle is left in
+        // the gateway once the rear axle is at this depth.
+        let (scene, vehicle) = (wide_scene(), lbx());
+        for (arriving, last_through) in [
+            (Direction::Forward, vehicle.rear_overhang),
+            (
+                Direction::Reverse,
+                vehicle.wheelbase + vehicle.front_overhang,
+            ),
+        ] {
+            let depth = entry_depth(&scene, &vehicle, arriving);
+            assert!(
+                depth - last_through > 0.55,
+                "{arriving:?}: {depth} leaves {last_through} m of vehicle in the posts"
+            );
+        }
+    }
+
+    #[test]
+    fn driving_in_needs_less_depth_than_backing_in() {
+        // The pose is the rear axle, so what sets the depth is the end that
+        // clears the gateway last: the rear bumper going in nose first, the
+        // nose backing in. Asking for the nose either way is what charged a
+        // driver a manoeuvre they did not need.
+        let (scene, vehicle) = (wide_scene(), lbx());
+        let forward = entry_depth(&scene, &vehicle, Direction::Forward);
+        let reverse = entry_depth(&scene, &vehicle, Direction::Reverse);
+        let expected = vehicle.wheelbase + vehicle.front_overhang - vehicle.rear_overhang;
+        assert!(
+            (reverse - forward - expected).abs() < 1e-12,
+            "got {forward} and {reverse}"
+        );
     }
 
     #[test]
     fn a_swinging_gate_pushes_the_entry_depth_back_by_a_leaf() {
         let mut scene = wide_scene();
-        let sliding = entry_depth(&scene, &lbx());
+        let sliding = entry_depth(&scene, &lbx(), Direction::Forward);
         scene.gate = GateKind::Swinging {
             leaf_length: 1.15,
             leaf_thickness: 0.10,
@@ -145,7 +196,7 @@ mod tests {
             hinge_depth_ratio: 0.5,
             open_angle: Radians::from_degrees(90.0),
         };
-        assert!((entry_depth(&scene, &lbx()) - sliding - 1.15).abs() < 1e-9);
+        assert!((entry_depth(&scene, &lbx(), Direction::Forward) - sliding - 1.15).abs() < 1e-9);
     }
 
     #[test]

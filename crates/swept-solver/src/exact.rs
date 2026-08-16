@@ -622,7 +622,7 @@ mod tests {
             first.pose.y
         );
         assert!(
-            last.pose.y >= crate::path::entry_depth(&sc, &vehicle) - 1e-6,
+            last.pose.y >= crate::path::entry_depth(&sc, &vehicle, Direction::Forward) - 1e-6,
             "ends past the entry depth, got y={}",
             last.pose.y
         );
@@ -666,7 +666,7 @@ mod tests {
             first.pose.y
         );
         assert!(
-            last.pose.y >= crate::path::entry_depth(&sc, &vehicle) - 1e-6,
+            last.pose.y >= crate::path::entry_depth(&sc, &vehicle, Direction::Reverse) - 1e-6,
             "ends past the entry depth, got y={}",
             last.pose.y
         );
