@@ -266,6 +266,88 @@ pub fn csc(frame: Frame) -> Vec<Word> {
     out
 }
 
+/// `L⁺R⁻L⁻` — three arcs, no straight run.
+///
+/// The two turning centres are `u1` apart. Three arcs can bridge them only
+/// while that stays within four radii, which is what the `acos(u1 / 4)` says:
+/// beyond it the argument leaves `[-1, 1]` and the family does not apply.
+fn lp_rm_lm(f: Frame) -> Option<(f64, f64, f64)> {
+    let xi = f.x - f.phi.sin();
+    let eta = f.y - 1.0 + f.phi.cos();
+    let (separation, theta) = polar(xi, eta);
+    if separation > 4.0 {
+        return None;
+    }
+    let half_middle = (separation / 4.0).acos();
+    let t = wrap_pi(theta + PI / 2.0 + half_middle);
+    let u = wrap_pi(2.0f64.mul_add(-half_middle, PI));
+    let v = wrap_pi(f.phi - t - u);
+    // `(t, −u, v)`, not `(t, −u, −v)`. The heading a word turns through is the
+    // sum of its arcs with `L` positive and `R` negative, so this triplet
+    // turns through `t + u + v`, which the last line makes equal to φ. Negating
+    // `v` as well turns through `t + u − v` and lands a full turn out — an
+    // error the landing test caught at 2.96 radians.
+    Some((t, -u, v))
+}
+
+/// Every three-arc word between the frame's two poses.
+#[must_use]
+pub fn ccc(frame: Frame) -> Vec<Word> {
+    use Steering::{Left, Right};
+    let mut out = Vec::new();
+
+    for (transform, flip, mirror) in VARIANTS {
+        let f = transform(frame);
+        let sign = if flip { -1.0 } else { 1.0 };
+        let (a, b) = if mirror { (Right, Left) } else { (Left, Right) };
+
+        if let Some((t, u, v)) = lp_rm_lm(f) {
+            out.push(Word(vec![
+                Element {
+                    steering: a,
+                    length: sign * t,
+                },
+                Element {
+                    steering: b,
+                    length: sign * u,
+                },
+                Element {
+                    steering: a,
+                    length: sign * v,
+                },
+            ]));
+        }
+
+        // The same three arcs read from the goal backwards, which is a
+        // distinct word rather than the same one: the outer arcs swap places
+        // while the middle keeps its gear.
+        let (turn_sin, turn_cos) = f.phi.sin_cos();
+        let backwards = Frame {
+            x: f.x.mul_add(turn_cos, f.y * turn_sin),
+            y: f.x.mul_add(turn_sin, -(f.y * turn_cos)),
+            phi: f.phi,
+        };
+        if let Some((t, u, v)) = lp_rm_lm(backwards) {
+            out.push(Word(vec![
+                Element {
+                    steering: a,
+                    length: sign * v,
+                },
+                Element {
+                    steering: b,
+                    length: sign * u,
+                },
+                Element {
+                    steering: a,
+                    length: sign * t,
+                },
+            ]));
+        }
+    }
+    out.retain(Word::is_valid);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,6 +378,43 @@ mod tests {
             assert!(word.is_valid(), "invalid word {word:?}");
             let error = landing_error(word, frame);
             assert!(error < 1e-9, "{word:?} misses by {error} on {frame:?}");
+        }
+    }
+
+    #[test]
+    fn three_arcs_land_on_a_near_goal() {
+        // Close together and turned: exactly where the three-arc families
+        // live, and where the straight-run ones give long detours.
+        let frame = Frame {
+            x: 0.6,
+            y: 0.9,
+            phi: 1.4,
+        };
+        assert_all_land(&ccc(frame), frame);
+    }
+
+    #[test]
+    fn three_arcs_are_absent_when_the_circles_cannot_meet() {
+        // Far apart, no three-arc word applies. Returning an empty vector is
+        // the answer, not a failure.
+        let frame = Frame {
+            x: 12.0,
+            y: 0.0,
+            phi: 0.0,
+        };
+        assert!(ccc(frame).is_empty());
+    }
+
+    #[test]
+    fn three_arcs_land_when_the_goal_sits_behind() {
+        let frame = Frame {
+            x: -0.8,
+            y: 0.4,
+            phi: -0.9,
+        };
+        for word in &ccc(frame) {
+            let error = landing_error(word, frame);
+            assert!(error < 1e-9, "{word:?} misses by {error}");
         }
     }
 
