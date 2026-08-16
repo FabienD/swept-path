@@ -66,6 +66,8 @@ export interface PageTexts {
   "dis.driver.body": string;
   "dis.use.title": string;
   "dis.use.body": string;
+  "dis.privacy.title": string;
+  "dis.privacy.body": string;
 }
 
 const FR: PageTexts = {
@@ -149,6 +151,10 @@ const FR: PageTexts = {
   "dis.use.title": "En pratique",
   "dis.use.body":
     "Servez-vous en pour écarter ce qui est manifestement impossible, pour comparer des ouvertures, ou pour savoir ce qu'un élargissement de portail vous ferait gagner. Avant de couper un mur ou d'acheter un véhicule, vérifiez sur place, à vitesse d'homme, avec quelqu'un dehors pour regarder.",
+
+  "dis.privacy.title": "Ce que ce site sait de vous",
+  "dis.privacy.body":
+    "Le calcul se fait entièrement dans votre navigateur : les mesures que vous saisissez ne sont envoyées nulle part, et il n'y a aucun serveur pour les recevoir. Votre choix de langue et d'unités reste dans votre navigateur. Le site compte les pages consultées à l'aide de Vercel Web Analytics, sans cookie et sans rien déposer sur votre machine ; les paramètres d'adresse sont retirés avant l'envoi, pour qu'aucune dimension ne puisse partir par ce biais.",
 };
 
 const EN: PageTexts = {
@@ -232,6 +238,10 @@ const EN: PageTexts = {
   "dis.use.title": "In practice",
   "dis.use.body":
     "Use it to rule out what is plainly impossible, to compare openings, or to see what widening a gateway would buy you. Before cutting a wall or buying a vehicle, check on site, at walking pace, with someone standing outside to watch.",
+
+  "dis.privacy.title": "What this site knows about you",
+  "dis.privacy.body":
+    "The computation happens entirely in your browser: the measurements you enter are sent nowhere, and there is no server to receive them. Your language and unit choices stay in your browser. The site counts page views using Vercel Web Analytics, without cookies and without storing anything on your machine; query strings are stripped before an event is sent, so no dimension can leave that way.",
 };
 
 export const PAGE_TEXTS: Record<Locale, PageTexts> = { fr: FR, en: EN };

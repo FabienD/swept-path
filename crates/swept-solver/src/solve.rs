@@ -159,6 +159,41 @@ mod tests {
         maneuver.poses.last().expect("a path has poses").direction
     }
 
+    /// Reported from production: the trace wanders once through the gateway.
+    ///
+    /// Checked on `alternatives`, which is what the interface calls, and on
+    /// every depth it returns — not just the one that happens to be selected.
+    #[test]
+    fn no_alternative_wanders_around_the_yard() {
+        let ev3 = Vehicle::new(2.680, 4.300, 0.815, 1.850, 2.040, 0.14, 3.496).expect("valid");
+        let mut sc = scene(2.40);
+        sc.road_width = 5.90;
+        sc.sidewalk_width = 1.30;
+        sc.curb_height = 0.12;
+
+        let Outcome::Found(list) =
+            alternatives(&ev3, &sc, SearchBudget::default(), &mut Silent, None)
+        else {
+            panic!("this gateway admits an entry");
+        };
+
+        for m in &list {
+            let travelled: f64 = m
+                .poses
+                .windows(2)
+                .map(|w| (w[1].pose.x - w[0].pose.x).hypot(w[1].pose.y - w[0].pose.y))
+                .sum();
+            let first = m.poses.first().expect("poses").pose;
+            let arrival = m.poses.last().expect("poses").pose;
+            let direct = (arrival.x - first.x).hypot(arrival.y - first.y);
+            assert!(
+                travelled < direct * 3.0,
+                "{} moves: walked {travelled:.1} m to cover {direct:.1} m",
+                m.moves
+            );
+        }
+    }
+
     #[test]
     fn asking_to_enter_in_reverse_never_answers_with_a_forward_entry() {
         // Reported: a run restricted to reverse came back with a one-move

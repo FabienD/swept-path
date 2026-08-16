@@ -319,6 +319,65 @@ mod tests {
         Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).expect("valid vehicle")
     }
 
+    /// Reported from production: the trace loops around inside the yard once
+    /// through the gateway.
+    ///
+    /// Measured rather than judged from a screenshot. An entry is a drive
+    /// from the street to a spot in the yard; a path several times the
+    /// distance it covers is doing something other than entering.
+    ///
+    /// The reported scene: a 2,40 m opening on swinging leaves, a 5,90 m
+    /// roadway, a 1,30 m sidewalk, and a Kia EV3 whose published 5,2 m
+    /// curb-to-curb radius converts to a 3,50 m pivot radius.
+    #[test]
+    fn a_one_move_entry_does_not_wander_once_it_is_through() {
+        let ev3 = Vehicle::new(2.680, 4.300, 0.815, 1.850, 2.040, 0.14, 3.496).expect("valid");
+        let scene = Scene {
+            left_post: Post {
+                inner_edge_x: -1.20,
+                width: 0.55,
+                depth: 0.55,
+            },
+            right_post: Post {
+                inner_edge_x: 1.20,
+                width: 0.55,
+                depth: 0.55,
+            },
+            wall_thickness: 0.30,
+            sidewalk_width: 1.30,
+            curb_cut_width: 3.20,
+            road_width: 5.90,
+            curb_height: 0.12,
+            // Swinging leaves, as reported: they cut the free passage from
+            // 2,40 m to 2,29 m and are what the screenshot showed.
+            gate: GateKind::Swinging {
+                leaf_length: 1.15,
+                leaf_thickness: 0.04,
+                hinge_offset: 0.035,
+                hinge_depth_ratio: 0.5,
+                open_angle: Radians::from_degrees(93.0),
+            },
+        };
+
+        let Outcome::Found(list) = search(&ev3, &scene, Approach::Forward, Grid::fine()) else {
+            panic!("this gateway admits a one-move entry");
+        };
+        let poses = &list[0].poses;
+
+        let travelled: f64 = poses
+            .windows(2)
+            .map(|w| (w[1].pose.x - w[0].pose.x).hypot(w[1].pose.y - w[0].pose.y))
+            .sum();
+        let first = poses.first().expect("poses").pose;
+        let arrival = poses.last().expect("poses").pose;
+        let direct = (arrival.x - first.x).hypot(arrival.y - first.y);
+
+        assert!(
+            travelled < direct * 2.0,
+            "walked {travelled:.1} m to cover {direct:.1} m of ground"
+        );
+    }
+
     /// Reported: a search restricted to reverse looks like a forward one.
     ///
     /// Reversing into a yard leaves the vehicle nose-out, facing the street.
