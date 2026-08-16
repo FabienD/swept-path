@@ -15,7 +15,7 @@ import {
 } from "./domain/labels";
 import type { ErrorDto, ManeuverDto, SceneDto, VehicleDto } from "./domain/types";
 import type { VehiclePreset } from "./domain/vehicles";
-import { VEHICLES, searchVehicles, vehicleById } from "./domain/vehicles";
+import { VEHICLES, pivotRadius, searchVehicles, vehicleById } from "./domain/vehicles";
 import { NONE, commit, nextHighlight } from "./ui/combobox";
 import type { Verdict } from "./domain/verdict";
 import {
@@ -39,11 +39,12 @@ import { createStore } from "./state/store";
 import { arrivesFromTheRight, readRequest, readScene } from "./ui/form";
 import { CANCELLED, SolverClient } from "./worker/client";
 import { text } from "./i18n/dictionary";
+import { applyLanguage } from "./i18n/apply";
 import type { TextKey } from "./i18n/dictionary";
 import type { Preferences } from "./i18n/preferences";
 import { loadPreferences, savePreferences } from "./i18n/preferences";
 import type { Magnitude, UnitSystem } from "./domain/units";
-import { fromDisplay, stepFor, toDisplay, unitOf } from "./domain/units";
+import { fromDisplay, stepFor, toDisplay } from "./domain/units";
 
 const VIEWPORT = { width: 1000, height: 600 };
 const client = new SolverClient();
@@ -98,29 +99,6 @@ function measuredFields(): { input: HTMLInputElement; magnitude: Magnitude }[] {
   return [...document.querySelectorAll<HTMLInputElement>("input[data-magnitude]")].map(
     (input) => ({ input, magnitude: input.dataset["magnitude"] as Magnitude }),
   );
-}
-
-/** Puts the page into one language: labels, placeholders, and the units. */
-function applyLanguage(preferences: Preferences): void {
-  const { locale, units } = preferences;
-
-  for (const node of document.querySelectorAll<HTMLElement>("[data-i18n]")) {
-    node.textContent = text(locale, node.dataset["i18n"] as TextKey);
-  }
-  for (const node of document.querySelectorAll<HTMLElement>("[data-i18n-placeholder]")) {
-    node.setAttribute(
-      "placeholder",
-      text(locale, node.dataset["i18nPlaceholder"] as TextKey),
-    );
-  }
-  for (const node of document.querySelectorAll<HTMLElement>("[data-i18n-aria]")) {
-    node.setAttribute("aria-label", text(locale, node.dataset["i18nAria"] as TextKey));
-  }
-  for (const node of document.querySelectorAll<HTMLElement>("[data-unit]")) {
-    node.textContent = unitOf(node.dataset["unit"] as Magnitude, units);
-  }
-
-  document.documentElement.lang = locale;
 }
 
 /**
@@ -644,6 +622,36 @@ function flagMissing(): number {
 }
 
 /**
+ * Shows the pivot radius, which is derived rather than entered.
+ *
+ * The form asks for the curb-to-curb radius because that is the figure on
+ * every spec sheet. What the bicycle model turns about is the rear axle,
+ * well inside it — so the conversion is shown rather than hidden, since a
+ * reader who knows their car turns in 5,2 m should be able to see what the
+ * simulator makes of that.
+ *
+ * A dash when the geometry does not close: a radius smaller than the
+ * wheelbase describes no circle a vehicle can trace.
+ */
+function renderPivotRadius(): void {
+  const shown = byId("pivot-radius");
+  if (!shown) return;
+
+  const preferences = store.get().preferences;
+  const read = (id: string) => {
+    const input = byId<HTMLInputElement>(id);
+    if (!input || input.value === "") return Number.NaN;
+    return fromDisplay(input.valueAsNumber, "dimension", preferences.units);
+  };
+
+  const pivot = pivotRadius(read("radius"), read("wheelbase"), read("body-width"));
+  shown.textContent =
+    pivot !== null && Number.isFinite(pivot)
+      ? length(pivot, "dimension", preferences)
+      : "—";
+}
+
+/**
  * Shows the rear overhang, which is derived rather than entered.
  *
  * `length − wheelbase − front_overhang`. It is not a field because that would
@@ -728,15 +736,20 @@ function applyPreset(id: string): void {
   set("mirror-width", preset.mirror_width);
   set("mirror-width-folded", preset.mirror_width_folded);
   set("ground-clearance", preset.ground_clearance);
-  set("radius", preset.min_turning_radius, 2);
-  // Say where the number came from: it is not the one on the spec sheet, and
-  // someone checking against the manufacturer would otherwise think it wrong.
+  // The published figure, since that is what the field now holds. A vehicle
+  // whose published radius is measured wall-to-wall yields nothing: that
+  // conversion is not the same, and a figure quietly too large would turn
+  // every verdict optimistic.
+  set("radius", preset.published_radius_kind === "curb" ? preset.published_radius : null, 2);
   const note = byId("radius-note");
   if (note) {
+    const { locale } = store.get().preferences;
     note.textContent =
-      preset.min_turning_radius !== null && preset.published_radius !== null
-        ? `— déduit de ${preset.published_radius.toFixed(1)} m entre trottoirs`
-        : "— non publié pour ce modèle, à renseigner";
+      preset.published_radius !== null && preset.published_radius_kind === "curb"
+        ? ""
+        : locale === "en"
+          ? "Not published curb-to-curb for this model — enter it yourself."
+          : "Non publié entre trottoirs pour ce modèle — à renseigner.";
   }
   flagMissing();
   clearResult();
@@ -821,6 +834,7 @@ function fillPresets(): void {
     applyPreset(chosen.id);
     openWhatIsMissing();
     renderRearOverhang();
+  renderPivotRadius();
     clearResult();
     draw();
   };
@@ -941,6 +955,7 @@ form?.addEventListener("input", (event) => {
   }
   openWhatIsMissing();
   renderRearOverhang();
+  renderPivotRadius();
   clearResult();
   draw();
 });
@@ -968,6 +983,7 @@ function adopt(next: Preferences): void {
   savePreferences(next, preferencesStorage);
   applyLanguage(next);
   renderRearOverhang();
+  renderPivotRadius();
   clearResult();
   void syncMaxAngle();
   draw();
@@ -1160,6 +1176,7 @@ byId("run-min-road")?.addEventListener("click", async () => {
   applyLanguage(initial);
   openWhatIsMissing();
   renderRearOverhang();
+  renderPivotRadius();
 }
 
 draw();

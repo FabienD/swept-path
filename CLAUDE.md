@@ -10,10 +10,12 @@ le français dans l'interface.
 
 ## État actuel
 
-`prototype/index.html` est un prototype monofichier fonctionnel, en JS pur,
-sans dépendance. Il n'est **pas** la base de code cible : c'est une référence
-d'algorithme et de comportement. Le reproduire fidèlement avant de le
-dépasser.
+Le prototype monofichier d'origine a été retiré du dépôt : le portage est
+fait, et ce qu'il garantissait est conservé sous forme de vecteurs. Les 800
+cas de `crates/swept-core/tests/fixtures/` viennent de lui, et `golden.rs`
+compare le noyau à ces valeurs à 1e-12 près à chaque CI. C'est le seul oracle
+indépendant du noyau avec celui de Reeds-Shepp : les autres tests comparent le
+code à des valeurs écrites par la même main que lui.
 
 ## Décisions déjà prises
 
@@ -25,8 +27,8 @@ dépasser.
 - **Cible technique** : noyau géométrique + solveur en Rust compilé en Wasm,
   interface et rendu SVG en TypeScript. Frontière étroite : on passe une
   description de scène, on récupère un tableau de poses. Calcul dans un
-  Web Worker — le prototype gèle l'onglet, c'est le défaut principal à ne
-  pas reproduire.
+  Web Worker — le prototype gelait l'onglet, ce qui était le défaut à ne pas
+  reproduire.
 - **Base véhicules** : fichier statique JSON chargé une fois et filtré côté
   client. Pas de backend, pas de base de données.
 
@@ -97,7 +99,7 @@ portage. Chacune est désormais marquée *vérifié* ou *corrigé*.
   Multiplier les manœuvres n'achète pas de marge, parce que le plafond
   théorique vaut `(W − w) / 2` quelle que soit la trajectoire.
 
-## Défauts connus du prototype
+## Défauts hérités du prototype
 
 À corriger, pas à reproduire.
 

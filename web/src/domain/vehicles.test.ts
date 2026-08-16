@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { VEHICLES, searchVehicles, vehicleById } from "./vehicles";
+import { VEHICLES, pivotRadius, searchVehicles, vehicleById } from "./vehicles";
 
 describe("vehicle table", () => {
   it("reads every entry from the database, with unique ids", () => {
@@ -97,5 +97,45 @@ describe("searching the table", () => {
 
   it("returns nothing rather than everything when nothing matches", () => {
     expect(searchVehicles("zzzz")).toHaveLength(0);
+  });
+});
+
+describe("the radius the form asks for", () => {
+  it("converts a curb-to-curb figure into the pivot radius", () => {
+    // Lexus LBX: 5,2 m published, 2,58 m wheelbase, 1,825 m body. The rear
+    // axle traces a noticeably tighter circle than the outer front wheel.
+    const pivot = pivotRadius(5.2, 2.58, 1.825);
+    expect(pivot).not.toBeNull();
+    expect(pivot!).toBeGreaterThan(3.5);
+    expect(pivot!).toBeLessThan(3.7);
+  });
+
+  it("always lands inside the published circle", () => {
+    // The whole reason for the conversion: taking the published figure as the
+    // pivot radius makes every vehicle turn wider than it can, and the
+    // simulator then invents manoeuvres to make up for it.
+    for (const [curb, wheelbase, width] of [
+      [5.2, 2.58, 1.825],
+      [5.9, 2.87, 1.9],
+      [4.9, 2.45, 1.75],
+    ] as const) {
+      expect(pivotRadius(curb, wheelbase, width)!).toBeLessThan(curb);
+    }
+  });
+
+  it("refuses a radius the geometry cannot close", () => {
+    // A circle smaller than the wheelbase is not a tighter turn, it is an
+    // impossible one — and a NaN here is what makes the boundary name the
+    // field rather than the solver work on a wrong circle.
+    expect(pivotRadius(2.0, 2.58, 1.825)).toBeNull();
+  });
+
+  it("grows with the published radius, monotonically", () => {
+    let previous = 0;
+    for (const curb of [4.5, 5.0, 5.5, 6.0, 6.5]) {
+      const pivot = pivotRadius(curb, 2.58, 1.825)!;
+      expect(pivot).toBeGreaterThan(previous);
+      previous = pivot;
+    }
   });
 });

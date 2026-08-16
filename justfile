@@ -77,14 +77,6 @@ build: wasm
 
 # --------------------------------------------------------- measurements ---
 
-# Regenerate the golden vectors from the frozen prototype.
-fixtures:
-    node tools/extract-golden/extract.js
-
-# Check the committed fixtures still match the prototype, as CI does.
-fixtures-check:
-    node tools/extract-golden/extract.js --check
-
 # What refining the planning grid costs, in nodes and in clearance.
 grid-cost:
     cargo run -p swept-solver --release --example grid_cost
@@ -96,4 +88,4 @@ doc:
 # -------------------------------------------------------- before pushing ---
 
 # Everything CI runs. Green here should mean green there.
-ci: check test fixtures-check build
+ci: check test build
