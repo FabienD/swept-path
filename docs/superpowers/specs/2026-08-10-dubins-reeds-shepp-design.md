@@ -70,12 +70,29 @@ Dans **`swept-core`**, module `curves`. Ce sont des primitives cinématiques
 pures : elles ne connaissent ni scène, ni obstacle, ni stratégie de recherche —
 seulement deux poses et un rayon.
 
-**Implémentées, pas importées.** La crate [`reeds_shepp`](https://crates.io/crates/reeds_shepp)
-existe, mais `swept-core` n'a aucune dépendance externe, et c'est cette
-propriété qui permet sa publication sous `MIT OR Apache-2.0` à côté d'une
-application AGPL. Dubins tient en environ 150 lignes, Reeds-Shepp en 500, tous
-deux entièrement spécifiés dans la littérature — et ce sont précisément le
-genre de fonctions que des tests de propriétés valident bien.
+**Implémentées, pas importées — mais pas pour la raison qu'on croit.** La crate
+[`reeds_shepp`](https://crates.io/crates/reeds_shepp) existe et **elle est sous
+licence MIT**, donc parfaitement compatible avec `MIT OR Apache-2.0` : cette
+section a d'abord affirmé le contraire, et c'était faux. Vérifié le
+2026-08-15 sur crates.io.
+
+La vraie raison tient en deux points. `swept-core` n'a **aucune dépendance de
+production**, propriété revendiquée dans le README et dans `CLAUDE.md`, et
+qu'une seule dépendance suffirait à perdre. Et la crate en est à sa version
+0.1.1 pour 1 233 téléchargements : rien n'indique que ses formules soient plus
+sûres que les nôtres.
+
+Dubins tient en environ 150 lignes, Reeds-Shepp en 500 — mesuré après coup :
+`dubins.rs` en fait 578, dont 410 de code. Tous deux sont entièrement spécifiés
+dans la littérature, et ce sont précisément le genre de fonctions que des tests
+de propriétés valident bien.
+
+**Cette crate sert donc d'oracle plutôt que de dépendance.** Placée en
+`[dev-dependencies]`, elle donne une seconde transcription, indépendante de la
+nôtre, contre laquelle comparer sur des paires de poses tirées au hasard —
+exactement le rôle que le prototype joue pour les vecteurs dorés. Le noyau
+garde ses zéro dépendances, et les formules gagnent un vérificateur qui n'est
+pas leur auteur.
 
 ## 5. Ce que cela remplace
 
