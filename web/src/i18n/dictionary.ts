@@ -65,6 +65,8 @@ export interface Texts {
   "field.wheelbase": string;
   "field.length": string;
   "field.frontOverhang": string;
+  "field.rearOverhang": string;
+  "field.derived": string;
   "field.bodyWidth": string;
   "field.groundClearance": string;
   "field.mirrorWidth": string;
@@ -158,6 +160,8 @@ const FR: Texts = {
   "field.wheelbase": "Empattement",
   "field.length": "Longueur totale",
   "field.frontOverhang": "Porte-à-faux avant",
+  "field.rearOverhang": "Porte-à-faux arrière",
+  "field.derived": "déduit",
   "field.bodyWidth": "Largeur caisse",
   "field.groundClearance": "Garde au sol",
   "field.mirrorWidth": "Rétros déployés",
@@ -249,6 +253,8 @@ const EN: Texts = {
   "field.wheelbase": "Wheelbase",
   "field.length": "Overall length",
   "field.frontOverhang": "Front overhang",
+  "field.rearOverhang": "Rear overhang",
+  "field.derived": "derived",
   "field.bodyWidth": "Body width",
   "field.groundClearance": "Ground clearance",
   "field.mirrorWidth": "Width, mirrors out",

@@ -630,6 +630,36 @@ function flagMissing(): number {
 }
 
 /**
+ * Shows the rear overhang, which is derived rather than entered.
+ *
+ * `length − wheelbase − front_overhang`. It is not a field because that would
+ * be a fourth number for three degrees of freedom, and the first thing anyone
+ * could make contradict itself. But it is worth seeing: it is what crosses
+ * the gateway first when reversing in, and a long rear overhang is what
+ * catches a post nobody was watching.
+ *
+ * Blank while any of the three is missing — an arithmetic answer built from
+ * an empty field would read as a measurement.
+ */
+function renderRearOverhang(): void {
+  const shown = byId("rear-overhang");
+  if (!shown) return;
+
+  const preferences = store.get().preferences;
+  const read = (id: string) => {
+    const input = byId<HTMLInputElement>(id);
+    if (!input || input.value === "") return Number.NaN;
+    return fromDisplay(input.valueAsNumber, "dimension", preferences.units);
+  };
+
+  const rear = read("length") - read("wheelbase") - read("front-overhang");
+  // Negative means the three contradict each other, which the core rejects by
+  // name when the search runs. Saying nothing here beats showing "-12 cm".
+  shown.textContent =
+    Number.isFinite(rear) && rear > 0 ? length(rear, "dimension", preferences) : "—";
+}
+
+/**
  * Opens any disclosure holding a measurement that is still missing.
  *
  * The rule the fold has to obey: a required field that is empty is never
@@ -775,6 +805,8 @@ function fillPresets(): void {
     if (!chosen) return;
     field.value = chosen.label;
     applyPreset(chosen.id);
+    openWhatIsMissing();
+    renderRearOverhang();
     clearResult();
     draw();
   };
@@ -894,6 +926,7 @@ form?.addEventListener("input", (event) => {
     if (shown) shown.textContent = target.value;
   }
   openWhatIsMissing();
+  renderRearOverhang();
   clearResult();
   draw();
 });
@@ -920,6 +953,7 @@ function adopt(next: Preferences): void {
   store.set({ preferences: next });
   savePreferences(next, preferencesStorage);
   applyLanguage(next);
+  renderRearOverhang();
   clearResult();
   void syncMaxAngle();
   draw();
@@ -1110,6 +1144,8 @@ byId("run-min-road")?.addEventListener("click", async () => {
   if (units) units.value = initial.units;
   convertFields("metric", initial.units);
   applyLanguage(initial);
+  openWhatIsMissing();
+  renderRearOverhang();
 }
 
 draw();
