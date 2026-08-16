@@ -198,13 +198,31 @@ d'aujourd'hui : la PR 1 ne le rend pas pire.
 
 ## Vérifications
 
-- La table des longueurs cumulées se construit une fois par manœuvre, pas à
-  chaque image : `draw()` tourne à chaque rendu et reconstruit tout le SVG.
-- Le dépliant s'ouvre bien quand un champ qu'il contient est signalé en erreur.
-- Les deux tracés (sourdine et parcouru) ne doublent pas le nombre de
-  primitives au point de peser sur le rendu — le tracé en sourdine peut être
-  émis une fois et non redécoupé par bande.
-- La jauge affiche le plafond `(W − w) / 2`, pas une valeur approchée.
+Faites, avec ce qu'elles ont donné.
+
+- **La table des longueurs cumulées, une fois par manœuvre plutôt qu'à chaque
+  image.** Inquiétude infondée, mesure faite : sur 420 poses elle coûte 5 µs,
+  soit 15 µs pour les trois appels d'une image — 0,09 % d'une image de 16,7 ms.
+  Laissée telle quelle, sans mémoïsation.
+- **Ce qui pesait vraiment était ailleurs.** L'abonnement du store reconstruit
+  tout à chaque notification, et la lecture en émet soixante par seconde :
+  `renderAlternatives` recréait donc les boutons et rattachait leurs écouteurs
+  soixante fois par seconde, sous le pointeur. Un clic pouvait atterrir sur un
+  bouton qui venait d'être remplacé. Les parties qui ne dépendent que du choix
+  ne sont désormais rebâties que quand le choix change.
+- **Le dépliant s'ouvre sur un champ signalé.** Placé dans `flag()` plutôt que
+  dans `flagMissing()` : c'est le point unique par lequel passent aussi les
+  champs rejetés par la frontière Wasm.
+- **Le tracé en sourdine est émis en une seule polyligne**, non redécoupée par
+  bande : il ne porte aucune information de proximité, seulement une
+  destination.
+- **La jauge affiche bien `(W − w) / 2`**, calculé depuis la largeur du
+  passage lue comme `right_post.inner_edge_x − left_post.inner_edge_x` — et
+  non comme `inner_edge_x × 2`, qui deviendrait faux le jour où les deux
+  montants seront posés indépendamment (défaut connu n° 4 du prototype).
+- **Hiérarchie visuelle mesurée** plutôt que jugée à l'œil : l'élément de
+  décor le plus marqué est à 2,77 de contraste sur le fond du plan, la bande
+  la plus discrète à 5,75. Rien du bâti ne concurrence le tracé.
 
 ## Hors périmètre
 
