@@ -1,5 +1,6 @@
 import type { SceneDto } from "../domain/types";
-import { metres } from "../domain/labels";
+import type { Preferences } from "../i18n/preferences";
+import { length } from "../domain/labels";
 import type { Primitive } from "./primitives";
 import { rectangle } from "./primitives";
 import type { Bounds } from "./projection";
@@ -68,7 +69,10 @@ function leaf(scene: SceneDto, side: 1 | -1): Primitive | null {
  * Mirrors what the domain builds as obstacles, so that what is shown and what
  * is computed cannot drift apart.
  */
-export function sceneToPrimitives(scene: SceneDto): Primitive[] {
+export function sceneToPrimitives(
+  scene: SceneDto,
+  preferences: Preferences,
+): Primitive[] {
   const left = scene.left_post.inner_edge_x;
   const right = scene.right_post.inner_edge_x;
   const leftOuter = left - scene.left_post.width;
@@ -152,14 +156,20 @@ export function sceneToPrimitives(scene: SceneDto): Primitive[] {
       type: "label",
       role: "annotation",
       at: { x: bounds.xMin + 0.3, y: roadEdge + 0.35 },
-      text: `chaussée ${metres(scene.road_width)}`,
+      text: `${preferences.locale === "en" ? "roadway" : "chaussée"} ${length(
+        scene.road_width,
+        "distance",
+        preferences,
+      )}`,
       anchor: "start",
     },
     {
       type: "label",
       role: "annotation",
       at: { x: (left + right) / 2, y: gateDepth(scene) + Math.max(scene.left_post.depth, scene.wall_thickness) + 0.5 },
-      text: `passage libre ${metres(clear)}`,
+      text: `${
+        preferences.locale === "en" ? "clear opening" : "passage libre"
+      } ${length(clear, "dimension", preferences)}`,
       anchor: "middle",
     },
   );

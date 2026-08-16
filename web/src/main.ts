@@ -1,10 +1,14 @@
 import { BANDS } from "./domain/bands";
 import {
-  centimetres,
   confidenceLabel,
   errorMessage,
-  metres,
+  leafTooOpen,
+  length,
+  minRoadResult,
+  missingMeasurements,
   moves,
+  searchProgress,
+  underThreshold,
   verdictDetail,
   verdictHeadline,
   verdictNuance,
@@ -32,6 +36,12 @@ import { renderSvg } from "./render/svg";
 import { createStore } from "./state/store";
 import { arrivesFromTheRight, readRequest, readScene } from "./ui/form";
 import { CANCELLED, SolverClient } from "./worker/client";
+import { text } from "./i18n/dictionary";
+import type { TextKey } from "./i18n/dictionary";
+import type { Preferences } from "./i18n/preferences";
+import { loadPreferences, savePreferences } from "./i18n/preferences";
+import type { Magnitude, UnitSystem } from "./domain/units";
+import { fromDisplay, stepFor, toDisplay, unitOf } from "./domain/units";
 
 const VIEWPORT = { width: 1000, height: 600 };
 const client = new SolverClient();
@@ -41,7 +51,15 @@ const client = new SolverClient();
 // earlier, and the slider was never bounded.
 const probe = new SolverClient();
 
+const preferencesStorage: Pick<globalThis.Storage, "getItem" | "setItem"> =
+  globalThis.localStorage;
+
 const store = createStore({
+  /** Language and units, restored from the last visit or guessed. */
+  preferences: loadPreferences(
+    preferencesStorage,
+    globalThis.navigator?.language,
+  ) as Preferences,
   busy: false,
   /**
    * The judged result, or null when there is nothing to judge.
@@ -63,6 +81,69 @@ const store = createStore({
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
   document.getElementById(id) as T | null;
+
+/* ------------------------------------------------------------------ i18n */
+
+/**
+ * Every numeric field, with what it measures.
+ *
+ * Read from the markup rather than listed here, so a field added to the page
+ * cannot be forgotten by this file — it would show a figure with no unit and
+ * stop converting, silently, which is the worst way to be wrong about a
+ * measurement.
+ */
+function measuredFields(): { input: HTMLInputElement; magnitude: Magnitude }[] {
+  return [...document.querySelectorAll<HTMLInputElement>("input[data-magnitude]")].map(
+    (input) => ({ input, magnitude: input.dataset["magnitude"] as Magnitude }),
+  );
+}
+
+/** Puts the page into one language: labels, placeholders, and the units. */
+function applyLanguage(preferences: Preferences): void {
+  const { locale, units } = preferences;
+
+  for (const node of document.querySelectorAll<HTMLElement>("[data-i18n]")) {
+    node.textContent = text(locale, node.dataset["i18n"] as TextKey);
+  }
+  for (const node of document.querySelectorAll<HTMLElement>("[data-i18n-placeholder]")) {
+    node.setAttribute(
+      "placeholder",
+      text(locale, node.dataset["i18nPlaceholder"] as TextKey),
+    );
+  }
+  for (const node of document.querySelectorAll<HTMLElement>("[data-i18n-aria]")) {
+    node.setAttribute("aria-label", text(locale, node.dataset["i18nAria"] as TextKey));
+  }
+  for (const node of document.querySelectorAll<HTMLElement>("[data-unit]")) {
+    node.textContent = unitOf(node.dataset["unit"] as Magnitude, units);
+  }
+
+  document.documentElement.lang = locale;
+}
+
+/**
+ * Rewrites every measurement into the other system.
+ *
+ * The fields hold what the reader typed, in the unit they typed it in, so the
+ * switch has to convert them — leaving 2.29 in a field now labelled "in"
+ * would silently turn a 2,29 m gateway into a 5,8 cm one. Going through
+ * metres both ways means the stored measurement never changes; only how it
+ * is written does.
+ */
+function convertFields(from: UnitSystem, to: UnitSystem): void {
+  if (from === to) return;
+  for (const { input, magnitude } of measuredFields()) {
+    input.step = String(stepFor(magnitude, to));
+    if (input.value === "") continue;
+    const held = fromDisplay(input.valueAsNumber, magnitude, from);
+    if (Number.isNaN(held)) continue;
+    const shown = toDisplay(held, magnitude, to);
+    // Rounded to the step, so the field shows a figure someone could have
+    // typed rather than the full float of a conversion.
+    const step = stepFor(magnitude, to);
+    input.value = String(Math.round(shown / step) * step);
+  }
+}
 
 /* -------------------------------------------------------------- playback */
 
@@ -134,14 +215,14 @@ function draw(): void {
   let scene: SceneDto;
   let vehicle: VehicleDto;
   try {
-    scene = readScene();
-    vehicle = readRequest().vehicle;
+    scene = readScene(store.get().preferences.units);
+    vehicle = readRequest(store.get().preferences.units).vehicle;
   } catch {
     return;
   }
 
   const projection = projectionFor(boundsFor(scene), VIEWPORT, arrivesFromTheRight());
-  const primitives = [...sceneToPrimitives(scene)];
+  const primitives = [...sceneToPrimitives(scene, store.get().preferences)];
 
   const { alternatives, selected, position } = store.get();
   const current = alternatives[selected];
@@ -153,7 +234,12 @@ function draw(): void {
 
 /* --------------------------------------------------------------- reports */
 
-const BAND_NAMES = ["au large", "vigilance", "proche", "très proche"] as const;
+const BAND_KEYS = [
+  "band.clear",
+  "band.watch",
+  "band.close",
+  "band.tight",
+] as const satisfies readonly TextKey[];
 const BAND_TOKENS = [
   "--color-band-clear",
   "--color-band-watch",
@@ -168,15 +254,31 @@ function renderLegend(show: boolean): void {
     legend.replaceChildren();
     return;
   }
-  legend.innerHTML = `${BAND_NAMES.map((name, i) => {
+  const preferences = store.get().preferences;
+  const english = preferences.locale === "en";
+  const bound = (metres: number) => length(metres, "clearance", preferences);
+
+  legend.innerHTML = `${BAND_KEYS.map((key, i) => {
     const range =
       i === 0
-        ? `plus de ${BANDS[0] * 100} cm`
+        ? english
+          ? `over ${bound(BANDS[0])}`
+          : `plus de ${bound(BANDS[0])}`
         : i === 3
-          ? `moins de ${BANDS[2] * 100} cm`
-          : `${BANDS[i]! * 100} à ${BANDS[i - 1]! * 100} cm`;
-    return `<span class="flex items-center gap-1"><i class="inline-block h-2 w-4 rounded" style="background:var(${BAND_TOKENS[i]})"></i>${name} (${range})</span>`;
-  }).join("")}<span class="flex items-center gap-1"><i class="inline-block h-2 w-4 rounded" style="background:var(--color-overhang)"></i>surplomb du trottoir</span><span class="ml-auto">trait plein : marche avant · pointillé : marche arrière</span>`;
+          ? english
+            ? `under ${bound(BANDS[2])}`
+            : `moins de ${bound(BANDS[2])}`
+          : english
+            ? `${bound(BANDS[i]!)} to ${bound(BANDS[i - 1]!)}`
+            : `${bound(BANDS[i]!)} à ${bound(BANDS[i - 1]!)}`;
+    return `<span class="flex items-center gap-1"><i class="inline-block h-2 w-4 rounded" style="background:var(${BAND_TOKENS[i]})"></i>${text(
+      preferences.locale,
+      key,
+    )} (${range})</span>`;
+  }).join("")}<span class="flex items-center gap-1"><i class="inline-block h-2 w-4 rounded" style="background:var(--color-overhang)"></i>${text(
+    preferences.locale,
+    "legend.overhang",
+  )}</span><span class="ml-auto">${text(preferences.locale, "legend.gears")}</span>`;
 }
 
 function renderStats(maneuver: ManeuverDto): void {
@@ -188,19 +290,26 @@ function renderStats(maneuver: ManeuverDto): void {
        <dd class="mt-0.5 text-lg tabular-nums">${value}</dd>
      </div>`;
 
+  const preferences = store.get().preferences;
+  const room = (m: number) => length(m, "clearance", preferences);
+  const far = (m: number) => length(m, "distance", preferences);
+  const say = (key: TextKey) => text(preferences.locale, key);
+
   // Two clearances, because they answer different questions: the gateway is
   // what the driver asked about, the overall figure may be a curb metres away.
   stats.innerHTML = [
-    card("Manœuvres", String(maneuver.moves)),
-    card("Marge dans le passage", centimetres(maneuver.min_clearance_in_gateway)),
-    card("Marge minimale du trajet", centimetres(maneuver.min_clearance)),
-    card("Distance parcourue", metres(maneuver.distance)),
-    card("Sous 25 cm", metres(maneuver.metres_under_25cm)),
-    card("Sous 10 cm", metres(maneuver.metres_under_10cm)),
+    card(say("stats.moves"), String(maneuver.moves)),
+    card(say("stats.gatewayClearance"), room(maneuver.min_clearance_in_gateway)),
+    card(say("stats.tripClearance"), room(maneuver.min_clearance)),
+    card(say("stats.distance"), far(maneuver.distance)),
+    // The thresholds are shown in the reader's unit too, so the cards and the
+    // legend cannot disagree about where "close" begins.
+    card(underThreshold(BANDS[1], preferences), far(maneuver.metres_under_25cm)),
+    card(underThreshold(BANDS[2], preferences), far(maneuver.metres_under_10cm)),
     // Shown only when it has something to say: a zero on every ordinary
     // trajectory would teach nobody anything.
     ...(maneuver.metres_overhanging > 0
-      ? [card("Surplomb du trottoir", metres(maneuver.metres_overhanging))]
+      ? [card(say("stats.overhang"), far(maneuver.metres_overhanging))]
       : []),
   ].join("");
 }
@@ -234,24 +343,28 @@ function renderGauge(verdict: Verdict | null): void {
   // any edit wipes the verdict, so the widths shown are the widths solved.
   let ceiling: number;
   try {
-    const scene = readScene();
+    const scene = readScene(store.get().preferences.units);
     const opening = scene.right_post.inner_edge_x - scene.left_post.inner_edge_x;
-    ceiling = clearanceCeiling(opening, readRequest().vehicle.mirror_width);
+    ceiling = clearanceCeiling(opening, readRequest(store.get().preferences.units).vehicle.mirror_width);
   } catch {
     gauge.classList.add("hidden");
     return;
   }
 
   gauge.classList.remove("hidden");
+  const preferences = store.get().preferences;
   const value = byId("gauge-value");
-  if (value) value.textContent = centimetres(verdict.clearance);
+  if (value) value.textContent = length(verdict.clearance, "clearance", preferences);
   const marker = byId("gauge-marker");
   if (marker) {
     marker.style.left = `${gaugeFraction(verdict.clearance, ceiling) * 100}%`;
   }
   const top = byId("gauge-ceiling");
   if (top) {
-    top.textContent = `${centimetres(ceiling)} — le maximum possible ici`;
+    top.textContent = `${length(ceiling, "clearance", preferences)} — ${text(
+      preferences.locale,
+      "gauge.ceiling",
+    )}`;
   }
   // The tinted share is where a margin is thin in absolute terms, so it
   // shrinks as the ceiling grows rather than staying a fixed fraction.
@@ -265,7 +378,7 @@ function renderGauge(verdict: Verdict | null): void {
 function renderAlternatives(): void {
   const box = byId("alternatives");
   if (!box) return;
-  const { alternatives, selected } = store.get();
+  const { alternatives, selected, preferences } = store.get();
   if (alternatives.length === 0) {
     box.replaceChildren();
     return;
@@ -280,10 +393,15 @@ function renderAlternatives(): void {
                ? "border-accent bg-accent text-ink"
                : "border-line bg-panel text-fg"
            }">
-           <span class="block text-sm font-medium">${moves(a.moves)}</span>
-           <span class="block text-xs opacity-80">${centimetres(
+           <span class="block text-sm font-medium">${moves(
+             a.moves,
+             preferences.locale,
+           )}</span>
+           <span class="block text-xs opacity-80">${length(
              a.min_clearance_in_gateway,
-           )} · ${confidenceLabel(a.confidence)}</span>
+             "clearance",
+             preferences,
+           )} · ${confidenceLabel(a.confidence, preferences.locale)}</span>
          </button>`,
     )
     .join("");
@@ -308,19 +426,25 @@ let shownAlternatives: readonly ManeuverDto[] | null = null;
 let shownSelected = -1;
 
 store.subscribe(() => {
-  const { outcome, message, alternatives, selected, busy, progress, playing } =
+  const { outcome, message, alternatives, selected, busy, progress, playing, preferences } =
     store.get();
 
   // The headline answers the question; the nuance qualifies it without
   // contradicting it. A free-form message has no headline — it is not an
   // answer — and takes the detail line on its own.
   const headline = byId("verdict-headline");
-  if (headline) headline.textContent = outcome ? verdictHeadline(outcome) : "";
+  if (headline) {
+    headline.textContent = outcome ? verdictHeadline(outcome, preferences.locale) : "";
+  }
   const nuance = byId("verdict-nuance");
-  if (nuance) nuance.textContent = outcome ? (verdictNuance(outcome) ?? "") : "";
+  if (nuance) {
+    nuance.textContent = outcome
+      ? (verdictNuance(outcome, preferences.locale) ?? "")
+      : "";
+  }
   const detail = byId("verdict-detail");
   if (detail) {
-    detail.textContent = outcome ? verdictDetail(outcome) : message;
+    detail.textContent = outcome ? verdictDetail(outcome, preferences) : message;
     // A message is the interface speaking, and often a refusal: it would go
     // unread in the muted grey the detail line uses.
     detail.classList.toggle("text-dim", Boolean(outcome));
@@ -334,7 +458,9 @@ store.subscribe(() => {
   if (note) note.textContent = progress;
 
   const run = byId("run");
-  if (run) run.textContent = busy ? "Arrêter" : "Calculer";
+  if (run) {
+    run.textContent = text(preferences.locale, busy ? "action.stop" : "action.compute");
+  }
 
   const current = alternatives[selected];
 
@@ -429,8 +555,9 @@ const FIELD_INPUTS: Record<string, string> = {
  * to that value is what makes it mean something.
  */
 function renderPlayback(): void {
-  const { alternatives, selected, position, playing } = store.get();
+  const { alternatives, selected, position, playing, preferences } = store.get();
   const current = alternatives[selected];
+  const say = (key: TextKey) => text(preferences.locale, key);
 
   const button = byId<HTMLButtonElement>("play");
   if (button) button.disabled = !current;
@@ -438,11 +565,9 @@ function renderPlayback(): void {
   const label = byId("play-label");
   if (glyph) glyph.textContent = playing ? "❚❚" : "▶";
   if (label) {
-    label.textContent = playing
-      ? "Pause"
-      : stillnessWanted()
-        ? "Montrer l'épure"
-        : "Lire la manœuvre";
+    label.textContent = say(
+      playing ? "play.pause" : stillnessWanted() ? "play.still" : "play.play",
+    );
   }
 
   const percent = byId("scrub-label");
@@ -459,7 +584,7 @@ function renderPlayback(): void {
   const pose = current.poses[poseAt(timelineOf(current.poses), position)]!;
   if (gear) {
     gear.classList.remove("hidden");
-    gear.textContent = pose.reverse ? "ARRIÈRE" : "AVANT";
+    gear.textContent = say(pose.reverse ? "gear.reverse" : "gear.forward");
     // Reverse wears white, from the vehicle's own reversing lamps; forward
     // wears the accent. The trace keeps the proximity colours, so the gear is
     // read on the vehicle and here, never on the path.
@@ -467,7 +592,7 @@ function renderPlayback(): void {
     gear.classList.toggle("bg-accent", !pose.reverse);
     gear.classList.add("text-ink");
   }
-  if (live) live.textContent = centimetres(pose.clearance);
+  if (live) live.textContent = length(pose.clearance, "clearance", preferences);
 }
 
 /** Marks or clears one input as needing attention. */
@@ -596,7 +721,7 @@ async function syncMaxAngle(): Promise<void> {
     return;
   }
   try {
-    const radians = await probe.maxGateAngle(readScene());
+    const radians = await probe.maxGateAngle(readScene(store.get().preferences.units));
     const degrees = Math.round((radians * 180) / Math.PI);
     store.set({ maxAngleDegrees: degrees });
     slider.max = String(degrees);
@@ -637,6 +762,54 @@ form?.addEventListener("change", () => {
   draw();
 });
 
+/**
+ * Adopts a new language or unit system.
+ *
+ * The result on screen was computed and written in the old one, so it is
+ * cleared rather than relabelled: converting a finished verdict would be
+ * fine, but converting the search that produced it would not, and a verdict
+ * whose figures no longer match the form beside it is worse than none.
+ */
+function adopt(next: Preferences): void {
+  const previous = store.get().preferences;
+  if (previous.locale === next.locale && previous.units === next.units) return;
+
+  convertFields(previous.units, next.units);
+  store.set({ preferences: next });
+  savePreferences(next, preferencesStorage);
+  applyLanguage(next);
+  clearResult();
+  void syncMaxAngle();
+  draw();
+}
+
+/** True once the visitor has set the units themselves. */
+let unitsChosen = false;
+
+byId<HTMLSelectElement>("locale")?.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement)) return;
+  const locale = target.value as Preferences["locale"];
+  // Choosing English moves the units to imperial, once, as a first guess —
+  // and only from the untouched default. Someone who has already set the
+  // units has said what they want, and is not overruled by a language change.
+  const units =
+    locale === "en" && !unitsChosen ? "us" : store.get().preferences.units;
+  adopt({ locale, units });
+  const control = byId<HTMLSelectElement>("units");
+  if (control) control.value = units;
+});
+
+byId<HTMLSelectElement>("units")?.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement)) return;
+  unitsChosen = true;
+  adopt({
+    locale: store.get().preferences.locale,
+    units: target.value as Preferences["units"],
+  });
+});
+
 byId("play")?.addEventListener("click", () => {
   if (store.get().playing) stopPlaying();
   else startPlaying();
@@ -666,21 +839,23 @@ form?.addEventListener("submit", async (event) => {
   // silently queueing another one.
   if (store.get().busy) {
     client.cancel();
-    store.set({ busy: false, message: "Calcul interrompu.", progress: "" });
+    store.set({
+      busy: false,
+      message: text(store.get().preferences.locale, "msg.interrupted"),
+      progress: "",
+    });
     return;
   }
   // The slider is bounded by max_gate_angle, but a bound that fails silently
   // would let someone compute a scene where the leaf passes through its own
   // post — an answer that means nothing. Refuse rather than pretend.
-  const requested = readScene();
+  const requested = readScene(store.get().preferences.units);
   const { maxAngleDegrees } = store.get();
   if (requested.gate.kind === "swinging" && maxAngleDegrees !== null) {
     const degrees = (requested.gate.open_angle * 180) / Math.PI;
     if (degrees > maxAngleDegrees + 0.5) {
       store.set({
-        message:
-          `Un vantail ne peut pas s'ouvrir à ${degrees.toFixed(0)}° avec cet axe : ` +
-          `il traverserait le pilier. Le maximum est ${maxAngleDegrees}°.`,
+        message: leafTooOpen(degrees, maxAngleDegrees, store.get().preferences.locale),
       });
       return;
     }
@@ -692,10 +867,7 @@ form?.addEventListener("submit", async (event) => {
   const missing = flagMissing();
   if (missing > 0) {
     store.set({
-      message:
-        missing === 1
-          ? "Une mesure manque, signalée en rouge dans le formulaire."
-          : `${missing} mesures manquent, signalées en rouge dans le formulaire.`,
+      message: missingMeasurements(missing, store.get().preferences.locale),
       alternatives: [],
     });
     return;
@@ -709,7 +881,7 @@ form?.addEventListener("submit", async (event) => {
   // not otherwise fit.
   const refusal = refuseOnWidth(
     requested.right_post.inner_edge_x - requested.left_post.inner_edge_x,
-    readRequest().vehicle.mirror_width,
+    readRequest(store.get().preferences.units).vehicle.mirror_width,
   );
   if (refusal) {
     store.set({ outcome: refusal, message: "", alternatives: [], busy: false });
@@ -723,22 +895,21 @@ form?.addEventListener("submit", async (event) => {
     busy: true,
     outcome: null,
     message: "",
-    progress: "Calcul des trajectoires en une manœuvre…",
+    progress: text(store.get().preferences.locale, "msg.firstPass"),
     alternatives: [],
   });
 
   try {
     const response = await client.solve(
-      readRequest(),
-      (moves, expanded, budget) => {
-        // "Situations" rather than nodes: what the planner counts is the
-        // vehicle placed somewhere, facing some way, in some gear. And the
-        // ceiling is named, because a running count without its scale says
-        // nothing about where this ends.
-        const count = expanded.toLocaleString("fr-FR");
-        const ceiling = budget.toLocaleString("fr-FR");
+      readRequest(store.get().preferences.units),
+      (moveCount, expanded, budget) => {
         store.set({
-          progress: `Calcul des trajectoires en ${moves} manœuvres — ${count} situations essayées sur ${ceiling} au plus`,
+          progress: searchProgress(
+            moveCount,
+            expanded,
+            budget,
+            store.get().preferences.locale,
+          ),
         });
       },
     );
@@ -758,7 +929,7 @@ form?.addEventListener("submit", async (event) => {
       // say the same thing.
       const input = error.field ? FIELD_INPUTS[error.field] : undefined;
       if (input) flag(input, true);
-      store.set({ message: errorMessage(error) });
+      store.set({ message: errorMessage(error, store.get().preferences.locale) });
     }
   } finally {
     // Only clear the flag if nothing took over in the meantime.
@@ -770,32 +941,40 @@ byId("run-min-road")?.addEventListener("click", async () => {
   const absent = flagMissing();
   if (absent > 0) {
     store.set({
-      message:
-        absent === 1
-          ? "Une mesure manque, signalée en rouge dans le formulaire."
-          : `${absent} mesures manquent, signalées en rouge dans le formulaire.`,
+      message: missingMeasurements(absent, store.get().preferences.locale),
     });
     return;
   }
-  store.set({ busy: true, message: "Recherche de la chaussée minimale…", outcome: null });
+  store.set({
+    busy: true,
+    message: text(store.get().preferences.locale, "msg.minRoadSearching"),
+    outcome: null,
+  });
   try {
-    const width = await client.minRoad(readRequest());
-    store.set({
-      message:
-        width === null
-          ? "Aucune largeur de chaussée ne permet l'entrée en un mouvement : le passage lui-même est bloquant."
-          : `Il faut au minimum ${metres(width)} de chaussée pour entrer en un seul mouvement.`,
-    });
+    const width = await client.minRoad(readRequest(store.get().preferences.units));
+    store.set({ message: minRoadResult(width, store.get().preferences) });
   } catch (thrown) {
     const error = thrown as ErrorDto;
     if (error.code !== CANCELLED) {
       const input = error.field ? FIELD_INPUTS[error.field] : undefined;
       if (input) flag(input, true);
-      store.set({ message: errorMessage(error) });
+      store.set({ message: errorMessage(error, store.get().preferences.locale) });
     }
   } finally {
     store.set({ busy: client.busy });
   }
 });
+
+// The page ships in French with metric fields; the first thing to do is put
+// it into whatever was chosen last time, or guessed from the browser.
+{
+  const initial = store.get().preferences;
+  const locale = byId<HTMLSelectElement>("locale");
+  if (locale) locale.value = initial.locale;
+  const units = byId<HTMLSelectElement>("units");
+  if (units) units.value = initial.units;
+  convertFields("metric", initial.units);
+  applyLanguage(initial);
+}
 
 draw();
