@@ -87,12 +87,17 @@
               <span id="vehicle-missing" class="text-band-tight"></span>
             </summary>
             <div class="mt-3 grid grid-cols-2 gap-2.5">
-              <label class="col-span-2 grid gap-1">
-                <span class="text-xs text-dim" data-i18n="field.mirrors"></span>
-                <select id="mirrors-state" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
-                  <option value="out" data-i18n="mirrors.out"></option>
-                  <option value="folded" data-i18n="mirrors.folded"></option>
-                </select>
+              <!-- A checkbox, not a choice of two: mirrors out is the state a
+                   car is in, and folding them is the thing you decide to do.
+                   Unchecked is therefore the honest default — it is also the
+                   wider figure, so the default never flatters the result. -->
+              <label class="col-span-2 flex items-center gap-2">
+                <input
+                  id="mirrors-folded"
+                  type="checkbox"
+                  class="size-4 accent-accent"
+                />
+                <span class="text-xs text-dim" data-i18n="mirrors.folded"></span>
               </label>
               <label class="grid gap-1">
                 <span class="text-xs text-dim">

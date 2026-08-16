@@ -58,8 +58,6 @@ export interface Texts {
   "side.fromRight": string;
 
   "group.vehicleSizes": string;
-  "field.mirrors": string;
-  "mirrors.out": string;
   "mirrors.folded": string;
   "field.radius": string;
   "field.wheelbase": string;
@@ -153,9 +151,7 @@ const FR: Texts = {
   "side.fromRight": "Par la droite",
 
   "group.vehicleSizes": "Cotes du véhicule",
-  "field.mirrors": "Rétroviseurs",
-  "mirrors.out": "Déployés",
-  "mirrors.folded": "Rabattus",
+  "mirrors.folded": "Rétroviseurs rabattus",
   "field.radius": "Rayon de pivot",
   "field.wheelbase": "Empattement",
   "field.length": "Longueur totale",
@@ -246,9 +242,7 @@ const EN: Texts = {
   "side.fromRight": "From the right",
 
   "group.vehicleSizes": "Vehicle measurements",
-  "field.mirrors": "Mirrors",
-  "mirrors.out": "Extended",
-  "mirrors.folded": "Folded",
+  "mirrors.folded": "Mirrors folded",
   "field.radius": "Pivot radius",
   "field.wheelbase": "Wheelbase",
   "field.length": "Overall length",

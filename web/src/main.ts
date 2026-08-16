@@ -516,11 +516,11 @@ function clearResult(): void {
 /**
  * Every numeric input a simulation needs filled.
  *
- * `mirror-width-folded` is absent on purpose: it only matters when the
- * mirrors are set to folded, and demanding it otherwise would flag a field
- * the run does not read.
+ * `mirror-width-folded` is absent here on purpose: it only matters when the
+ * mirrors are folded, and demanding it otherwise would flag a field the run
+ * does not read. [`requiredInputs`] adds it when the box is ticked.
  */
-const REQUIRED_INPUTS: readonly string[] = [
+const ALWAYS_REQUIRED: readonly string[] = [
   "opening",
   "post-depth",
   "post-width",
@@ -537,6 +537,20 @@ const REQUIRED_INPUTS: readonly string[] = [
   "ground-clearance",
   "mirror-width",
 ];
+
+/**
+ * The measurements this particular run needs.
+ *
+ * Folding the mirrors swaps which width is read, so it also swaps which one
+ * has to be there. Several vehicles in the table have no folded figure — the
+ * EV5's was left out because 1,850 m across a 1,875 m body cannot be right —
+ * and ticking the box would otherwise send a NaN across the boundary and come
+ * back with a rejection naming a field nobody was asked to fill.
+ */
+function requiredInputs(): readonly string[] {
+  const folded = byId<HTMLInputElement>("mirrors-folded")?.checked ?? false;
+  return folded ? [...ALWAYS_REQUIRED, "mirror-width-folded"] : ALWAYS_REQUIRED;
+}
 
 /** Maps a field name the boundary rejects to the input that holds it. */
 const FIELD_INPUTS: Record<string, string> = {
@@ -620,7 +634,7 @@ function flag(id: string, missing: boolean): void {
  */
 function flagMissing(): number {
   let missing = 0;
-  for (const id of REQUIRED_INPUTS) {
+  for (const id of requiredInputs()) {
     const input = byId<HTMLInputElement>(id);
     const empty = !input || Number.isNaN(input.valueAsNumber);
     if (empty) missing += 1;
@@ -673,7 +687,7 @@ function renderRearOverhang(): void {
 function openWhatIsMissing(): void {
   const missing = new Set<HTMLElement>();
   let count = 0;
-  for (const id of REQUIRED_INPUTS) {
+  for (const id of requiredInputs()) {
     const input = byId<HTMLInputElement>(id);
     if (!input || !Number.isNaN(input.valueAsNumber)) continue;
     count += 1;
@@ -867,7 +881,7 @@ function fillPresets(): void {
     if (event.target !== field && !list.contains(event.target as Node)) close();
   });
 
-  for (const id of REQUIRED_INPUTS) {
+  for (const id of requiredInputs()) {
     byId<HTMLInputElement>(id)?.addEventListener("input", () => {
       const input = byId<HTMLInputElement>(id);
       flag(id, !input || Number.isNaN(input.valueAsNumber));
