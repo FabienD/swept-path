@@ -6,198 +6,256 @@
     <title>Épure de giration — swept-path</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body class="min-h-dvh bg-stone-50 text-stone-900">
-    <main class="mx-auto max-w-5xl px-4 py-8">
-      <h1 class="text-2xl font-semibold tracking-tight">Épure de giration</h1>
-      <p class="mt-2 max-w-2xl text-stone-600">
-        Vérifie si un véhicule peut franchir un passage étroit — portail,
-        entrée de cour, box de parking — et en combien de manœuvres.
-      </p>
+  <body class="min-h-dvh bg-ink text-fg">
+    <div class="hazard-band"></div>
 
-      <form id="params" class="mt-8 grid gap-6">
-        <fieldset class="grid gap-3 sm:grid-cols-4">
-          <legend class="mb-2 text-sm font-medium text-stone-700">Le passage</legend>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Type</span>
-            <select id="gate-kind" class="rounded border border-stone-300 px-3 py-2">
-              <option value="sliding">Coulissant ou sans portail</option>
-              <option value="swinging">Battant</option>
-            </select>
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Passage entre piliers</span>
-            <input id="opening" type="number" min="0" step="0.01" value="2.40" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Profondeur des piliers</span>
-            <input id="post-depth" type="number" min="0" step="0.01" value="0.55" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Largeur des piliers</span>
-            <input id="post-width" type="number" min="0" step="0.01" value="0.55" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Épaisseur des murets</span>
-            <input id="wall" type="number" min="0" step="0.01" value="0.30" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-        </fieldset>
+    <!-- Two panes: what you measure on the left, what it gives you on the
+         right. Below 820 px they stack, plan first — the answer should not
+         sit under twenty inputs on a phone. -->
+    <main class="grid lg:grid-cols-[300px_minmax(0,1fr)]">
+      <!-- ─────────────────────────── settings ─────────────────────────── -->
+      <aside class="order-2 border-line bg-panel p-5 lg:order-1 lg:min-h-dvh lg:border-r">
+        <h1 class="text-xs tracking-[0.18em] text-dim uppercase">
+          Épure <b class="font-semibold text-accent">de giration</b>
+        </h1>
+        <p class="mt-3 text-sm text-dim">
+          Ce véhicule franchit-il ce passage, et en combien de manœuvres.
+        </p>
 
-        <fieldset id="leaf-box" class="hidden grid-cols-2 gap-3 sm:grid-cols-4">
-          <legend class="mb-2 text-sm font-medium text-stone-700">Les vantaux</legend>
+        <form id="params" class="mt-5 grid gap-3">
           <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Longueur d'un vantail</span>
-            <input id="leaf-length" type="number" min="0" step="0.01" value="1.15" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Épaisseur du vantail</span>
-            <input id="leaf-thickness" type="number" min="0" step="0.001" value="0.04" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Écartement de l'axe</span>
-            <input id="hinge-offset" type="number" min="0" step="0.001" value="0.035" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Position de l'axe (%)</span>
-            <input id="hinge-depth" type="number" step="5" min="0" max="100" value="50" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1 sm:col-span-4">
-            <span class="text-sm text-stone-600">
-              Angle d'ouverture — <span id="angle-value">93</span>°
-              <span id="angle-max" class="ml-2 text-stone-500"></span>
-            </span>
-            <input id="open-angle" type="range" min="70" max="180" step="1" value="93" class="w-full" />
-          </label>
-        </fieldset>
-
-        <fieldset class="grid gap-3 sm:grid-cols-4">
-          <legend class="mb-2 text-sm font-medium text-stone-700">La voirie</legend>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Largeur du trottoir</span>
-            <input id="sidewalk" type="number" min="0" step="0.01" value="1.30" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Largeur du bateau</span>
-            <input id="curb" type="number" min="0" step="0.01" value="3.20" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Largeur de chaussée</span>
-            <input id="road" type="number" min="0" step="0.01" value="5.90" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Hauteur de bordure</span>
-            <input id="curb-height" type="number" min="0" step="0.01" value="0.12" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Sens d'arrivée</span>
-            <select id="side" class="rounded border border-stone-300 px-3 py-2">
-              <option value="1">Par la gauche</option>
-              <option value="-1">Par la droite</option>
-            </select>
-          </label>
-        </fieldset>
-
-        <fieldset class="grid gap-3 sm:grid-cols-4">
-          <legend class="mb-2 text-sm font-medium text-stone-700">Le véhicule</legend>
-          <label class="grid gap-1 sm:col-span-2">
-            <span class="text-sm text-stone-600">Modèle</span>
+            <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase">Véhicule</span>
             <input
               id="preset-search"
               type="search"
               placeholder="Filtrer — marque ou modèle"
-              class="rounded border border-stone-300 px-3 py-2"
+              class="rounded border border-line bg-plan px-2 py-1.5 text-sm"
             />
-            <select id="preset" class="rounded border border-stone-300 px-3 py-2"></select>
-            <p id="preset-note" class="text-sm text-stone-500"></p>
+            <select id="preset" class="rounded border border-line bg-plan px-2 py-1.5 text-sm"></select>
+            <span id="preset-note" class="text-xs text-dim"></span>
           </label>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <label class="grid gap-1">
+              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase">Passage m</span>
+              <input id="opening" type="number" min="0" step="0.01" value="2.40" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase">Chaussée m</span>
+              <input id="road" type="number" min="0" step="0.01" value="5.90" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase">Trottoir m</span>
+              <input id="sidewalk" type="number" min="0" step="0.01" value="1.30" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase">Piliers m</span>
+              <input id="post-width" type="number" min="0" step="0.01" value="0.55" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+          </div>
+
           <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Rétroviseurs</span>
-            <select id="mirrors-state" class="rounded border border-stone-300 px-3 py-2">
-              <option value="out">Déployés</option>
-              <option value="folded">Rabattus</option>
+            <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase">Portail</span>
+            <select id="gate-kind" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
+              <option value="sliding">Coulissant</option>
+              <option value="swinging">Battants</option>
             </select>
           </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">
-              Rayon de pivot
-              <span id="radius-note" class="text-stone-500"></span>
-            </span>
-            <input id="radius" type="number" min="0" step="0.001" value="3.59" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Empattement</span>
-            <input id="wheelbase" type="number" min="0" step="0.001" value="2.580" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Longueur totale</span>
-            <input id="length" type="number" min="0" step="0.001" value="4.190" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Porte-à-faux avant</span>
-            <input id="front-overhang" type="number" min="0" step="0.001" value="0.850" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Largeur caisse</span>
-            <input id="body-width" type="number" min="0" step="0.001" value="1.825" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Garde au sol</span>
-            <input id="ground-clearance" type="number" min="0" step="0.001" value="0.180" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Largeur rétros déployés</span>
-            <input id="mirror-width" type="number" min="0" step="0.001" value="2.029" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-          <label class="grid gap-1">
-            <span class="text-sm text-stone-600">Rétros rabattus</span>
-            <input id="mirror-width-folded" type="number" min="0" step="0.001" value="1.865" class="rounded border border-stone-300 px-3 py-2" />
-          </label>
-        </fieldset>
 
-        <div class="flex flex-wrap items-center gap-3">
-          <button id="run" type="submit" class="rounded bg-stone-900 px-4 py-2 text-stone-50">
-            Rechercher l'entrée
+          <button id="run" type="submit" class="mt-1 rounded bg-accent px-4 py-2 text-sm font-bold text-ink">
+            Calculer
           </button>
-          <button id="run-min-road" type="button" class="rounded border border-stone-400 px-4 py-2">
-            Chaussée minimale
-          </button>
-          <label class="flex items-center gap-2 text-sm text-stone-700">
-            <span>Sens</span>
-            <select id="direction" class="rounded border border-stone-300 px-2 py-1">
-              <option value="any">Avant ou arrière</option>
-              <option value="forward">Marche avant seulement</option>
-              <option value="reverse">Marche arrière seulement</option>
-            </select>
-          </label>
+
+          <!-- Everything you do not measure with a tape on your own gate. It
+               opens itself when one of its fields is flagged: a message
+               pointing at a field nobody can see is worse than no message. -->
+          <details id="fine-settings" class="mt-1 border-t border-line pt-3">
+            <summary class="cursor-pointer text-xs text-dim marker:text-accent">
+              Réglages fins
+            </summary>
+
+            <div class="mt-3 grid gap-3">
+              <fieldset id="leaf-box" class="hidden gap-2.5">
+                <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase">Les vantaux</legend>
+                <div class="grid grid-cols-2 gap-2.5">
+                  <label class="grid gap-1">
+                    <span class="text-xs text-dim">Longueur</span>
+                    <input id="leaf-length" type="number" min="0" step="0.01" value="1.15" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                  </label>
+                  <label class="grid gap-1">
+                    <span class="text-xs text-dim">Épaisseur</span>
+                    <input id="leaf-thickness" type="number" min="0" step="0.001" value="0.04" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                  </label>
+                  <label class="grid gap-1">
+                    <span class="text-xs text-dim">Écartement de l'axe</span>
+                    <input id="hinge-offset" type="number" min="0" step="0.001" value="0.035" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                  </label>
+                  <label class="grid gap-1">
+                    <span class="text-xs text-dim">Position de l'axe %</span>
+                    <input id="hinge-depth" type="number" step="5" min="0" max="100" value="50" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                  </label>
+                </div>
+                <label class="mt-2 grid gap-1">
+                  <span class="text-xs text-dim">
+                    Ouverture — <span id="angle-value">93</span>°
+                    <span id="angle-max" class="ml-1 text-dim"></span>
+                  </span>
+                  <input id="open-angle" type="range" min="70" max="180" step="1" value="93" class="w-full accent-accent" />
+                </label>
+              </fieldset>
+
+              <fieldset class="grid grid-cols-2 gap-2.5">
+                <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase">Le passage</legend>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Profondeur des piliers</span>
+                  <input id="post-depth" type="number" min="0" step="0.01" value="0.55" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Épaisseur des murets</span>
+                  <input id="wall" type="number" min="0" step="0.01" value="0.30" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+              </fieldset>
+
+              <fieldset class="grid grid-cols-2 gap-2.5">
+                <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase">La voirie</legend>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Largeur du bateau</span>
+                  <input id="curb" type="number" min="0" step="0.01" value="3.20" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Hauteur de bordure</span>
+                  <input id="curb-height" type="number" min="0" step="0.01" value="0.12" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+                <label class="col-span-2 grid gap-1">
+                  <span class="text-xs text-dim">Sens d'arrivée</span>
+                  <select id="side" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
+                    <option value="left">Le portail est à droite</option>
+                    <option value="right">Le portail est à gauche</option>
+                  </select>
+                </label>
+              </fieldset>
+
+              <fieldset class="grid grid-cols-2 gap-2.5">
+                <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase">Le véhicule</legend>
+                <label class="col-span-2 grid gap-1">
+                  <span class="text-xs text-dim">Rétroviseurs</span>
+                  <select id="mirrors-state" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
+                    <option value="out">Déployés</option>
+                    <option value="folded">Rabattus</option>
+                  </select>
+                </label>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">
+                    Rayon de pivot <span id="radius-note" class="text-dim"></span>
+                  </span>
+                  <input id="radius" type="number" min="0" step="0.001" value="3.59" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Empattement</span>
+                  <input id="wheelbase" type="number" min="0" step="0.001" value="2.580" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Longueur totale</span>
+                  <input id="length" type="number" min="0" step="0.001" value="4.190" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Porte-à-faux avant</span>
+                  <input id="front-overhang" type="number" min="0" step="0.001" value="0.850" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Largeur caisse</span>
+                  <input id="body-width" type="number" min="0" step="0.001" value="1.825" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Garde au sol</span>
+                  <input id="ground-clearance" type="number" min="0" step="0.001" value="0.180" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Rétros déployés</span>
+                  <input id="mirror-width" type="number" min="0" step="0.001" value="2.029" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Rétros rabattus</span>
+                  <input id="mirror-width-folded" type="number" min="0" step="0.001" value="1.865" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+              </fieldset>
+
+              <fieldset class="grid gap-2.5">
+                <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase">La recherche</legend>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">Sens de marche</span>
+                  <select id="direction" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
+                    <option value="any">Avant ou arrière</option>
+                    <option value="forward">Marche avant seulement</option>
+                    <option value="reverse">Marche arrière seulement</option>
+                  </select>
+                </label>
+                <button id="run-min-road" type="button" class="rounded border border-line px-3 py-1.5 text-xs text-dim">
+                  Chaussée minimale
+                </button>
+              </fieldset>
+            </div>
+          </details>
+        </form>
+      </aside>
+
+      <!-- ───────────────────────────── plan ───────────────────────────── -->
+      <section class="order-1 min-w-0 p-5 lg:order-2">
+        <div class="flex flex-wrap items-end gap-x-10 gap-y-4">
+          <output id="verdict" class="block">
+            <span id="verdict-headline" class="block text-3xl leading-none font-extrabold tracking-tight"></span>
+            <span id="verdict-nuance" class="block text-3xl leading-none font-extrabold tracking-tight text-accent"></span>
+          </output>
+
+          <!-- The gauge. A margin without its ceiling is a figure without a
+               scale, and this tool knows the ceiling exactly. -->
+          <div id="gauge" class="hidden min-w-[220px] flex-1">
+            <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase">Marge la plus étroite</span>
+            <div id="gauge-value" class="text-2xl leading-none font-extrabold tracking-tight text-accent tabular-nums"></div>
+            <div class="gauge-track relative mt-1.5 h-[5px] rounded">
+              <i id="gauge-marker" class="absolute -top-1 h-[13px] w-[2.5px] bg-fg" style="left: 0%"></i>
+            </div>
+            <div class="mt-1 flex justify-between text-[0.6rem] text-dim tabular-nums">
+              <span>0</span>
+              <span id="gauge-ceiling"></span>
+            </div>
+          </div>
         </div>
-      </form>
 
-      <output id="verdict" class="mt-8 block text-stone-800"></output>
-      <div id="progress" class="mt-2 hidden">
-        <div class="h-1 w-full overflow-hidden rounded bg-stone-200">
-          <div class="h-full w-1/3 animate-[sweep_1.1s_ease-in-out_infinite] rounded bg-stone-500"></div>
+        <p id="verdict-detail" class="mt-3 max-w-3xl text-sm text-dim"></p>
+
+        <div id="progress" class="mt-3 hidden max-w-3xl">
+          <div class="h-1 w-full overflow-hidden rounded bg-line">
+            <div class="h-full w-1/3 animate-[sweep_1.1s_ease-in-out_infinite] rounded bg-accent"></div>
+          </div>
+          <p id="progress-note" class="mt-1 text-xs text-dim"></p>
         </div>
-        <p id="progress-note" class="mt-1 text-sm text-stone-500"></p>
-      </div>
-      <div id="alternatives" class="mt-4 flex flex-wrap gap-2"></div>
-      <dl id="stats" class="mt-4 grid gap-3 sm:grid-cols-3"></dl>
 
-      <figure class="mt-6">
-        <svg
-          id="plan"
-          viewBox="0 0 1000 600"
-          class="w-full rounded border border-stone-200 bg-white"
-          role="img"
-          aria-label="Vue en plan de la manœuvre"
-        ></svg>
-        <figcaption id="legend" class="mt-2 flex flex-wrap gap-4 text-xs text-stone-600"></figcaption>
-      </figure>
+        <figure class="mt-4">
+          <div class="overflow-hidden rounded-lg border border-line">
+            <svg
+              id="plan"
+              viewBox="0 0 1000 600"
+              class="w-full bg-plan"
+              role="img"
+              aria-label="Vue en plan de la manœuvre"
+            ></svg>
 
-      <label class="mt-4 grid gap-1">
-        <span class="text-sm text-stone-600">
-          Position sur le trajet — <span id="scrub-label">100 %</span>
-        </span>
-        <input id="scrub" type="range" min="0" max="100" value="100" step="1" disabled class="w-full" />
-      </label>
+            <!-- The playback bar. It is the scrubber today; the play button
+                 lands with the next batch. -->
+            <div class="flex flex-wrap items-center gap-3 border-t border-line bg-panel px-3 py-2">
+              <label class="flex flex-1 items-center gap-3 text-xs text-dim">
+                <span class="whitespace-nowrap">Position — <span id="scrub-label" class="tabular-nums">100 %</span></span>
+                <input id="scrub" type="range" min="0" max="100" value="100" step="1" disabled class="w-full flex-1 accent-accent" />
+              </label>
+            </div>
+          </div>
+          <figcaption id="legend" class="mt-2 flex flex-wrap gap-4 text-xs text-dim"></figcaption>
+        </figure>
+
+        <div id="alternatives" class="mt-4 flex flex-wrap gap-2"></div>
+        <dl id="stats" class="mt-4 grid gap-3 sm:grid-cols-3"></dl>
+      </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

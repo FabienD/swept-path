@@ -5,9 +5,14 @@ import {
   errorMessage,
   metres,
   moves,
+  verdictDetail,
+  verdictHeadline,
+  verdictNuance,
 } from "./domain/labels";
 import type { ErrorDto, ManeuverDto, SceneDto, VehicleDto } from "./domain/types";
 import { VEHICLES, searchVehicles, vehicleById } from "./domain/vehicles";
+import type { Verdict } from "./domain/verdict";
+import { clearanceCeiling, gaugeFraction, verdictOf } from "./domain/verdict";
 import { pathToPrimitives } from "./render/path";
 import { projectionFor } from "./render/projection";
 import { boundsFor, sceneToPrimitives } from "./render/scene";
@@ -26,7 +31,16 @@ const probe = new SolverClient();
 
 const store = createStore({
   busy: false,
-  verdict: "",
+  /**
+   * The judged result, or null when there is nothing to judge.
+   *
+   * Kept apart from `message`: one is an answer to the question asked, the
+   * other is the interface talking about itself — "calcul en cours", a
+   * rejected measurement, the minimum carriageway. Showing them in the same
+   * slot is what made every state look equally important.
+   */
+  outcome: null as Verdict | null,
+  message: "",
   progress: "",
   alternatives: [] as ManeuverDto[],
   selected: 0,
@@ -96,9 +110,9 @@ function renderStats(maneuver: ManeuverDto): void {
   const stats = byId("stats");
   if (!stats) return;
   const card = (key: string, value: string) =>
-    `<div class="rounded border border-stone-200 bg-white px-3 py-2">
-       <dt class="text-xs uppercase tracking-wide text-stone-500">${key}</dt>
-       <dd class="mt-0.5 text-lg">${value}</dd>
+    `<div class="rounded border border-line bg-panel px-3 py-2">
+       <dt class="text-xs uppercase tracking-wide text-dim">${key}</dt>
+       <dd class="mt-0.5 text-lg tabular-nums">${value}</dd>
      </div>`;
 
   // Two clearances, because they answer different questions: the gateway is
@@ -118,6 +132,63 @@ function renderStats(maneuver: ManeuverDto): void {
   ].join("");
 }
 
+/**
+ * Clearance below which a computed margin is not worth trusting, in metres.
+ *
+ * ARBITRARY. The tinted share of the gauge, and the order of magnitude below
+ * which the figure no longer survives how accurately anyone measures their
+ * own gateway with a tape.
+ */
+const UNTRUSTWORTHY_M = 0.015;
+
+/**
+ * Places the margin on a scale that ends at the most the geometry allows.
+ *
+ * `(W − w) / 2` is the ceiling whatever the trajectory — the project's main
+ * conclusion. Without it, "4,5 cm" is a figure with no scale: the reader
+ * cannot tell whether it is nearly all that was available or a third of it.
+ */
+function renderGauge(verdict: Verdict | null): void {
+  const gauge = byId("gauge");
+  if (!gauge) return;
+
+  if (!verdict || verdict.outcome !== "passes") {
+    gauge.classList.add("hidden");
+    return;
+  }
+
+  // Read from the form, which `clearResult` keeps in step with the result:
+  // any edit wipes the verdict, so the widths shown are the widths solved.
+  let ceiling: number;
+  try {
+    const scene = readScene();
+    const opening = scene.right_post.inner_edge_x - scene.left_post.inner_edge_x;
+    ceiling = clearanceCeiling(opening, readRequest().vehicle.mirror_width);
+  } catch {
+    gauge.classList.add("hidden");
+    return;
+  }
+
+  gauge.classList.remove("hidden");
+  const value = byId("gauge-value");
+  if (value) value.textContent = centimetres(verdict.clearance);
+  const marker = byId("gauge-marker");
+  if (marker) {
+    marker.style.left = `${gaugeFraction(verdict.clearance, ceiling) * 100}%`;
+  }
+  const top = byId("gauge-ceiling");
+  if (top) {
+    top.textContent = `${centimetres(ceiling)} — le maximum possible ici`;
+  }
+  // The tinted share is where a margin is thin in absolute terms, so it
+  // shrinks as the ceiling grows rather than staying a fixed fraction.
+  const track = gauge.querySelector<HTMLElement>(".gauge-track");
+  if (track) {
+    const share = ceiling > 0 ? Math.min(UNTRUSTWORTHY_M / ceiling, 1) : 1;
+    track.style.setProperty("--gauge-danger", `${share * 100}%`);
+  }
+}
+
 function renderAlternatives(): void {
   const box = byId("alternatives");
   if (!box) return;
@@ -133,8 +204,8 @@ function renderAlternatives(): void {
         `<button type="button" data-index="${i}"
            class="rounded border px-3 py-2 text-left ${
              i === selected
-               ? "border-stone-900 bg-stone-900 text-stone-50"
-               : "border-stone-300 bg-white"
+               ? "border-accent bg-accent text-ink"
+               : "border-line bg-panel text-fg"
            }">
            <span class="block text-sm font-medium">${moves(a.moves)}</span>
            <span class="block text-xs opacity-80">${centimetres(
@@ -154,9 +225,24 @@ function renderAlternatives(): void {
 }
 
 store.subscribe(() => {
-  const { verdict, alternatives, selected, busy, progress } = store.get();
-  const output = byId("verdict");
-  if (output) output.textContent = verdict;
+  const { outcome, message, alternatives, selected, busy, progress } = store.get();
+
+  // The headline answers the question; the nuance qualifies it without
+  // contradicting it. A free-form message has no headline — it is not an
+  // answer — and takes the detail line on its own.
+  const headline = byId("verdict-headline");
+  if (headline) headline.textContent = outcome ? verdictHeadline(outcome) : "";
+  const nuance = byId("verdict-nuance");
+  if (nuance) nuance.textContent = outcome ? (verdictNuance(outcome) ?? "") : "";
+  const detail = byId("verdict-detail");
+  if (detail) {
+    detail.textContent = outcome ? verdictDetail(outcome) : message;
+    // A message is the interface speaking, and often a refusal: it would go
+    // unread in the muted grey the detail line uses.
+    detail.classList.toggle("text-dim", Boolean(outcome));
+    detail.classList.toggle("text-fg", !outcome && message !== "");
+  }
+  renderGauge(outcome);
 
   const bar = byId("progress");
   if (bar) bar.classList.toggle("hidden", !busy);
@@ -164,9 +250,7 @@ store.subscribe(() => {
   if (note) note.textContent = progress;
 
   const run = byId("run");
-  if (run) {
-    run.textContent = busy ? "Arrêter le calcul" : "Rechercher l'entrée";
-  }
+  if (run) run.textContent = busy ? "Arrêter" : "Calculer";
 
   renderAlternatives();
   const current = alternatives[selected];
@@ -189,7 +273,8 @@ function clearResult(): void {
     alternatives: [],
     selected: 0,
     position: 1,
-    verdict: "",
+    outcome: null,
+    message: "",
     progress: "",
     busy: false,
   });
@@ -235,9 +320,13 @@ const FIELD_INPUTS: Record<string, string> = {
 function flag(id: string, missing: boolean): void {
   const input = byId<HTMLInputElement>(id);
   if (!input) return;
-  input.classList.toggle("border-red-500", missing);
-  input.classList.toggle("bg-red-50", missing);
+  input.classList.toggle("border-band-tight", missing);
+  input.classList.toggle("bg-band-tight/10", missing);
   input.setAttribute("aria-invalid", missing ? "true" : "false");
+  // A field flagged inside a closed disclosure is a message pointing at
+  // something nobody can see. Opening it is the whole reason the message
+  // says "signalée en rouge dans le formulaire" and means it.
+  if (missing) input.closest("details")?.setAttribute("open", "");
 }
 
 /**
@@ -417,7 +506,7 @@ form?.addEventListener("submit", async (event) => {
   // silently queueing another one.
   if (store.get().busy) {
     client.cancel();
-    store.set({ busy: false, verdict: "Calcul interrompu.", progress: "" });
+    store.set({ busy: false, message: "Calcul interrompu.", progress: "" });
     return;
   }
   // The slider is bounded by max_gate_angle, but a bound that fails silently
@@ -429,7 +518,7 @@ form?.addEventListener("submit", async (event) => {
     const degrees = (requested.gate.open_angle * 180) / Math.PI;
     if (degrees > maxAngleDegrees + 0.5) {
       store.set({
-        verdict:
+        message:
           `Un vantail ne peut pas s'ouvrir à ${degrees.toFixed(0)}° avec cet axe : ` +
           `il traverserait le pilier. Le maximum est ${maxAngleDegrees}°.`,
       });
@@ -443,7 +532,7 @@ form?.addEventListener("submit", async (event) => {
   const missing = flagMissing();
   if (missing > 0) {
     store.set({
-      verdict:
+      message:
         missing === 1
           ? "Une mesure manque, signalée en rouge dans le formulaire."
           : `${missing} mesures manquent, signalées en rouge dans le formulaire.`,
@@ -457,7 +546,8 @@ form?.addEventListener("submit", async (event) => {
   // message says the planner has taken over.
   store.set({
     busy: true,
-    verdict: "Calcul en cours…",
+    outcome: null,
+    message: "",
     progress: "Calcul des trajectoires en une manœuvre…",
     alternatives: [],
   });
@@ -477,29 +567,14 @@ form?.addEventListener("submit", async (event) => {
         });
       },
     );
-    if (response.alternatives.length === 0) {
-      // An exhaustive sweep proves absence; a heuristic one does not.
-      store.set({
-        verdict: response.budget_exhausted
-          ? "Aucune entrée trouvée dans le budget imparti. La recherche est heuristique : cela ne prouve pas que l'entrée soit impossible."
-          : "Aucune entrée n'est possible avec ces mesures.",
-      });
-      return;
-    }
-
-    const best = response.alternatives[0]!;
-    const elsewhere =
-      best.min_clearance < best.min_clearance_in_gateway - 1e-9
-        ? ` Ailleurs sur le trajet, la marge descend à ${centimetres(best.min_clearance)} — sur la voirie, pas dans le passage.`
-        : "";
-
+    // One path for all three outcomes. `verdictOf` is what knows that an
+    // exhausted budget proves nothing, so no caller has to remember it.
     store.set({
       alternatives: response.alternatives,
       selected: 0,
       position: 1,
-      verdict: `Entrée possible en ${moves(best.moves)}, avec ${centimetres(
-        best.min_clearance_in_gateway,
-      )} de marge dans le passage (${confidenceLabel(best.confidence)}).${elsewhere}`,
+      outcome: verdictOf(response),
+      message: "",
     });
   } catch (thrown) {
     const error = thrown as ErrorDto;
@@ -508,7 +583,7 @@ form?.addEventListener("submit", async (event) => {
       // say the same thing.
       const input = error.field ? FIELD_INPUTS[error.field] : undefined;
       if (input) flag(input, true);
-      store.set({ verdict: errorMessage(error) });
+      store.set({ message: errorMessage(error) });
     }
   } finally {
     // Only clear the flag if nothing took over in the meantime.
@@ -520,18 +595,18 @@ byId("run-min-road")?.addEventListener("click", async () => {
   const absent = flagMissing();
   if (absent > 0) {
     store.set({
-      verdict:
+      message:
         absent === 1
           ? "Une mesure manque, signalée en rouge dans le formulaire."
           : `${absent} mesures manquent, signalées en rouge dans le formulaire.`,
     });
     return;
   }
-  store.set({ busy: true, verdict: "Recherche de la chaussée minimale…" });
+  store.set({ busy: true, message: "Recherche de la chaussée minimale…", outcome: null });
   try {
     const width = await client.minRoad(readRequest());
     store.set({
-      verdict:
+      message:
         width === null
           ? "Aucune largeur de chaussée ne permet l'entrée en un mouvement : le passage lui-même est bloquant."
           : `Il faut au minimum ${metres(width)} de chaussée pour entrer en un seul mouvement.`,
@@ -541,7 +616,7 @@ byId("run-min-road")?.addEventListener("click", async () => {
     if (error.code !== CANCELLED) {
       const input = error.field ? FIELD_INPUTS[error.field] : undefined;
       if (input) flag(input, true);
-      store.set({ verdict: errorMessage(error) });
+      store.set({ message: errorMessage(error) });
     }
   } finally {
     store.set({ busy: client.busy });

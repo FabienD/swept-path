@@ -1,13 +1,75 @@
 @import "tailwindcss";
 
-/* Proximity bands, carried over from the prototype (index.html:605). Kept as
-   tokens rather than literals so the renderer never hard-codes a colour. */
+/*
+ * The palette. Everything the interface paints comes from here, so that no
+ * component hard-codes a colour and a theme stays one edit away.
+ *
+ * The ground is dark because the plan is the point: a trace reads better on
+ * it, and the four proximity bands separate further apart. The accent is the
+ * yellow of road markings, which is where the whole visual direction comes
+ * from.
+ */
 @theme {
-  --color-band-clear: #2c6e8f;
-  --color-band-watch: #d9a400;
-  --color-band-close: #dd6b1f;
-  --color-band-tight: #c42b1c;
-  --color-overhang: #7c3aed;
+  --color-ink: #131310;
+  --color-panel: #1a1a15;
+  --color-line: #2c2c22;
+  --color-fg: #f2f2ec;
+  --color-dim: #8f8f80;
+  --color-accent: #f7d708;
+  --color-plan: #0d0d0a;
+
+  /*
+   * Proximity bands, carried over from the prototype (index.html:605) and
+   * re-picked for a dark ground.
+   *
+   * The old values were chosen against stone-50. Contrast was not what forced
+   * the change — all of them clear 3.0 on this ground — but distinguishability
+   * was: the old "watch" amber sat at dE 23.8 from the accent, under the 25
+   * where two signalling hues stop being told apart at a glance. A trace in
+   * the plan and a figure in the interface would have read as the same
+   * colour. These values put that distance at 27.2, and the closest pair of
+   * bands at 28.1.
+   */
+  --color-band-clear: #4da6d4;
+  --color-band-watch: #e3b23c;
+  --color-band-close: #f0813a;
+  --color-band-tight: #f2564b;
+  --color-overhang: #a98bfa;
+
+  /*
+   * The plan's scenery. In tokens rather than literals for the same reason
+   * the bands are: the renderer states what a thing *is* — a wall, a post, a
+   * ghost — and the palette decides what that looks like. A light theme is
+   * then this block again, not a pass over the drawing code.
+   *
+   * The built world stays quiet on purpose. It is the frame, not the answer:
+   * the posts are the brightest of it because they are what the vehicle has
+   * to fit between, and everything else recedes behind the trace.
+   */
+  --color-plan-grid: #1e1e18;
+  --color-wall: #33332a;
+  --color-wall-edge: #4a4a3c;
+  --color-post: #57574a;
+  --color-post-edge: #75756a;
+  --color-leaf: #44443a;
+  --color-leaf-edge: #6f6f5e;
+  --color-sidewalk: #1c1c15;
+  --color-sidewalk-edge: #2c2c22;
+  --color-road-edge: #4a4a3c;
+  --color-road-centre: #3a3a2e;
+  --color-annotation: #8f8f80;
+  --color-ghost: #5a5a48;
+}
+
+/* The oblique hazard band, straight out of the road-marking vocabulary.
+   Tailwind has no utility for a repeating gradient at an angle. */
+.hazard-band {
+  height: 7px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-accent) 0 13px,
+    var(--color-ink) 13px 26px
+  );
 }
 
 /* The indeterminate progress bar: a band sweeping end to end, because
@@ -19,4 +81,27 @@
   100% {
     transform: translateX(300%);
   }
+}
+
+/*
+ * The gauge that puts a margin against the most the geometry allows: its
+ * scale runs from nothing to (W - w) / 2.
+ *
+ * The warm end is not decoration. A margin is not comfortable because it is
+ * a large share of the ceiling — on a tight gateway the ceiling itself is
+ * small — so the track is tinted where a margin is thin in absolute terms,
+ * and the tinted share is set from the ceiling in `main.ts`.
+ */
+.gauge-track {
+  background: linear-gradient(
+    90deg,
+    var(--color-band-tight) 0 var(--gauge-danger, 12%),
+    var(--color-line) var(--gauge-danger, 12%) 100%
+  );
+}
+
+/* Native controls default to a light scheme and would render pale on this
+   ground — number spinners and the range track especially. */
+:root {
+  color-scheme: dark;
 }
