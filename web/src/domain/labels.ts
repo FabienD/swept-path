@@ -265,9 +265,15 @@ export function leafTooOpen(
  * "Situations" rather than nodes: what the planner counts is the vehicle
  * placed somewhere, facing some way, in some gear. And the ceiling is named,
  * because a running count without its scale says nothing about where it ends.
+ *
+ * "Up to" and not "in": the figure the solver reports is `max_moves`, the
+ * depth it may reach, not a depth it is working on. The planner explores one
+ * tree and keeps the roomiest landing at every depth, so it never searches
+ * "in four moves" — and saying it did left people waiting for a four-move
+ * answer that was never coming.
  */
 export function searchProgress(
-  moveCount: number,
+  maxMoves: number,
   expanded: number,
   budget: number,
   locale: Locale,
@@ -276,6 +282,6 @@ export function searchProgress(
   const tried = expanded.toLocaleString(tag);
   const ceiling = budget.toLocaleString(tag);
   return locale === "en"
-    ? `Computing ${moveCount}-move trajectories — ${tried} situations tried, of at most ${ceiling}`
-    : `Calcul des trajectoires en ${moveCount} manœuvres — ${tried} situations essayées sur ${ceiling} au plus`;
+    ? `Computing trajectories of up to ${maxMoves} moves — ${tried} situations tried, of at most ${ceiling}`
+    : `Calcul des trajectoires jusqu'à ${maxMoves} manœuvres — ${tried} situations essayées sur ${ceiling} au plus`;
 }

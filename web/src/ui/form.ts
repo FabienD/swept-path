@@ -24,6 +24,15 @@ function num(id: string, units: UnitSystem): number {
   return fromDisplay(element.valueAsNumber, magnitude, units);
 }
 
+/** Reads a checkbox, or throws if the control is missing. */
+function ticked(id: string): boolean {
+  const element = document.getElementById(id);
+  if (!(element instanceof HTMLInputElement)) {
+    throw new Error(`missing checkbox: ${id}`);
+  }
+  return element.checked;
+}
+
 /** Reads a select, or throws if the control is missing. */
 function choice(id: string): string {
   const element = document.getElementById(id);
@@ -68,7 +77,7 @@ export function readScene(units: UnitSystem): SceneDto {
 
 /** Builds the vehicle from the form, honouring the mirror setting. */
 export function readVehicle(units: UnitSystem): VehicleDto {
-  const folded = choice("mirrors-state") === "folded";
+  const folded = ticked("mirrors-folded");
   return {
     wheelbase: num("wheelbase", units),
     length: num("length", units),

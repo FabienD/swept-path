@@ -15,7 +15,7 @@
 
 use crate::path::entry_depth;
 use std::f64::consts::FRAC_PI_2;
-use swept_core::kinematics::Pose;
+use swept_core::kinematics::{Direction, Pose};
 use swept_core::scene::Scene;
 use swept_core::units::Radians;
 use swept_core::vehicle::Vehicle;
@@ -95,19 +95,34 @@ pub fn start_poses(
 }
 
 /// Every pose an entry may finish on: in the yard, square to the opening.
+///
+/// `arriving` is how the passage is crossed, and it decides which way the
+/// vehicle ends up pointing. Driving in leaves it nose-first into the yard;
+/// **reversing in leaves it nose-out, facing the street** — that is what
+/// reversing in *means*, and it is the whole difference between the two.
+///
+/// Getting this wrong is not cosmetic. A reverse search aimed at a nose-in
+/// goal returns the forward path: same curve, same clearance, merely labelled
+/// as reversing. The interface then draws it dashed and badges it ARRIÈRE
+/// while showing a vehicle that drove in nose-first.
 #[must_use]
 pub fn goal_poses(
     vehicle: &Vehicle,
     scene: &Scene,
     entry_steps: u16,
     heading_steps: u16,
+    arriving: Direction,
 ) -> Vec<Pose> {
     let depth = entry_depth(scene, vehicle);
     let span = GOAL_HEADING_SPAN_DEGREES.to_radians();
+    let square = match arriving {
+        Direction::Forward => FRAC_PI_2,
+        Direction::Reverse => -FRAC_PI_2,
+    };
 
     let mut out = Vec::new();
     for x in spread(-ENTRY_SPAN_M, ENTRY_SPAN_M, entry_steps) {
-        for heading in spread(FRAC_PI_2 - span, FRAC_PI_2 + span, heading_steps) {
+        for heading in spread(square - span, square + span, heading_steps) {
             out.push(Pose::new(x, depth, Radians::new(heading)));
         }
     }
@@ -197,9 +212,30 @@ mod tests {
     }
 
     #[test]
+    fn reversing_in_ends_nose_out_towards_the_street() {
+        // The point of the whole distinction: a car reversed into a yard is
+        // parked facing out, ready to drive away forwards. Aiming it nose-in
+        // is what made a reverse search return the forward path.
+        let (vehicle, sc) = (lbx(), scene(3.0));
+        for pose in goal_poses(&vehicle, &sc, 4, 2, Direction::Reverse) {
+            assert!(pose.heading.get() < 0.0, "got {}", pose.heading.get());
+        }
+    }
+
+    #[test]
+    fn the_two_directions_face_opposite_ways_from_the_same_spot() {
+        let (vehicle, sc) = (lbx(), scene(3.0));
+        let forward = goal_poses(&vehicle, &sc, 0, 0, Direction::Forward);
+        let reverse = goal_poses(&vehicle, &sc, 0, 0, Direction::Reverse);
+        assert!((forward[0].heading.get() + reverse[0].heading.get()).abs() < 1e-12);
+        assert!((forward[0].x - reverse[0].x).abs() < 1e-12);
+        assert!((forward[0].y - reverse[0].y).abs() < 1e-12);
+    }
+
+    #[test]
     fn every_goal_sits_in_the_yard_facing_into_it() {
         let (vehicle, sc) = (lbx(), scene(3.0));
-        let goals = goal_poses(&vehicle, &sc, 8, 2);
+        let goals = goal_poses(&vehicle, &sc, 8, 2, Direction::Forward);
         assert!(!goals.is_empty());
         let depth = crate::path::entry_depth(&sc, &vehicle);
         for pose in &goals {
@@ -217,7 +253,7 @@ mod tests {
         // square to the opening. Enforcing it in the generator means no later
         // stage has to check it.
         let (vehicle, sc) = (lbx(), scene(3.0));
-        for pose in goal_poses(&vehicle, &sc, 8, 4) {
+        for pose in goal_poses(&vehicle, &sc, 8, 4, Direction::Forward) {
             let off_square = (pose.heading.get() - FRAC_PI_2).abs();
             assert!(
                 off_square <= GOAL_HEADING_SPAN_DEGREES.to_radians() + 1e-12,
@@ -233,7 +269,7 @@ mod tests {
         // runs the coarse grid a dozen times over and would otherwise start
         // returning nothing at all.
         let (vehicle, sc) = (lbx(), scene(3.0));
-        let goals = goal_poses(&vehicle, &sc, 0, 0);
+        let goals = goal_poses(&vehicle, &sc, 0, 0, Direction::Forward);
         assert_eq!(goals.len(), 1);
         assert!(goals[0].x.abs() < 1e-12);
         assert!((goals[0].heading.get() - FRAC_PI_2).abs() < 1e-12);
@@ -252,6 +288,9 @@ mod tests {
     fn more_steps_never_yield_fewer_poses() {
         let (vehicle, sc) = (lbx(), scene(3.0));
         assert!(start_poses(&vehicle, &sc, 8, 12).len() >= start_poses(&vehicle, &sc, 4, 6).len());
-        assert!(goal_poses(&vehicle, &sc, 16, 4).len() >= goal_poses(&vehicle, &sc, 8, 2).len());
+        assert!(
+            goal_poses(&vehicle, &sc, 16, 4, Direction::Forward).len()
+                >= goal_poses(&vehicle, &sc, 8, 2, Direction::Forward).len()
+        );
     }
 }

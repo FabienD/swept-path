@@ -151,7 +151,19 @@ pub fn search(vehicle: &Vehicle, scene: &Scene, approach: Approach, grid: Grid) 
     let step = Discretisation::default().sample_step;
 
     let starts = start_poses(vehicle, scene, grid.start_x_steps, grid.lateral_steps);
-    let goals = goal_poses(vehicle, scene, grid.entry_steps, grid.heading_steps);
+    // Aimed the way the vehicle will be pointing when it gets there, which is
+    // not the same for the two approaches: reversing in ends nose-out.
+    let arriving = match approach {
+        Approach::Forward => Direction::Forward,
+        Approach::Reverse => Direction::Reverse,
+    };
+    let goals = goal_poses(
+        vehicle,
+        scene,
+        grid.entry_steps,
+        grid.heading_steps,
+        arriving,
+    );
     if starts.is_empty() || goals.is_empty() {
         return Outcome::NotFound {
             budget_exhausted: false,
@@ -305,6 +317,35 @@ mod tests {
 
     fn lbx() -> Vehicle {
         Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).expect("valid vehicle")
+    }
+
+    /// Reported: a search restricted to reverse looks like a forward one.
+    ///
+    /// Reversing into a yard leaves the vehicle nose-out, facing the street.
+    /// If it ends nose-in, the path is a forward entry wearing a reverse
+    /// label — the same geometry, only drawn dashed and badged ARRIÈRE.
+    #[test]
+    fn reversing_in_leaves_the_vehicle_facing_the_street() {
+        let outcome = search(
+            &lbx(),
+            &scene_with_opening(5.0),
+            Approach::Reverse,
+            Grid::fine(),
+        );
+        let Outcome::Found(list) = outcome else {
+            panic!("a 5 m opening admits a reverse entry");
+        };
+        let arrival = list[0].poses.last().expect("a path has poses");
+        // Tested on the sine rather than the angle: `turned_about` normalises
+        // into [0, 2π), so nose-out reads as 270° here and as -90° elsewhere.
+        // Which way the nose actually points is the claim, not how the number
+        // happens to be written.
+        let heading = arrival.pose.heading.get();
+        assert!(
+            heading.sin() < 0.0,
+            "reversing in should end nose-out towards the street; got {:.1} degrees",
+            heading.to_degrees()
+        );
     }
 
     #[test]
@@ -585,7 +626,11 @@ mod tests {
         );
         let best = outcome.best().expect("4 m admits a reverse entry");
         let last = best.poses.last().expect("a manoeuvre has poses");
-        let off_square = (last.pose.heading.get() - std::f64::consts::FRAC_PI_2).abs();
+        // Square to the opening, whichever way the nose points. This used to
+        // compare against +90° alone, which quietly demanded a nose-in
+        // finish — and so held the reverse search to the forward answer.
+        // Perpendicular means the heading has no component along the wall.
+        let off_square = last.pose.heading.get().cos().abs().asin();
         assert!(
             off_square.to_degrees() <= 5.0 + 1e-9,
             "finished {} degrees off square",

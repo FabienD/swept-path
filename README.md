@@ -8,8 +8,8 @@ drivable trajectory, the clearance left at the tightest point, and **where that
 figure came from**.
 
 *Swept path* is the English term of art; in French the field is called
-*épure de giration*. The interface speaks French today — see
-[Language](#language).
+*épure de giration*. The interface speaks either, and measures in metres or in
+US units — see [Language](#language).
 
 ## What it answers
 
@@ -108,17 +108,26 @@ Stated plainly, because a confident wrong answer is worse than no answer.
 ## Language
 
 Code, identifiers, rustdoc, test names and commit messages are in English. The
-interface and the notes under `docs/` are in French, because the domain
-vocabulary — *épure de giration*, *vantail*, *bateau* — is where the precision
-lives for the people this was first built for. Translation is planned, and the
-split is what makes it cheap: no French has leaked into the domain layer, which
-returns codes rather than sentences.
+notes under `docs/` are in French, because the domain vocabulary — *épure de
+giration*, *vantail*, *bateau* — is where the precision lives for the people
+this was first built for.
+
+The interface reads in French or English, chosen in the page and remembered in
+the browser. That was cheap because no French had leaked into the domain layer,
+which returns codes rather than sentences: the whole translation lives in
+`web/src/i18n/` and `web/src/domain/labels.ts`.
+
+Units are a separate setting, and metric by default for everyone. The two are
+independent on purpose — reading in English says nothing about the tape someone
+measured their gate with. In US units, what a length *is* decides how it is
+shown: inches for the vehicle and the margins, as a manufacturer's sheet gives
+them, feet for the roadway and the trip. One unit throughout would report a
+5,90 m street as 232 in, which is arithmetically right and unreadable.
 
 Inside the core, lengths are metres and angles are radians, without exception —
-degrees appear only on screen. Unit conversion, imperial included, belongs to
-the same presentation layer as translation, and for the same reason: a solver
-that has to ask which units it is in is a solver that will one day get it
-wrong.
+degrees appear only on screen. Conversion happens at the single boundary every
+measurement crosses, when the form is read, for the same reason: a solver that
+has to ask which units it is in is a solver that will one day get it wrong.
 
 ## Licence
 
