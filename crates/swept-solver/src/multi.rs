@@ -86,6 +86,28 @@ pub const START_POSITIONS: u8 = 10;
 /// worse than the batch before.
 pub const ANALYTIC_EVERY: u32 = 20;
 
+/// How much clearance a metre of extra driving has to buy, in metres.
+///
+/// Plans of the same depth used to be ranked on clearance alone. That is the
+/// right rule for the exact sweep, where every candidate joins the same two
+/// poses and so covers comparable ground. Here two plans of equal depth can
+/// differ by tens of metres, and clearance alone will always pick the long
+/// one: driving further from the walls is exactly how you leave more room.
+///
+/// Measured on a 2,40 m gateway before this existed: the two-move answer
+/// walked 47,7 m to cover 9,7 m of ground, buying 6 cm over the direct
+/// route — 1,8 mm of clearance per extra metre driven. Nobody drives 35 m
+/// round a yard for that.
+///
+/// So the two are traded against each other. At three millimetres per metre,
+/// the 2,20 m case still keeps its detour (6,7 mm per metre, and it is what
+/// takes that gateway from 2 cm to 5,5 cm) while the 2,40 m wandering is
+/// refused.
+///
+/// ARBITRARY in magnitude, measured in effect: the two cases above are what
+/// set it, and `no_alternative_wanders_around_the_yard` holds it.
+pub const CLEARANCE_PER_METRE: f64 = 0.003;
+
 /// Distance from the opening centre within which a landing is attempted.
 ///
 /// ARBITRARY — carried over from the prototype (`index.html:490`).
@@ -311,6 +333,19 @@ fn shortfall(margin: f64) -> f64 {
 }
 
 /// What a node is ranked on: shunts, then distance, then how tight it got.
+/// Whether a landing beats the one already held for its depth.
+///
+/// Room, less what the driving costs to get it. Clearance on its own always
+/// prefers the longer way round — driving further from the walls is exactly
+/// how you leave more room — which is what sent the planner round the yard.
+/// See [`CLEARANCE_PER_METRE`].
+fn worth_keeping(held: Option<&(usize, Landing, f64)>, landing: &Landing, reached: f64) -> bool {
+    let worth = landing.min_clearance - reached * CLEARANCE_PER_METRE;
+    held.is_none_or(|(_, best, best_reach)| {
+        worth > best.min_clearance - best_reach * CLEARANCE_PER_METRE
+    })
+}
+
 fn score_of(moves: u8, travelled: f64, worst_shortfall: f64, end: &Pose, goal: f64) -> f64 {
     f64::from(moves) * MOVE_COST
         + travelled * LENGTH_COST_PER_M
@@ -371,7 +406,9 @@ pub fn plan(
     // The roomiest landing found for each total move count. One search now
     // answers every depth, instead of one search per depth re-exploring the
     // same space — which cost three times over for nothing.
-    let mut best: Vec<Option<(usize, Landing)>> = vec![None; usize::from(max_moves) + 2];
+    // The reach is kept beside the landing so that two plans of the same
+    // depth can be compared on ground covered as well as on room left.
+    let mut best: Vec<Option<(usize, Landing, f64)>> = vec![None; usize::from(max_moves) + 2];
     // Counted per move count, not overall: a single quota would fill up with
     // landings at one depth and stop the search before it ever reached the
     // others.
@@ -418,11 +455,12 @@ pub fn plan(
                 let Some(slot) = best.get_mut(usize::from(total)) else {
                     continue;
                 };
-                if slot
-                    .as_ref()
-                    .is_none_or(|(_, b)| landing.min_clearance > b.min_clearance)
-                {
-                    *slot = Some((index, landing));
+                // Roomier by enough to matter, or as roomy and shorter. The
+                // second half is what stops a plan from wandering the yard to
+                // buy a millimetre — see `CLEARANCE_TIE_M`.
+                let reached = travelled + landing.length();
+                if worth_keeping(slot.as_ref(), &landing, reached) {
+                    *slot = Some((index, landing, reached));
                 }
                 solutions[usize::from(total)] += 1;
             }
@@ -484,7 +522,7 @@ pub fn plan(
 /// Turns the best landing of each move count into an outcome.
 fn collect(
     arena: &[Node],
-    best: &[Option<(usize, Landing)>],
+    best: &[Option<(usize, Landing, f64)>],
     vehicle: &Vehicle,
     field: &ClearanceField,
     exhausted: bool,
@@ -493,7 +531,7 @@ fn collect(
         .iter()
         .enumerate()
         .filter_map(|(total, slot)| {
-            let (index, landing) = slot.as_ref()?;
+            let (index, landing, _) = slot.as_ref()?;
             #[allow(clippy::cast_possible_truncation)]
             Some(assemble(
                 arena,

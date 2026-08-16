@@ -73,9 +73,21 @@ pub const LANDING_CURVES_TRIED: usize = 48;
 /// short by construction. A bound restores that property without giving up the
 /// closed form.
 ///
-/// ARBITRARY in magnitude: generous enough for any manoeuvre in front of a
-/// gateway, far short of the distance needed to reach the end of the wall.
-pub const LANDING_MAX_LENGTH_M: f64 = 25.0;
+/// Twenty-five metres was still far too generous. Measured on a 2,40 m
+/// gateway: the two-move answer used a landing of over twenty metres, giving
+/// a plan that walked 46 m to cover 10 m of ground — driving most of a street
+/// to arrive 6 cm roomier. Nobody does that.
+///
+/// Fifteen is about three vehicle lengths: enough to pull past a gateway,
+/// back in and straighten, which is what a landing is for. Beyond that the
+/// manoeuvre stops resembling anything a driver would do, and the planner is
+/// better off reporting that a depth has no sensible answer than inventing
+/// one — which is what it now does at 2,40 m.
+///
+/// ARBITRARY in magnitude, measured in effect. A limit of the model: it is a
+/// fixed length where it should scale with the vehicle, and a long wheelbase
+/// will feel it first.
+pub const LANDING_MAX_LENGTH_M: f64 = 15.0;
 
 /// Sampling step along a landing curve, in metres.
 ///
@@ -109,6 +121,18 @@ impl Landing {
     #[must_use]
     pub fn moves(&self, arriving_in: Direction) -> u8 {
         self.reversals + u8::from(self.starts_in() != arriving_in)
+    }
+
+    /// How far the landing itself covers, in metres.
+    ///
+    /// Ground covered, not displacement: a landing that shunts back and forth
+    /// travels every metre of it, and that is what makes it long.
+    #[must_use]
+    pub fn length(&self) -> f64 {
+        self.poses
+            .windows(2)
+            .map(|w| (w[1].x - w[0].x).hypot(w[1].y - w[0].y))
+            .sum()
     }
 
     /// The gear the landing begins in.
