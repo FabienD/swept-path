@@ -47,226 +47,219 @@
           </label>
         </div>
 
-        <form id="params" class="mt-5 grid gap-3">
-          <!-- One field, not two. What you type filters the list; a name it
-               does not know is not an error but your own vehicle, whose
-               measurements you then enter yourself. -->
-          <div class="relative grid gap-1">
-            <label
-              class="text-[0.65rem] tracking-[0.13em] text-dim uppercase"
-              for="vehicle-name"
-              data-i18n="field.vehicle"
-            ></label>
-            <input
-              id="vehicle-name"
-              type="text"
-              role="combobox"
-              autocomplete="off"
-              aria-expanded="false"
-              aria-controls="vehicle-list"
-              aria-autocomplete="list"
-              data-i18n-placeholder="field.vehicleFilter"
-              class="rounded border border-line bg-plan px-2 py-1.5 text-sm"
-            />
-            <ul
-              id="vehicle-list"
-              role="listbox"
-              hidden
-              class="absolute top-full right-0 left-0 z-10 mt-1 max-h-64 overflow-y-auto rounded border border-line bg-panel py-1 text-sm shadow-lg"
-            ></ul>
-            <span id="preset-note" class="text-xs text-dim"></span>
-          </div>
+        <form id="params" class="mt-5 grid gap-5">
+          <!-- Three subjects, and nothing after the button. Each one shows what
+               you are asked for and folds away what it can work out or assume:
+               the vehicle you drive, the gateway you aim at, the street you
+               come down. -->
 
-          <!-- The measurements of the vehicle itself. Folded away once they
-               are all filled, and opened by `openWhatIsMissing` whenever one
-               is not — including for a listed vehicle whose figure the table
-               does not have. -->
-          <details id="vehicle-box">
-            <summary class="cursor-pointer text-xs text-dim marker:text-accent">
-              <span data-i18n="group.vehicleSizes"></span>
-              <span id="vehicle-missing" class="text-band-tight"></span>
-            </summary>
-            <div class="mt-3 grid grid-cols-2 gap-2.5">
-              <!-- A checkbox, not a choice of two: mirrors out is the state a
-                   car is in, and folding them is the thing you decide to do.
-                   Unchecked is therefore the honest default — it is also the
-                   wider figure, so the default never flatters the result. -->
-              <label class="col-span-2 flex items-center gap-2">
-                <input
-                  id="mirrors-folded"
-                  type="checkbox"
-                  class="size-4 accent-accent"
-                />
-                <span class="text-xs text-dim" data-i18n="mirrors.folded"></span>
-              </label>
-              <label class="grid gap-1">
-                <span class="text-xs text-dim">
-                  <span data-i18n="field.radius"></span> <span id="radius-note" class="text-dim"></span>
-                </span>
-                <input id="radius" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-              </label>
-              <label class="grid gap-1">
-                <span class="text-xs text-dim"><span data-i18n="field.wheelbase"></span> <span data-unit="dimension"></span></span>
-                <input id="wheelbase" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-              </label>
-              <label class="grid gap-1">
-                <span class="text-xs text-dim"><span data-i18n="field.length"></span> <span data-unit="dimension"></span></span>
-                <input id="length" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-              </label>
-              <label class="grid gap-1">
-                <span class="text-xs text-dim"><span data-i18n="field.frontOverhang"></span> <span data-unit="dimension"></span></span>
-                <input id="front-overhang" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-              </label>
-              <!-- Derived, not entered: length minus wheelbase minus front
-                   overhang. A fourth field would be a fourth number for three
-                   degrees of freedom, and the first thing anyone could make
-                   contradict itself. Shown because it is what crosses the
-                   gateway first when reversing in. -->
-              <div class="col-span-2 flex items-baseline justify-between border-y border-line py-1.5">
-                <span class="text-xs text-dim">
-                  <span data-i18n="field.rearOverhang"></span>
-                  <span class="opacity-70">— <span data-i18n="field.derived"></span></span>
-                </span>
-                <output id="rear-overhang" class="text-sm tabular-nums"></output>
-              </div>
+          <!-- ─────────────────────── the vehicle ─────────────────────── -->
+          <section class="grid gap-2.5">
+            <h2 class="text-[0.62rem] tracking-[0.16em] text-accent uppercase" data-i18n="section.vehicle"></h2>
 
-              <label class="grid gap-1">
-                <span class="text-xs text-dim"><span data-i18n="field.bodyWidth"></span> <span data-unit="dimension"></span></span>
-                <input id="body-width" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-              </label>
-              <label class="grid gap-1">
-                <span class="text-xs text-dim"><span data-i18n="field.groundClearance"></span> <span data-unit="dimension"></span></span>
-                <input id="ground-clearance" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-              </label>
-              <label class="grid gap-1">
-                <span class="text-xs text-dim"><span data-i18n="field.mirrorWidth"></span> <span data-unit="dimension"></span></span>
-                <input id="mirror-width" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-              </label>
-              <label class="grid gap-1">
-                <span class="text-xs text-dim"><span data-i18n="field.mirrorWidthFolded"></span> <span data-unit="dimension"></span></span>
-                <input id="mirror-width-folded" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-              </label>
-            </fieldset>
-
+            <div class="relative grid gap-1">
+              <input
+                id="vehicle-name"
+                type="text"
+                role="combobox"
+                autocomplete="off"
+                aria-expanded="false"
+                aria-controls="vehicle-list"
+                aria-autocomplete="list"
+                data-i18n-placeholder="field.vehicleFilter"
+                class="rounded border border-line bg-plan px-2 py-1.5 text-sm"
+              />
+              <ul
+                id="vehicle-list"
+                role="listbox"
+                hidden
+                class="absolute top-full right-0 left-0 z-10 mt-1 max-h-64 overflow-y-auto rounded border border-line bg-panel py-1 text-sm shadow-lg"
+              ></ul>
+              <span id="preset-note" class="text-xs text-dim"></span>
             </div>
-          </details>
 
-          <div class="grid grid-cols-2 gap-2.5 border-t border-line pt-4">
+            <details id="vehicle-box">
+              <summary class="cursor-pointer text-xs text-dim marker:text-accent">
+                <span data-i18n="fine.vehicle"></span>
+                <span id="vehicle-missing" class="text-band-tight"></span>
+              </summary>
+              <div class="mt-3 grid grid-cols-2 gap-2.5">
+                <label class="col-span-2 flex items-center gap-2">
+                  <input id="mirrors-folded" type="checkbox" class="size-4 accent-accent" />
+                  <span class="text-xs text-dim" data-i18n="mirrors.folded"></span>
+                </label>
             <label class="grid gap-1">
-              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase"><span data-i18n="field.opening"></span> <span data-unit="dimension"></span></span>
+              <span class="text-xs text-dim"><span data-i18n="field.wheelbase"></span> <span data-unit="dimension"></span></span>
+              <input id="wheelbase" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.length"></span> <span data-unit="dimension"></span></span>
+              <input id="length" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.frontOverhang"></span> <span data-unit="dimension"></span></span>
+              <input id="front-overhang" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.bodyWidth"></span> <span data-unit="dimension"></span></span>
+              <input id="body-width" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.mirrorWidth"></span> <span data-unit="dimension"></span></span>
+              <input id="mirror-width" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.mirrorWidthFolded"></span> <span data-unit="dimension"></span></span>
+              <input id="mirror-width-folded" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.groundClearance"></span> <span data-unit="dimension"></span></span>
+              <input id="ground-clearance" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+                <label class="grid gap-1">
+                  <span class="text-xs text-dim">
+                    <span data-i18n="field.radius"></span>
+                    <span data-unit="dimension"></span>
+                    <span id="radius-note" class="text-dim"></span>
+                  </span>
+                  <input id="radius" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                </label>
+
+                <!-- Derived, not entered: length minus wheelbase minus front
+                     overhang. A fourth field would be a fourth number for three
+                     degrees of freedom. Shown because it is what crosses the
+                     gateway first when reversing in. -->
+                <div class="col-span-2 flex items-baseline justify-between border-t border-line pt-2">
+                  <span class="text-xs text-dim">
+                    <span data-i18n="field.rearOverhang"></span>
+                    <span class="opacity-70">— <span data-i18n="field.derived"></span></span>
+                  </span>
+                  <output id="rear-overhang" class="text-sm tabular-nums"></output>
+                </div>
+              </div>
+            </details>
+          </section>
+
+          <!-- ─────────────────────── the gateway ─────────────────────── -->
+          <section class="grid gap-2.5 border-t border-line pt-4">
+            <h2 class="text-[0.62rem] tracking-[0.16em] text-accent uppercase" data-i18n="section.gate"></h2>
+
+            <div class="grid grid-cols-2 gap-2.5">
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.opening"></span> <span data-unit="dimension"></span></span>
               <input id="opening" data-magnitude="dimension" type="number" min="0" step="0.01" value="2.40" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
             </label>
             <label class="grid gap-1">
-              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase"><span data-i18n="field.road"></span> <span data-unit="distance"></span></span>
+              <span class="text-xs text-dim"><span data-i18n="field.posts"></span> <span data-unit="dimension"></span></span>
+              <input id="post-width" data-magnitude="dimension" type="number" min="0" step="0.01" value="0.55" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            </div>
+
+            <label class="grid gap-1">
+              <span class="text-xs text-dim" data-i18n="field.gateKind"></span>
+              <select id="gate-kind" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
+                <option value="sliding" data-i18n="gate.sliding"></option>
+                <option value="swinging" data-i18n="gate.swinging"></option>
+              </select>
+            </label>
+
+            <details>
+              <summary class="cursor-pointer text-xs text-dim marker:text-accent" data-i18n="fine.gate"></summary>
+              <div class="mt-3 grid gap-3">
+                <div class="grid grid-cols-2 gap-2.5">
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.postDepth"></span> <span data-unit="dimension"></span></span>
+              <input id="post-depth" data-magnitude="dimension" type="number" min="0" step="0.01" value="0.55" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.wall"></span> <span data-unit="dimension"></span></span>
+              <input id="wall" data-magnitude="dimension" type="number" min="0" step="0.01" value="0.30" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+                </div>
+
+                <fieldset id="leaf-box" class="hidden gap-2.5">
+                  <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="group.leaves"></legend>
+                  <div class="grid grid-cols-2 gap-2.5">
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.leafLength"></span> <span data-unit="dimension"></span></span>
+              <input id="leaf-length" data-magnitude="dimension" type="number" min="0" step="0.01" value="1.15" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.leafThickness"></span> <span data-unit="dimension"></span></span>
+              <input id="leaf-thickness" data-magnitude="dimension" type="number" min="0" step="0.001" value="0.04" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.hingeOffset"></span> <span data-unit="dimension"></span></span>
+              <input id="hinge-offset" data-magnitude="dimension" type="number" min="0" step="0.001" value="0.035" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+                    <label class="grid gap-1">
+                      <span class="text-xs text-dim" data-i18n="field.hingeDepth"></span>
+                      <input id="hinge-depth" type="number" step="5" min="0" max="100" value="50" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+                    </label>
+                  </div>
+                  <label class="mt-2 grid gap-1">
+                    <span class="text-xs text-dim">
+                      <span data-i18n="field.openAngle"></span> — <span id="angle-value">93</span>°
+                      <span id="angle-max" class="ml-1 text-dim"></span>
+                    </span>
+                    <input id="open-angle" type="range" min="70" max="180" step="1" value="93" class="w-full accent-accent" />
+                  </label>
+                </fieldset>
+              </div>
+            </details>
+          </section>
+
+          <!-- ─────────────────────── the street ──────────────────────── -->
+          <section class="grid gap-2.5 border-t border-line pt-4">
+            <h2 class="text-[0.62rem] tracking-[0.16em] text-accent uppercase" data-i18n="section.street"></h2>
+
+            <div class="grid grid-cols-2 gap-2.5">
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.road"></span> <span data-unit="distance"></span></span>
               <input id="road" data-magnitude="distance" type="number" min="0" step="0.01" value="5.90" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
             </label>
             <label class="grid gap-1">
-              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase"><span data-i18n="field.sidewalk"></span> <span data-unit="distance"></span></span>
+              <span class="text-xs text-dim"><span data-i18n="field.sidewalk"></span> <span data-unit="distance"></span></span>
               <input id="sidewalk" data-magnitude="distance" type="number" min="0" step="0.01" value="1.30" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
             </label>
-            <label class="grid gap-1">
-              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase"><span data-i18n="field.posts"></span> <span data-unit="dimension"></span></span>
-              <input id="post-width" data-magnitude="dimension" type="number" min="0" step="0.01" value="0.55" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-            </label>
-          </div>
+            </div>
 
-          <label class="grid gap-1">
-            <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="field.gate"></span>
-            <select id="gate-kind" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
-              <option value="sliding" data-i18n="gate.sliding"></option>
-              <option value="swinging" data-i18n="gate.swinging"></option>
-            </select>
-          </label>
-
-          <!-- Not measurements but the situation: which way you come down the
-               street, and which gear you mean to cross in. They change the
-               answer as much as any width does, so they are not folded away
-               with the millimetres. -->
-          <div class="grid gap-2.5">
             <label class="grid gap-1">
-              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="field.side"></span>
+              <span class="text-xs text-dim" data-i18n="field.side"></span>
               <select id="side" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
                 <option value="1" data-i18n="side.fromLeft"></option>
                 <option value="-1" data-i18n="side.fromRight"></option>
               </select>
             </label>
+
             <label class="grid gap-1">
-              <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="field.direction"></span>
+              <span class="text-xs text-dim" data-i18n="field.direction"></span>
               <select id="direction" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
                 <option value="any" data-i18n="direction.any"></option>
                 <option value="forward" data-i18n="direction.forward"></option>
                 <option value="reverse" data-i18n="direction.reverse"></option>
               </select>
             </label>
-          </div>
 
-          <button id="run" type="submit" class="mt-1 rounded bg-accent px-4 py-2 text-sm font-bold text-ink" data-i18n="action.compute"></button>
-
-          <!-- Everything you do not measure with a tape on your own gate. It
-               opens itself when one of its fields is flagged: a message
-               pointing at a field nobody can see is worse than no message. -->
-          <details id="fine-settings" class="mt-1 border-t border-line pt-3">
-            <summary class="cursor-pointer text-xs text-dim marker:text-accent" data-i18n="fine.summary"></summary>
-
-            <div class="mt-3 grid gap-3">
-              <fieldset id="leaf-box" class="hidden gap-2.5">
-                <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="group.leaves"></legend>
+            <details>
+              <summary class="cursor-pointer text-xs text-dim marker:text-accent" data-i18n="fine.street"></summary>
+              <div class="mt-3 grid gap-3">
                 <div class="grid grid-cols-2 gap-2.5">
-                  <label class="grid gap-1">
-                    <span class="text-xs text-dim"><span data-i18n="field.leafLength"></span> <span data-unit="dimension"></span></span>
-                    <input id="leaf-length" data-magnitude="dimension" type="number" min="0" step="0.01" value="1.15" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                  </label>
-                  <label class="grid gap-1">
-                    <span class="text-xs text-dim"><span data-i18n="field.leafThickness"></span> <span data-unit="dimension"></span></span>
-                    <input id="leaf-thickness" data-magnitude="dimension" type="number" min="0" step="0.001" value="0.04" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                  </label>
-                  <label class="grid gap-1">
-                    <span class="text-xs text-dim"><span data-i18n="field.hingeOffset"></span> <span data-unit="dimension"></span></span>
-                    <input id="hinge-offset" data-magnitude="dimension" type="number" min="0" step="0.001" value="0.035" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                  </label>
-                  <label class="grid gap-1">
-                    <span class="text-xs text-dim" data-i18n="field.hingeDepth"></span>
-                    <input id="hinge-depth" type="number" step="5" min="0" max="100" value="50" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                  </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.curbCut"></span> <span data-unit="distance"></span></span>
+              <input id="curb" data-magnitude="distance" type="number" min="0" step="0.01" value="3.20" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs text-dim"><span data-i18n="field.curbHeight"></span> <span data-unit="dimension"></span></span>
+              <input id="curb-height" data-magnitude="dimension" type="number" min="0" step="0.01" value="0.12" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+            </label>
                 </div>
-                <label class="mt-2 grid gap-1">
-                  <span class="text-xs text-dim">
-                    <span data-i18n="field.openAngle"></span> — <span id="angle-value">93</span>°
-                    <span id="angle-max" class="ml-1 text-dim"></span>
-                  </span>
-                  <input id="open-angle" type="range" min="70" max="180" step="1" value="93" class="w-full accent-accent" />
-                </label>
-              </fieldset>
-
-              <fieldset class="grid grid-cols-2 gap-2.5">
-                <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="group.gateway"></legend>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim"><span data-i18n="field.postDepth"></span> <span data-unit="dimension"></span></span>
-                  <input id="post-depth" data-magnitude="dimension" type="number" min="0" step="0.01" value="0.55" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim"><span data-i18n="field.wall"></span> <span data-unit="dimension"></span></span>
-                  <input id="wall" data-magnitude="dimension" type="number" min="0" step="0.01" value="0.30" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-              </fieldset>
-
-              <fieldset class="grid grid-cols-2 gap-2.5">
-                <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="group.street"></legend>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim"><span data-i18n="field.curbCut"></span> <span data-unit="distance"></span></span>
-                  <input id="curb" data-magnitude="distance" type="number" min="0" step="0.01" value="3.20" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim"><span data-i18n="field.curbHeight"></span> <span data-unit="dimension"></span></span>
-                  <input id="curb-height" data-magnitude="dimension" type="number" min="0" step="0.01" value="0.12" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-              </fieldset>
-
-              <fieldset class="grid gap-2.5">
-                <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="group.search"></legend>
                 <button id="run-min-road" type="button" class="rounded border border-line px-3 py-1.5 text-xs text-dim" data-i18n="action.minRoad"></button>
               </div>
-          </details>
+            </details>
+          </section>
+
+          <button id="run" type="submit" class="rounded bg-accent px-4 py-2.5 text-sm font-bold text-ink" data-i18n="action.compute"></button>
         </form>
       </aside>
 

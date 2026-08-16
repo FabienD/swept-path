@@ -19,6 +19,14 @@ export interface Texts {
   "app.tagline": string;
   "app.planLabel": string;
 
+  "section.vehicle": string;
+  "section.gate": string;
+  "section.street": string;
+  "fine.vehicle": string;
+  "fine.gate": string;
+  "fine.street": string;
+  "field.gateKind": string;
+
   "settings.language": string;
   "settings.units": string;
   "units.metric": string;
@@ -30,14 +38,12 @@ export interface Texts {
   "field.road": string;
   "field.sidewalk": string;
   "field.posts": string;
-  "field.gate": string;
   "gate.sliding": string;
   "gate.swinging": string;
 
   "action.compute": string;
   "action.stop": string;
   "action.minRoad": string;
-  "fine.summary": string;
 
   "group.leaves": string;
   "field.leafLength": string;
@@ -57,7 +63,6 @@ export interface Texts {
   "side.fromLeft": string;
   "side.fromRight": string;
 
-  "group.vehicleSizes": string;
   "mirrors.folded": string;
   "field.radius": string;
   "field.wheelbase": string;
@@ -112,6 +117,14 @@ const FR: Texts = {
   "app.tagline": "Ce véhicule franchit-il ce passage, et en combien de manœuvres.",
   "app.planLabel": "Vue en plan de la manœuvre",
 
+  "section.vehicle": "Le véhicule",
+  "section.gate": "Le passage",
+  "section.street": "La voirie",
+  "fine.vehicle": "Cotes du véhicule",
+  "fine.gate": "Piliers, murets, vantaux",
+  "fine.street": "Bateau et bordure",
+  "field.gateKind": "Type de portail",
+
   "settings.language": "Langue",
   "settings.units": "Unités",
   "units.metric": "Mètres",
@@ -123,14 +136,12 @@ const FR: Texts = {
   "field.road": "Chaussée",
   "field.sidewalk": "Trottoir",
   "field.posts": "Piliers",
-  "field.gate": "Portail",
   "gate.sliding": "Coulissant",
   "gate.swinging": "Battants",
 
   "action.compute": "Calculer",
   "action.stop": "Arrêter",
   "action.minRoad": "Chaussée minimale",
-  "fine.summary": "Réglages fins",
 
   "group.leaves": "Les vantaux",
   "field.leafLength": "Longueur",
@@ -150,7 +161,6 @@ const FR: Texts = {
   "side.fromLeft": "Par la gauche",
   "side.fromRight": "Par la droite",
 
-  "group.vehicleSizes": "Cotes du véhicule",
   "mirrors.folded": "Rétroviseurs rabattus",
   "field.radius": "Rayon de pivot",
   "field.wheelbase": "Empattement",
@@ -203,6 +213,14 @@ const EN: Texts = {
   "app.tagline": "Does this vehicle clear this opening, and in how many moves.",
   "app.planLabel": "Plan view of the manoeuvre",
 
+  "section.vehicle": "The vehicle",
+  "section.gate": "The gateway",
+  "section.street": "The street",
+  "fine.vehicle": "Vehicle measurements",
+  "fine.gate": "Posts, walls, leaves",
+  "fine.street": "Curb cut and curb",
+  "field.gateKind": "Gate type",
+
   "settings.language": "Language",
   "settings.units": "Units",
   "units.metric": "Meters",
@@ -214,14 +232,12 @@ const EN: Texts = {
   "field.road": "Roadway",
   "field.sidewalk": "Sidewalk",
   "field.posts": "Posts",
-  "field.gate": "Gate",
   "gate.sliding": "Sliding",
   "gate.swinging": "Swinging",
 
   "action.compute": "Compute",
   "action.stop": "Stop",
   "action.minRoad": "Narrowest roadway",
-  "fine.summary": "Detailed settings",
 
   "group.leaves": "The leaves",
   "field.leafLength": "Length",
@@ -241,7 +257,6 @@ const EN: Texts = {
   "side.fromLeft": "From the left",
   "side.fromRight": "From the right",
 
-  "group.vehicleSizes": "Vehicle measurements",
   "mirrors.folded": "Mirrors folded",
   "field.radius": "Pivot radius",
   "field.wheelbase": "Wheelbase",
