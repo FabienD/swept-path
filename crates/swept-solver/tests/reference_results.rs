@@ -31,22 +31,22 @@ fn scene(opening: f64, gate: GateKind) -> Scene {
             depth: 0.55,
         },
         wall_thickness: 0.30,
-        pavement_width: 1.20,
-        dropped_kerb_width: opening + 0.80,
+        sidewalk_width: 1.20,
+        curb_cut_width: opening + 0.80,
         road_width: 4.50,
-        kerb_height: f64::INFINITY,
+        curb_height: f64::INFINITY,
         gate,
     }
 }
 
-/// The same scene with no pavement, so that only the corridor constrains the
-/// crossing. Measuring the corridor means measuring the corridor, not the kerb
+/// The same scene with no sidewalk, so that only the corridor constrains the
+/// crossing. Measuring the corridor means measuring the corridor, not the curb
 /// the vehicle happens to clip on its way in.
 fn corridor_scene(opening: f64, gate: GateKind) -> Scene {
     Scene {
-        pavement_width: 0.0,
+        sidewalk_width: 0.0,
         road_width: 12.0,
-        kerb_height: f64::INFINITY,
+        curb_height: f64::INFINITY,
         ..scene(opening, gate)
     }
 }
@@ -262,7 +262,7 @@ fn clearance_never_exceeds_the_geometric_ceiling() {
     }
 }
 
-/// The measured gateway: 2.29 m clear, 1.30 m pavement, 5.90 m carriageway,
+/// The measured gateway: 2.29 m clear, 1.30 m sidewalk, 5.90 m carriageway,
 /// and leaves that swing back past square.
 fn measured_gateway() -> Scene {
     Scene {
@@ -277,10 +277,10 @@ fn measured_gateway() -> Scene {
             depth: 0.55,
         },
         wall_thickness: 0.30,
-        pavement_width: 1.30,
-        dropped_kerb_width: 3.20,
+        sidewalk_width: 1.30,
+        curb_cut_width: 3.20,
         road_width: 5.90,
-        kerb_height: f64::INFINITY,
+        curb_height: f64::INFINITY,
         gate: GateKind::Swinging {
             leaf_length: 1.15,
             leaf_thickness: 0.04,
@@ -312,7 +312,7 @@ fn measured_gateway() -> Scene {
 /// The measured gateway, widened to `width` between the posts.
 ///
 /// The real one is 2.29 m and admits no one-move entry at all, so the criteria
-/// below need a gateway that does. Everything else — hinges, leaves, pavement,
+/// below need a gateway that does. Everything else — hinges, leaves, sidewalk,
 /// carriageway — is left exactly as measured.
 fn measured_gateway_widened(width: f64) -> Scene {
     let mut scene = measured_gateway();
@@ -369,7 +369,7 @@ fn a_gateway_a_hand_wider_admits_a_proved_one_move_entry() {
     );
 
     // Criterion 2, second half: the tightest point is in the gateway, not
-    // against a kerb six metres short of it. A path whose worst moment is out
+    // against a curb six metres short of it. A path whose worst moment is out
     // on the road has not been squeezed by the opening at all, and its figure
     // answers a different question than the one that was asked.
     let field = ClearanceField::new(&scene, &vehicle);
@@ -383,7 +383,7 @@ fn a_gateway_a_hand_wider_admits_a_proved_one_move_entry() {
         .min_by(|a, b| a.0.total_cmp(&b.0))
         .expect("a collision-free manoeuvre has a tightest point");
     // The gateway runs from the outer face of the wall to behind the leaves,
-    // and the approach across the pavement counts as part of threading it.
+    // and the approach across the sidewalk counts as part of threading it.
     let gateway_far_side = scene.left_post.depth.max(scene.right_post.depth)
         + match scene.gate {
             GateKind::Swinging { leaf_length, .. } => leaf_length,
@@ -397,12 +397,12 @@ fn a_gateway_a_hand_wider_admits_a_proved_one_move_entry() {
     // failure this criterion is about — a tightest point out on the
     // carriageway, metres before the vehicle has anything to thread.
     let nose_reach = vehicle.wheelbase + vehicle.front_overhang;
-    let window = (-scene.pavement_width - nose_reach)..=gateway_far_side;
+    let window = (-scene.sidewalk_width - nose_reach)..=gateway_far_side;
     assert!(
         window.contains(&where_it_is.y),
         "tightest point at y={:.2} m, outside the gateway (which spans {:.2} to {:.2})",
         where_it_is.y,
-        -scene.pavement_width - nose_reach,
+        -scene.sidewalk_width - nose_reach,
         gateway_far_side
     );
 
@@ -419,26 +419,26 @@ fn a_gateway_a_hand_wider_admits_a_proved_one_move_entry() {
 
 /// What this batch was built for.
 ///
-/// The pure 2D model treats a kerb as a wall of infinite height, so the only
+/// The pure 2D model treats a curb as a wall of infinite height, so the only
 /// candidates the exhaustive sweep refused on this gateway were those whose
-/// front overhang swings over the pavement beside the dropped kerb. Declaring
-/// the kerb for what it is can only help — never hinder, since every candidate
+/// front overhang swings over the sidewalk beside the curb cut. Declaring
+/// the curb for what it is can only help — never hinder, since every candidate
 /// that was drivable before still is.
 ///
 /// MEASURED, and worth knowing: on **this** gateway it buys nothing at all.
-/// A wall, a 12 cm kerb and no pavement whatsoever all return 4.15 cm, with
+/// A wall, a 12 cm curb and no sidewalk whatsoever all return 4.15 cm, with
 /// the same tightest point and not one pose overhanging. What limits this
 /// entry is the opening, not the footway. The batch makes the model right
 /// where it was wrong; it does not make this gateway easier.
 #[test]
-fn a_low_kerb_never_costs_room_and_may_buy_some() {
+fn a_low_curb_never_costs_room_and_may_buy_some() {
     let vehicle =
         Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid vehicle");
 
     let walled = measured_gateway();
     let mut low = measured_gateway();
-    // MEASURED — a standard French T2 kerb stands 12 cm above the gutter.
-    low.kerb_height = 0.12;
+    // MEASURED — a standard French T2 curb stands 12 cm above the gutter.
+    low.curb_height = 0.12;
 
     let walled_best = search(&vehicle, &walled, Approach::Forward, Grid::fine());
     let low_best = search(&vehicle, &low, Approach::Forward, Grid::fine());
@@ -446,11 +446,11 @@ fn a_low_kerb_never_costs_room_and_may_buy_some() {
     match (walled_best.best(), low_best.best()) {
         (Some(w), Some(l)) => assert!(
             l.min_clearance >= w.min_clearance - 1e-9,
-            "a wall gave {:.1} cm, a kerb gave {:.1} cm",
+            "a wall gave {:.1} cm, a curb gave {:.1} cm",
             w.min_clearance * 100.0,
             l.min_clearance * 100.0
         ),
-        (Some(_), None) => panic!("lowering the kerb removed an entry that existed"),
+        (Some(_), None) => panic!("lowering the curb removed an entry that existed"),
         (None, _) => { /* nothing to compare, and the batch is not at fault */ }
     }
 }

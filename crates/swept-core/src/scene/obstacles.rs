@@ -15,15 +15,15 @@ pub const SCENE_HALF_EXTENT_M: f64 = 18.0;
 /// tunnel through it. ARBITRARY in magnitude, deliberate in intent.
 pub const FAR_SIDE_THICKNESS_M: f64 = 1000.0;
 
-/// Below this, a pavement is treated as absent, in metres.
+/// Below this, a sidewalk is treated as absent, in metres.
 ///
 /// ARBITRARY — carried over from the prototype (`index.html:243`), where it
 /// guards against a zero-height rectangle.
-pub const PAVEMENT_EPSILON_M: f64 = 0.001;
+pub const SIDEWALK_EPSILON_M: f64 = 0.001;
 
 /// A rectangle a vehicle can hit, and how tall it stands.
 ///
-/// Height is what lets a body pass over a kerb it would otherwise be stopped
+/// Height is what lets a body pass over a curb it would otherwise be stopped
 /// by. It lives here rather than on [`Obb`] because it is a fact about the
 /// scene, not about geometry: an [`Obb`] is a rectangle and should stay one.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -89,33 +89,33 @@ pub(super) fn build(scene: &Scene) -> Vec<Obstacle> {
         Obstacle::wall(Obb::from_bounds(
             -SCENE_HALF_EXTENT_M,
             SCENE_HALF_EXTENT_M,
-            -(scene.pavement_width + scene.road_width) - FAR_SIDE_THICKNESS_M,
-            -(scene.pavement_width + scene.road_width),
+            -(scene.sidewalk_width + scene.road_width) - FAR_SIDE_THICKNESS_M,
+            -(scene.sidewalk_width + scene.road_width),
         )),
     ];
 
-    // The pavement, split either side of the dropped kerb. The only thing in
+    // The sidewalk, split either side of the curb cut. The only thing in
     // a scene a vehicle can overhang.
-    if scene.pavement_width > PAVEMENT_EPSILON_M {
-        let half_kerb = scene.dropped_kerb_width / 2.0;
+    if scene.sidewalk_width > SIDEWALK_EPSILON_M {
+        let half_curb = scene.curb_cut_width / 2.0;
         let centre = f64::midpoint(left, right);
         obstacles.push(Obstacle::low(
             Obb::from_bounds(
                 -SCENE_HALF_EXTENT_M,
-                centre - half_kerb,
-                -scene.pavement_width,
+                centre - half_curb,
+                -scene.sidewalk_width,
                 0.0,
             ),
-            scene.kerb_height,
+            scene.curb_height,
         ));
         obstacles.push(Obstacle::low(
             Obb::from_bounds(
-                centre + half_kerb,
+                centre + half_curb,
                 SCENE_HALF_EXTENT_M,
-                -scene.pavement_width,
+                -scene.sidewalk_width,
                 0.0,
             ),
-            scene.kerb_height,
+            scene.curb_height,
         ));
     }
 

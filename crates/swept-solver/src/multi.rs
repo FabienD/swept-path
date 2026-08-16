@@ -268,7 +268,7 @@ fn seed(
     goal: f64,
 ) -> Option<Frontier> {
     let half_width = vehicle.mirror_width / 2.0;
-    let low = -scene.pavement_width - scene.road_width + half_width + SEED_MARGIN_LOW_M;
+    let low = -scene.sidewalk_width - scene.road_width + half_width + SEED_MARGIN_LOW_M;
     let high = -half_width - SEED_MARGIN_HIGH_M;
     if low > high {
         return None;
@@ -546,10 +546,10 @@ mod tests {
                 depth: 0.55,
             },
             wall_thickness: 0.30,
-            pavement_width: 1.20,
-            dropped_kerb_width: opening + 0.80,
+            sidewalk_width: 1.20,
+            curb_cut_width: opening + 0.80,
             road_width: 4.50,
-            kerb_height: f64::INFINITY,
+            curb_height: f64::INFINITY,
             gate: GateKind::Sliding,
         }
     }

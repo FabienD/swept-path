@@ -7,10 +7,10 @@ function scene(opening: number, swinging = false): SceneDto {
     left_post: { inner_edge_x: -opening / 2, width: 0.55, depth: 0.55 },
     right_post: { inner_edge_x: opening / 2, width: 0.55, depth: 0.55 },
     wall_thickness: 0.3,
-    pavement_width: 1.2,
-    dropped_kerb_width: opening + 0.8,
+    sidewalk_width: 1.2,
+    curb_cut_width: opening + 0.8,
     road_width: 4.5,
-    kerb_height: 0.12,
+    curb_height: 0.12,
     gate: swinging
       ? {
           kind: "swinging",
@@ -28,11 +28,11 @@ const shapes = (s: SceneDto) =>
   sceneToPrimitives(s).filter((p) => p.type === "polygon");
 
 describe("scene rendering", () => {
-  it("draws the wall, the posts and the split pavement", () => {
+  it("draws the wall, the posts and the split sidewalk", () => {
     const roles = shapes(scene(2.4)).map((p) => p.role);
     expect(roles.filter((r) => r === "wall")).toHaveLength(2);
     expect(roles.filter((r) => r === "post")).toHaveLength(2);
-    expect(roles.filter((r) => r === "pavement")).toHaveLength(2);
+    expect(roles.filter((r) => r === "sidewalk")).toHaveLength(2);
     expect(roles.filter((r) => r === "leaf")).toHaveLength(0);
   });
 
@@ -41,9 +41,9 @@ describe("scene rendering", () => {
     expect(roles.filter((r) => r === "leaf")).toHaveLength(2);
   });
 
-  it("omits the pavement when there is none", () => {
-    const none = { ...scene(2.4), pavement_width: 0 };
-    expect(shapes(none).filter((p) => p.role === "pavement")).toHaveLength(0);
+  it("omits the sidewalk when there is none", () => {
+    const none = { ...scene(2.4), sidewalk_width: 0 };
+    expect(shapes(none).filter((p) => p.role === "sidewalk")).toHaveLength(0);
   });
 
   it("leaves the full span clear for a sliding gate", () => {

@@ -23,7 +23,7 @@ import table from "../../../data/vehicles.json";
 const BODY_TO_TRACK_M = 0.26;
 
 /** What a published turning radius is measured on. */
-type RadiusKind = "kerb" | "wall" | "pivot" | null;
+type RadiusKind = "curb" | "wall" | "pivot" | null;
 
 /** One entry, with `null` wherever the database has no figure. */
 export interface VehiclePreset {
@@ -45,17 +45,17 @@ export interface VehiclePreset {
 }
 
 /**
- * Converts a kerb-to-kerb radius into the rear-axle pivot radius.
+ * Converts a curb-to-curb radius into the rear-axle pivot radius.
  *
- * Mirrors `swept_core::vehicle::pivot_radius_from_kerb`. Manufacturers
+ * Mirrors `swept_core::vehicle::pivot_radius_from_curb`. Manufacturers
  * publish the circle traced by the outer front wheel; the bicycle model turns
  * about the rear axle, which runs well inside it. Using the published figure
  * directly makes every vehicle turn about half again as wide as it really
  * can — and the simulator then invents manoeuvres to make up for it.
  */
-function pivotRadius(kerbRadius: number, wheelbase: number, width: number): number | null {
+function pivotRadius(curbRadius: number, wheelbase: number, width: number): number | null {
   const track = width - BODY_TO_TRACK_M;
-  const atFrontAxle = kerbRadius - track / 2;
+  const atFrontAxle = curbRadius - track / 2;
   const squared = atFrontAxle * atFrontAxle - wheelbase * wheelbase;
   return squared > 0 ? Math.sqrt(squared) : null;
 }
@@ -75,7 +75,7 @@ function pivotFrom(
 ): number | null {
   if (published === null) return null;
   if (kind === "pivot") return published;
-  if (kind !== "kerb" || wheelbase === null || width === null) return null;
+  if (kind !== "curb" || wheelbase === null || width === null) return null;
   return pivotRadius(published, wheelbase, width);
 }
 

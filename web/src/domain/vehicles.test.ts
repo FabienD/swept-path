@@ -37,7 +37,7 @@ describe("vehicle table", () => {
   });
 
   it("turns tighter than the published radius, wherever one is published", () => {
-    // Published figures are kerb to kerb, traced by the outer front wheel.
+    // Published figures are curb to curb, traced by the outer front wheel.
     // The bicycle model pivots about the rear axle, well inside that circle.
     for (const v of VEHICLES) {
       if (v.min_turning_radius === null || v.published_radius === null) continue;

@@ -57,7 +57,7 @@ impl Obb {
 
     /// Builds an axis-aligned rectangle from its bounds.
     ///
-    /// Most of a scene is walls and kerbs, which are axis-aligned; this is the
+    /// Most of a scene is walls and curbs, which are axis-aligned; this is the
     /// constructor they use.
     #[must_use]
     pub fn from_bounds(x0: f64, x1: f64, y0: f64, y1: f64) -> Self {

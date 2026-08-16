@@ -1,6 +1,6 @@
 //! The scene the vehicle has to get through.
 //!
-//! A road, a pavement broken by a dropped kerb, a wall pierced by an opening
+//! A road, a sidewalk broken by a curb cut, a wall pierced by an opening
 //! between two posts, and a free yard beyond. Everything is expressed in the
 //! frame described at the crate root.
 //!
@@ -58,20 +58,20 @@ pub struct Scene {
     pub right_post: Post,
     /// Thickness of the wall running away from the posts, in metres.
     pub wall_thickness: f64,
-    /// Width of the pavement between road and wall, in metres. Zero means no
-    /// pavement.
-    pub pavement_width: f64,
-    /// Width of the dropped kerb across the pavement, in metres.
-    pub dropped_kerb_width: f64,
+    /// Width of the sidewalk between road and wall, in metres. Zero means no
+    /// sidewalk.
+    pub sidewalk_width: f64,
+    /// Width of the curb cut across the sidewalk, in metres.
+    pub curb_cut_width: f64,
     /// Width of the carriageway available to manoeuvre in, in metres.
     pub road_width: f64,
-    /// Height of the pavement kerb, in metres.
+    /// Height of the sidewalk curb, in metres.
     ///
     /// The one thing in a scene a body can pass over. Set it to
-    /// `f64::INFINITY` to get the pre-height behaviour, where a kerb stops
+    /// `f64::INFINITY` to get the pre-height behaviour, where a curb stops
     /// everything — which is what the reference tests do, so that their
     /// results keep describing the world they were established in.
-    pub kerb_height: f64,
+    pub curb_height: f64,
     /// What closes the opening.
     pub gate: GateKind,
 }
@@ -86,10 +86,10 @@ impl Scene {
     ///     left_post: Post { inner_edge_x: -1.2, width: 0.55, depth: 0.55 },
     ///     right_post: Post { inner_edge_x: 1.2, width: 0.55, depth: 0.55 },
     ///     wall_thickness: 0.3,
-    ///     pavement_width: 1.2,
-    ///     dropped_kerb_width: 3.2,
+    ///     sidewalk_width: 1.2,
+    ///     curb_cut_width: 3.2,
     ///     road_width: 4.5,
-    ///     kerb_height: 0.12,
+    ///     curb_height: 0.12,
     ///     gate: GateKind::Sliding,
     /// };
     /// assert!((scene.opening_width() - 2.4).abs() < 1e-12);
@@ -135,10 +135,10 @@ mod tests {
                 depth: 0.55,
             },
             wall_thickness: 0.30,
-            pavement_width: 1.20,
-            dropped_kerb_width: 3.20,
+            sidewalk_width: 1.20,
+            curb_cut_width: 3.20,
             road_width: 4.50,
-            kerb_height: f64::INFINITY,
+            curb_height: f64::INFINITY,
             gate: GateKind::Sliding,
         }
     }
@@ -157,8 +157,8 @@ mod tests {
 
     #[test]
     fn builds_the_expected_obstacles_for_a_sliding_gate() {
-        // Two wall stretches, two pillars, the far kerb, and the pavement
-        // split either side of the dropped kerb: seven rectangles.
+        // Two wall stretches, two pillars, the far curb, and the sidewalk
+        // split either side of the curb cut: seven rectangles.
         assert_eq!(symmetric().obstacles().len(), 7);
     }
 
@@ -177,25 +177,25 @@ mod tests {
     }
 
     #[test]
-    fn omits_the_pavement_when_there_is_none() {
+    fn omits_the_sidewalk_when_there_is_none() {
         let mut scene = symmetric();
-        scene.pavement_width = 0.0;
+        scene.sidewalk_width = 0.0;
         assert_eq!(scene.obstacles().len(), 5);
     }
 
     #[test]
-    fn only_the_pavement_is_low() {
+    fn only_the_sidewalk_is_low() {
         // Everything a scene contains is a wall except the two strips of
-        // pavement, which a body can overhang. Getting this wrong in either
+        // sidewalk, which a body can overhang. Getting this wrong in either
         // direction is invisible until a result is wrong.
         let mut scene = symmetric();
-        scene.kerb_height = 0.12;
+        scene.curb_height = 0.12;
         let obstacles = scene.obstacles();
         let low: Vec<_> = obstacles.iter().filter(|o| o.height.is_finite()).collect();
         assert_eq!(
             low.len(),
             2,
-            "the pavement is split either side of the kerb"
+            "the sidewalk is split either side of the curb"
         );
         for obstacle in low {
             assert!((obstacle.height - 0.12).abs() < EPS);
@@ -203,19 +203,19 @@ mod tests {
     }
 
     #[test]
-    fn a_scene_without_a_pavement_has_nothing_low() {
+    fn a_scene_without_a_sidewalk_has_nothing_low() {
         let mut scene = symmetric();
-        scene.pavement_width = 0.0;
-        scene.kerb_height = 0.12;
+        scene.sidewalk_width = 0.0;
+        scene.curb_height = 0.12;
         assert!(scene.obstacles().iter().all(|o| !o.height.is_finite()));
     }
 
     #[test]
-    fn a_kerb_declared_full_height_leaves_no_low_obstacle() {
-        // How every pre-existing test keeps its results: an infinite kerb is
+    fn a_curb_declared_full_height_leaves_no_low_obstacle() {
+        // How every pre-existing test keeps its results: an infinite curb is
         // a wall, and the scene is exactly what it was before this batch.
         let mut scene = symmetric();
-        scene.kerb_height = f64::INFINITY;
+        scene.curb_height = f64::INFINITY;
         assert!(scene.obstacles().iter().all(|o| !o.height.is_finite()));
     }
 

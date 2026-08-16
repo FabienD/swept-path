@@ -20,7 +20,7 @@ export type Role =
   | "wall"
   | "post"
   | "leaf"
-  | "pavement"
+  | "sidewalk"
   | "road-edge"
   | "road-centre"
   | "vehicle"

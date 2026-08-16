@@ -139,10 +139,10 @@ mod tests {
                 depth: 0.55,
             },
             wall_thickness: 0.30,
-            pavement_width: 1.20,
-            dropped_kerb_width: opening + 0.80,
+            sidewalk_width: 1.20,
+            curb_cut_width: opening + 0.80,
             road_width: 4.50,
-            kerb_height: f64::INFINITY,
+            curb_height: f64::INFINITY,
             gate: GateKind::Sliding,
         }
     }
@@ -250,13 +250,13 @@ mod tests {
     #[test]
     fn more_moves_must_buy_more_room_than_every_shorter_answer() {
         // Fabien's gateway, with the pivot radius rather than the published
-        // one: swinging leaves at 90 degrees, 1.25 m pavement, 6.20 m road.
+        // one: swinging leaves at 90 degrees, 1.25 m sidewalk, 6.20 m road.
         let vehicle = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid");
         for opening in [2.30_f64, 2.40, 2.60, 3.00] {
             let mut sc = scene(opening);
-            sc.pavement_width = 1.25;
+            sc.sidewalk_width = 1.25;
             sc.road_width = 6.20;
-            sc.dropped_kerb_width = 3.20;
+            sc.curb_cut_width = 3.20;
             sc.gate = GateKind::Swinging {
                 leaf_length: 1.15,
                 leaf_thickness: 0.04,

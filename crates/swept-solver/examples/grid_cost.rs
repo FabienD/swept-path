@@ -35,10 +35,10 @@ fn scene(opening: f64) -> Scene {
             depth: 0.55,
         },
         wall_thickness: 0.30,
-        pavement_width: 1.20,
-        dropped_kerb_width: opening + 0.80,
+        sidewalk_width: 1.20,
+        curb_cut_width: opening + 0.80,
         road_width: 4.50,
-        kerb_height: f64::INFINITY,
+        curb_height: f64::INFINITY,
         gate: GateKind::Sliding,
     }
 }

@@ -59,7 +59,7 @@ impl Discretisation {
     /// protected by its own clumsiness, not by any virtue.
     ///
     /// Measured: on a 4 m opening the tightest point of a fine-grid plan sits
-    /// at pose 14 of 327, at `(-5.90, -2.47)` — grazing the kerb six metres
+    /// at pose 14 of 327, at `(-5.90, -2.47)` — grazing the curb six metres
     /// short of the gateway, nowhere near the opening.
     ///
     /// The fix is therefore not a bigger budget but a cost function that

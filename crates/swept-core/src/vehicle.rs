@@ -55,7 +55,7 @@ pub struct Vehicle {
     pub mirror_width: f64,
     /// Height of the lowest point of the bodywork, wheels excluded, in metres.
     ///
-    /// What decides whether the vehicle can overhang a kerb rather than be
+    /// What decides whether the vehicle can overhang a curb rather than be
     /// stopped by it. Manufacturers publish this figure, and three caveats
     /// come with it: it is quoted **unladen** — a loaded vehicle settles two
     /// to four centimetres — the measuring convention varies between makers,
@@ -69,17 +69,17 @@ pub struct Vehicle {
     /// Radius traced by the **rear axle centre** at full lock, in metres.
     ///
     /// This is the pivot the bicycle model turns about, and it is *not* the
-    /// figure manufacturers publish. A kerb-to-kerb radius is traced by the
+    /// figure manufacturers publish. A curb-to-curb radius is traced by the
     /// outer front wheel and is markedly larger — for a Lexus LBX, 5.20 m
     /// published against 3.59 m here. Feeding the published number in makes
     /// the vehicle turn about half again as wide as it can, and the simulator
     /// invents manoeuvres to compensate.
     ///
-    /// Use [`pivot_radius_from_kerb`] to convert.
+    /// Use [`pivot_radius_from_curb`] to convert.
     pub min_turning_radius: f64,
 }
 
-/// Converts a kerb-to-kerb radius into the rear-axle pivot radius.
+/// Converts a curb-to-curb radius into the rear-axle pivot radius.
 ///
 /// Manufacturers publish the circle traced by the outer front wheel. The rear
 /// axle centre runs inside it: subtract half the track to reach the front
@@ -87,10 +87,10 @@ pub struct Vehicle {
 /// hypotenuse that is and whose other leg is the wheelbase.
 ///
 /// ```
-/// use swept_core::vehicle::pivot_radius_from_kerb;
+/// use swept_core::vehicle::pivot_radius_from_curb;
 ///
 /// // Lexus LBX: 5.20 m published, 2.58 m wheelbase, 1.56 m track.
-/// let pivot = pivot_radius_from_kerb(5.20, 2.58, 1.56).unwrap();
+/// let pivot = pivot_radius_from_curb(5.20, 2.58, 1.56).unwrap();
 /// assert!((pivot - 3.59).abs() < 0.02);
 /// ```
 ///
@@ -99,17 +99,17 @@ pub struct Vehicle {
 /// Returns [`VehicleError::ImplausibleTurningRadius`] when the figures cannot
 /// describe a real vehicle — a radius smaller than the wheelbase it is
 /// supposed to swing, for instance.
-pub fn pivot_radius_from_kerb(
-    kerb_radius: f64,
+pub fn pivot_radius_from_curb(
+    curb_radius: f64,
     wheelbase: f64,
     track: f64,
 ) -> Result<f64, VehicleError> {
-    for value in [kerb_radius, wheelbase, track] {
+    for value in [curb_radius, wheelbase, track] {
         if !value.is_finite() || value <= 0.0 {
             return Err(VehicleError::ImplausibleTurningRadius);
         }
     }
-    let at_front_axle = kerb_radius - track / 2.0;
+    let at_front_axle = curb_radius - track / 2.0;
     let squared = at_front_axle.mul_add(at_front_axle, -(wheelbase * wheelbase));
     if squared <= 0.0 {
         return Err(VehicleError::ImplausibleTurningRadius);
@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn rejects_a_ground_clearance_of_zero() {
         // A vehicle flat on the ground overhangs nothing, which would silently
-        // turn every kerb back into a wall — the very state this batch leaves.
+        // turn every curb back into a wall — the very state this batch leaves.
         let error = Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.0, 5.2)
             .expect_err("zero is not a ground clearance");
         assert_eq!(error, VehicleError::NonPositive("ground_clearance"));
@@ -287,19 +287,19 @@ mod tests {
     }
 
     #[test]
-    fn converts_a_kerb_to_kerb_radius_into_a_pivot_radius() {
-        // Lexus LBX: 5.2 m kerb to kerb, 2.58 m wheelbase, 1.56 m track. The
+    fn converts_a_curb_to_curb_radius_into_a_pivot_radius() {
+        // Lexus LBX: 5.2 m curb to curb, 2.58 m wheelbase, 1.56 m track. The
         // rear axle centre runs on a much tighter circle than the outer front
         // wheel that traces the published figure.
-        let pivot = pivot_radius_from_kerb(5.2, 2.58, 1.56).expect("plausible");
+        let pivot = pivot_radius_from_curb(5.2, 2.58, 1.56).expect("plausible");
         assert!((pivot - 3.59).abs() < 0.02, "got {pivot}");
     }
 
     #[test]
     fn a_pivot_radius_is_always_tighter_than_the_published_one() {
-        for kerb in [4.8_f64, 5.2, 5.7, 6.2] {
-            let pivot = pivot_radius_from_kerb(kerb, 2.58, 1.56).expect("plausible");
-            assert!(pivot < kerb, "{pivot} should be under {kerb}");
+        for curb in [4.8_f64, 5.2, 5.7, 6.2] {
+            let pivot = pivot_radius_from_curb(curb, 2.58, 1.56).expect("plausible");
+            assert!(pivot < curb, "{pivot} should be under {curb}");
         }
     }
 
@@ -308,7 +308,7 @@ mod tests {
         // A car cannot turn inside its own wheelbase; such a figure is a
         // transcription error, not a very agile vehicle.
         assert_eq!(
-            pivot_radius_from_kerb(2.0, 2.58, 1.56),
+            pivot_radius_from_curb(2.0, 2.58, 1.56),
             Err(VehicleError::ImplausibleTurningRadius)
         );
     }

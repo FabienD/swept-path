@@ -28,10 +28,10 @@ fn scene(opening: f64) -> Scene {
             depth: 0.55,
         },
         wall_thickness: 0.30,
-        pavement_width: 1.30,
-        dropped_kerb_width: 3.20,
+        sidewalk_width: 1.30,
+        curb_cut_width: 3.20,
         road_width: 5.90,
-        kerb_height: f64::INFINITY,
+        curb_height: f64::INFINITY,
         gate: GateKind::Swinging {
             leaf_length: 1.15,
             leaf_thickness: 0.04,
@@ -43,7 +43,7 @@ fn scene(opening: f64) -> Scene {
 }
 
 fn main() {
-    // The measured vehicle, with the pivot radius rather than the kerb radius.
+    // The measured vehicle, with the pivot radius rather than the curb radius.
     let vehicle =
         Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 3.59).expect("valid vehicle");
 

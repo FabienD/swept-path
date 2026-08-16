@@ -68,14 +68,14 @@ pub struct SceneDto {
     pub right_post: PostDto,
     /// Wall thickness, in metres.
     pub wall_thickness: f64,
-    /// Pavement width, in metres; zero for none.
-    pub pavement_width: f64,
-    /// Dropped kerb width, in metres.
-    pub dropped_kerb_width: f64,
+    /// Sidewalk width, in metres; zero for none.
+    pub sidewalk_width: f64,
+    /// Curb cut width, in metres.
+    pub curb_cut_width: f64,
     /// Carriageway width, in metres.
     pub road_width: f64,
-    /// Kerb height, in metres. Infinite for a kerb nothing passes over.
-    pub kerb_height: f64,
+    /// Curb height, in metres. Infinite for a curb nothing passes over.
+    pub curb_height: f64,
     /// What closes the opening.
     pub gate: GateDto,
 }
@@ -96,10 +96,10 @@ impl SceneDto {
                 depth: self.right_post.depth,
             },
             wall_thickness: self.wall_thickness,
-            pavement_width: self.pavement_width,
-            dropped_kerb_width: self.dropped_kerb_width,
+            sidewalk_width: self.sidewalk_width,
+            curb_cut_width: self.curb_cut_width,
             road_width: self.road_width,
-            kerb_height: self.kerb_height,
+            curb_height: self.curb_height,
             gate: match self.gate {
                 GateDto::Sliding => GateKind::Sliding,
                 GateDto::Swinging {
@@ -226,7 +226,7 @@ pub struct ManeuverDto {
     pub min_clearance: f64,
     /// Tightest clearance **within the gateway**, in metres.
     ///
-    /// Separate from `min_clearance` because grazing a kerb six metres short
+    /// Separate from `min_clearance` because grazing a curb six metres short
     /// of the gate does not mean the same thing to a driver as grazing a post
     /// — and batch 1b showed the planner does exactly that.
     pub min_clearance_in_gateway: f64,
@@ -237,7 +237,7 @@ pub struct ManeuverDto {
     /// Distance travelled with part of the body over a low obstacle, in metres.
     ///
     /// Legal geometry, and worth reporting: the model is flat and knows
-    /// nothing of the bollard or sign that so often stands on a pavement.
+    /// nothing of the bollard or sign that so often stands on a sidewalk.
     pub metres_overhanging: f64,
     /// Total distance travelled, in metres.
     pub distance: f64,
@@ -435,10 +435,10 @@ mod tests {
                 depth: 0.55,
             },
             wall_thickness: 0.30,
-            pavement_width: 1.20,
-            dropped_kerb_width: 3.20,
+            sidewalk_width: 1.20,
+            curb_cut_width: 3.20,
             road_width: 4.50,
-            kerb_height: f64::INFINITY,
+            curb_height: f64::INFINITY,
             gate: GateDto::Sliding,
         }
     }
@@ -517,7 +517,7 @@ mod tests {
                     width: 0.55,
                     depth: 0.55,
                 },
-                dropped_kerb_width: 5.8,
+                curb_cut_width: 5.8,
                 ..scene_dto()
             },
             vehicle: vehicle_dto(),
@@ -534,7 +534,7 @@ mod tests {
 
     #[test]
     fn the_gateway_clearance_ignores_what_happens_out_on_the_road() {
-        // Batch 1b found the tightest point can sit against a kerb metres
+        // Batch 1b found the tightest point can sit against a curb metres
         // short of the gate. The two figures must then differ.
         let response = run_solve(SolveRequest {
             scene: scene_dto(),
@@ -579,7 +579,7 @@ mod tests {
         let mut scene = scene_dto();
         scene.left_post.inner_edge_x = -2.29 / 2.0;
         scene.right_post.inner_edge_x = 2.29 / 2.0;
-        scene.pavement_width = 1.30;
+        scene.sidewalk_width = 1.30;
         scene.road_width = 5.90;
         scene.gate = GateDto::Swinging {
             leaf_length: 1.15,
@@ -612,9 +612,9 @@ mod tests {
     }
 
     #[test]
-    fn a_walled_kerb_leaves_nothing_overhanging() {
+    fn a_walled_curb_leaves_nothing_overhanging() {
         let mut scene = scene_dto();
-        scene.kerb_height = f64::INFINITY;
+        scene.curb_height = f64::INFINITY;
         let response = run_solve(SolveRequest {
             scene,
             vehicle: vehicle_dto(),
@@ -632,7 +632,7 @@ mod tests {
         // The same guard the alert bands carry: a length summed from pose
         // spacing cannot exceed the length it is summed from.
         let mut scene = scene_dto();
-        scene.kerb_height = 0.12;
+        scene.curb_height = 0.12;
         let response = run_solve(SolveRequest {
             scene,
             vehicle: vehicle_dto(),

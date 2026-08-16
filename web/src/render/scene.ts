@@ -30,7 +30,7 @@ export function boundsFor(scene: SceneDto): Bounds {
   return {
     xMin: -HALF_VIEW_M,
     xMax: HALF_VIEW_M,
-    yMin: -scene.pavement_width - scene.road_width - 1.2,
+    yMin: -scene.sidewalk_width - scene.road_width - 1.2,
     yMax: deepest + gateDepth(scene) + YARD_MARGIN_M,
   };
 }
@@ -73,7 +73,7 @@ export function sceneToPrimitives(scene: SceneDto): Primitive[] {
   const right = scene.right_post.inner_edge_x;
   const leftOuter = left - scene.left_post.width;
   const rightOuter = right + scene.right_post.width;
-  const roadEdge = -scene.pavement_width - scene.road_width;
+  const roadEdge = -scene.sidewalk_width - scene.road_width;
 
   const out: Primitive[] = [];
 
@@ -100,13 +100,13 @@ export function sceneToPrimitives(scene: SceneDto): Primitive[] {
     });
   }
 
-  // The pavement, split either side of the dropped kerb.
-  if (scene.pavement_width > 0.001) {
-    const halfKerb = scene.dropped_kerb_width / 2;
+  // The sidewalk, split either side of the curb cut.
+  if (scene.sidewalk_width > 0.001) {
+    const halfCurb = scene.curb_cut_width / 2;
     const centre = (left + right) / 2;
     out.push(
-      rectangle("pavement", bounds.xMin, centre - halfKerb, -scene.pavement_width, 0),
-      rectangle("pavement", centre + halfKerb, bounds.xMax, -scene.pavement_width, 0),
+      rectangle("sidewalk", bounds.xMin, centre - halfCurb, -scene.sidewalk_width, 0),
+      rectangle("sidewalk", centre + halfCurb, bounds.xMax, -scene.sidewalk_width, 0),
     );
   }
 
@@ -123,7 +123,7 @@ export function sceneToPrimitives(scene: SceneDto): Primitive[] {
     if (primitive) out.push(primitive);
   }
 
-  // The far kerb, and the centre line when there is room for one.
+  // The far curb, and the centre line when there is room for one.
   out.push({
     type: "polyline",
     role: "road-edge",
@@ -133,7 +133,7 @@ export function sceneToPrimitives(scene: SceneDto): Primitive[] {
     ],
   });
   if (scene.road_width > 0.5) {
-    const middle = -scene.pavement_width - scene.road_width / 2;
+    const middle = -scene.sidewalk_width - scene.road_width / 2;
     out.push({
       type: "polyline",
       role: "road-centre",
