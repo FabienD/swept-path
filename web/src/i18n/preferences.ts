@@ -1,11 +1,14 @@
 /**
  * Which language and which units, remembered between visits.
  *
- * Two settings rather than one, because the pairings that look odd are real:
- * a French driver measuring an imported car wants inches in French, and an
- * English speaker living in France wants metres in English. Choosing English
- * moves the units to imperial once, as a first guess; after that they are
- * independent.
+ * Two settings, fully independent. The pairings that look odd are the real
+ * ones: a French driver measuring an imported car wants inches in French, and
+ * an English speaker living in France wants metres in English.
+ *
+ * Language is guessed from the browser; units never are. Metres are the
+ * default for everyone, because they are what the tool computes in and what
+ * the gateway was almost certainly measured with — imperial is a choice
+ * someone makes, not one made for them.
  */
 import type { UnitSystem } from "../domain/units";
 
@@ -30,15 +33,16 @@ const DEFAULT: Preferences = { locale: "fr", units: "metric" };
 /**
  * What to show someone who has never chosen.
  *
- * Only the United States gets inches. Britain reads English and measures its
- * gateways in metres, so language alone is not enough to decide units — which
- * is the same reason the two settings stay separate.
+ * The language follows the browser; the units do not follow the language.
+ * Even in the United States, a gateway is a thing someone goes out and
+ * measures, and the tape they own is far more likely to be metric than the
+ * page's language suggests.
  */
 export function detectPreferences(language: string | undefined): Preferences {
   if (!language) return DEFAULT;
-  const tag = language.toLowerCase();
-  if (tag.startsWith("fr")) return { locale: "fr", units: "metric" };
-  return { locale: "en", units: tag === "en-us" ? "us" : "metric" };
+  return language.toLowerCase().startsWith("fr")
+    ? { locale: "fr", units: "metric" }
+    : { locale: "en", units: "metric" };
 }
 
 const isLocale = (value: unknown): value is Locale => value === "fr" || value === "en";

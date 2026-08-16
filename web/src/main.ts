@@ -783,27 +783,20 @@ function adopt(next: Preferences): void {
   draw();
 }
 
-/** True once the visitor has set the units themselves. */
-let unitsChosen = false;
-
 byId<HTMLSelectElement>("locale")?.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLSelectElement)) return;
-  const locale = target.value as Preferences["locale"];
-  // Choosing English moves the units to imperial, once, as a first guess —
-  // and only from the untouched default. Someone who has already set the
-  // units has said what they want, and is not overruled by a language change.
-  const units =
-    locale === "en" && !unitsChosen ? "us" : store.get().preferences.units;
-  adopt({ locale, units });
-  const control = byId<HTMLSelectElement>("units");
-  if (control) control.value = units;
+  // Language alone. Changing it never moves the units: someone reading in
+  // English has said nothing about the tape they measured their gate with.
+  adopt({
+    locale: target.value as Preferences["locale"],
+    units: store.get().preferences.units,
+  });
 });
 
 byId<HTMLSelectElement>("units")?.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLSelectElement)) return;
-  unitsChosen = true;
   adopt({
     locale: store.get().preferences.locale,
     units: target.value as Preferences["units"],

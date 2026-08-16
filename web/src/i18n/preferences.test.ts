@@ -19,10 +19,11 @@ describe("guessing from the browser", () => {
     expect(detectPreferences("fr-CA")).toEqual({ locale: "fr", units: "metric" });
   });
 
-  it("gives inches only where they are actually used", () => {
-    // The United States measures its driveways in feet. Britain does not:
-    // it reads English and measures gateways in metres.
-    expect(detectPreferences("en-US")).toEqual({ locale: "en", units: "us" });
+  it("never guesses imperial, not even in the United States", () => {
+    // Metres are what the tool computes in and, far more often than the
+    // page's language suggests, what the gateway was measured with. Imperial
+    // is a choice someone makes, never one made for them.
+    expect(detectPreferences("en-US")).toEqual({ locale: "en", units: "metric" });
     expect(detectPreferences("en-GB")).toEqual({ locale: "en", units: "metric" });
   });
 
@@ -39,12 +40,12 @@ describe("guessing from the browser", () => {
 
 describe("remembering a choice", () => {
   it("prefers what was chosen over what was guessed", () => {
-    const store = fake({ [STORAGE_KEY]: '{"locale":"en","units":"metric"}' });
-    expect(loadPreferences(store, "fr-FR")).toEqual({ locale: "en", units: "metric" });
+    const store = fake({ [STORAGE_KEY]: '{"locale":"fr","units":"us"}' });
+    expect(loadPreferences(store, "fr-FR")).toEqual({ locale: "fr", units: "us" });
   });
 
   it("guesses when nothing was ever chosen", () => {
-    expect(loadPreferences(fake(), "en-US")).toEqual({ locale: "en", units: "us" });
+    expect(loadPreferences(fake(), "en-US")).toEqual({ locale: "en", units: "metric" });
   });
 
   it("guesses rather than throw on a stored value it cannot read", () => {
