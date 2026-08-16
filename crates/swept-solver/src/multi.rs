@@ -402,14 +402,14 @@ pub fn plan(
         let heading_error = (FRAC_PI_2 - pose.heading.get())
             .abs()
             .min((-FRAC_PI_2 - pose.heading.get()).abs());
-        if pose.x.abs() < LANDING_TRIGGER_X_M
-            && heading_error < LANDING_TRIGGER_HEADING_RAD
-            && expanded.is_multiple_of(ANALYTIC_EVERY)
-        {
+        if pose.x.abs() < LANDING_TRIGGER_X_M && heading_error < LANDING_TRIGGER_HEADING_RAD {
+            // The shaped landing runs every time; only the closed-form one is
+            // spaced out, because only it is expensive.
+            let with_curves = expanded.is_multiple_of(ANALYTIC_EVERY);
             // Each landing is filed under what it actually costs: turning
             // round to back in is a move, and a roomier landing that spends
             // one is not the same answer as a tighter one that does not.
-            for landing in landings(pose, vehicle, scene, &field, allowed) {
+            for landing in landings(pose, vehicle, scene, &field, allowed, with_curves) {
                 // Every shunt the curve makes counts, not just its final
                 // gear. The old landing was one arc and a straight run and
                 // could not shunt at all; a closed-form curve can, and a plan

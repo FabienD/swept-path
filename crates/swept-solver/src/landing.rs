@@ -8,13 +8,27 @@
 //! Every curve that applies is tried and the roomiest kept. Length never
 //! enters it: the shortest path is the one that grazes most.
 
-use crate::path::evaluate_at_least;
+use crate::budget::Discretisation;
+use crate::path::{entry_depth, evaluate, evaluate_at_least};
 use crate::poses::goal_poses;
+use std::f64::consts::{FRAC_PI_2, PI};
 use swept_core::clearance::ClearanceField;
 use swept_core::curves::reeds_shepp;
-use swept_core::kinematics::{Direction, Pose};
+use swept_core::kinematics::{Direction, Pose, sample_arc};
 use swept_core::scene::Scene;
 use swept_core::vehicle::Vehicle;
+
+/// Wraps an angle into `(-π, π]`, as the shaped landing needs.
+fn wrap(angle: f64) -> f64 {
+    let mut a = angle;
+    while a > PI {
+        a -= 2.0 * PI;
+    }
+    while a <= -PI {
+        a += 2.0 * PI;
+    }
+    a
+}
 
 /// How many points along the opening a landing aims at.
 ///
@@ -101,7 +115,7 @@ impl Landing {
     ///
     /// With an even number of gear changes the curve ends as it began.
     fn starts_in(&self) -> Direction {
-        if self.reversals % 2 == 0 {
+        if self.reversals.is_multiple_of(2) {
             self.direction
         } else {
             match self.direction {
@@ -135,6 +149,117 @@ fn landing_goals(vehicle: &Vehicle, scene: &Scene) -> Vec<Pose> {
     goals
 }
 
+/// How many turning radii the landing tries.
+///
+/// ARBITRARY — carried over from the prototype (`index.html:459`).
+pub const LANDING_RADIUS_COUNT: usize = 6;
+/// Spacing between those radii, in metres.
+///
+/// ARBITRARY — carried over from the prototype (`index.html:459`).
+pub const LANDING_RADIUS_SPREAD_M: f64 = 1.1;
+/// Longest swing allowed when lining up, in metres of arc.
+///
+/// Beyond this the manoeuvre stops resembling anything a driver would do.
+/// ARBITRARY — carried over from the prototype (`index.html:432`).
+pub const MAX_LANDING_ARC_M: f64 = 22.0;
+
+/// The turning radii a landing will try, tightest first.
+#[must_use]
+pub fn landing_radii(vehicle: &Vehicle) -> Vec<f64> {
+    (0..LANDING_RADIUS_COUNT)
+        .map(|i| {
+            #[allow(clippy::cast_precision_loss)]
+            let offset = i as f64 * LANDING_RADIUS_SPREAD_M;
+            vehicle.min_turning_radius + offset
+        })
+        .collect()
+}
+
+/// The older landing: an arc at a chosen radius, then a straight push in.
+///
+/// **Kept alongside the closed-form one, and not as a fallback.** A curve
+/// arrives at an exact pose but often still turning, which a gateway leaving
+/// eight centimetres of room does not allow. This shape always finishes on a
+/// straight run, which is clumsy where there is space and the only thing that
+/// threads a tight opening — measured: below 2.60 m the closed form finds no
+/// landing at all, where this one does.
+///
+/// Both are tried and the roomiest wins, which is the rule this project
+/// applies everywhere else.
+fn shaped_landings(
+    from: Pose,
+    vehicle: &Vehicle,
+    scene: &Scene,
+    field: &ClearanceField,
+    allowed: Option<Direction>,
+) -> Vec<Landing> {
+    let needed = entry_depth(scene, vehicle);
+    let step = Discretisation::default().sample_step;
+    let mut found: Vec<Landing> = Vec::with_capacity(2);
+
+    for direction in [Direction::Forward, Direction::Reverse] {
+        let mut best: Option<Landing> = None;
+        if allowed.is_some_and(|only| only != direction) {
+            continue;
+        }
+        let target = match direction {
+            Direction::Forward => FRAC_PI_2,
+            Direction::Reverse => -FRAC_PI_2,
+        };
+        let turn = wrap(target - from.heading.get());
+
+        for radius in landing_radii(vehicle) {
+            for sign in [1.0, -1.0] {
+                let mut poses = Vec::new();
+                let mut at = from;
+
+                if turn.abs() > 1e-4 {
+                    let curvature = sign / radius;
+                    let arc = turn / curvature;
+                    // Forwards must swing forwards, reverse must swing back.
+                    match direction {
+                        Direction::Forward if arc <= 0.0 => continue,
+                        Direction::Reverse if arc >= 0.0 => continue,
+                        _ => {}
+                    }
+                    if arc.abs() > MAX_LANDING_ARC_M {
+                        continue;
+                    }
+                    poses.extend(sample_arc(at, curvature, arc, step));
+                    at = at.advance(curvature, arc);
+                } else if direction == Direction::Reverse {
+                    continue;
+                }
+
+                if at.y >= needed {
+                    continue;
+                }
+                let push = needed - at.y;
+                let signed = match direction {
+                    Direction::Forward => push,
+                    Direction::Reverse => -push,
+                };
+                poses.extend(sample_arc(at, 0.0, signed, step));
+
+                if let Some(min_clearance) = evaluate(&poses, field)
+                    && best
+                        .as_ref()
+                        .is_none_or(|b| min_clearance > b.min_clearance)
+                {
+                    best = Some(Landing {
+                        poses,
+                        min_clearance,
+                        direction,
+                        reversals: 0,
+                    });
+                }
+            }
+        }
+        found.extend(best);
+    }
+    found
+}
+
 /// Every collision-free landing from `from`, roomiest first per direction.
 ///
 /// At most two are returned — one finishing forwards, one finishing in
@@ -142,8 +267,44 @@ fn landing_goals(vehicle: &Vehicle, scene: &Scene) -> Vec<Pose> {
 /// and only the best of each gear can win that comparison.
 ///
 /// `allowed` restricts the gear when the interface asked for one.
+///
+/// `with_curves` decides whether the closed-form landing is attempted. It
+/// costs orders of magnitude more than the shaped one — a grid of goal poses,
+/// forty-eight curves each, every one sampled and walked against every
+/// obstacle — so the caller spaces those attempts out. The shaped landing is
+/// cheap and always tried: skipping it is what emptied the tightest gateway.
 #[must_use]
 pub fn landings(
+    from: Pose,
+    vehicle: &Vehicle,
+    scene: &Scene,
+    field: &ClearanceField,
+    allowed: Option<Direction>,
+    with_curves: bool,
+) -> Vec<Landing> {
+    let curved = if with_curves {
+        curved_landings(from, vehicle, scene, field, allowed)
+    } else {
+        Vec::new()
+    };
+    let mut best: [Option<Landing>; 2] = [None, None];
+    for landing in curved
+        .into_iter()
+        .chain(shaped_landings(from, vehicle, scene, field, allowed))
+    {
+        let slot = &mut best[usize::from(landing.direction == Direction::Reverse)];
+        if slot
+            .as_ref()
+            .is_none_or(|b: &Landing| landing.min_clearance > b.min_clearance)
+        {
+            *slot = Some(landing);
+        }
+    }
+    best.into_iter().flatten().collect()
+}
+
+/// The closed-form landing: every Reeds-Shepp curve to a goal pose.
+fn curved_landings(
     from: Pose,
     vehicle: &Vehicle,
     scene: &Scene,
@@ -231,7 +392,7 @@ mod tests {
         let goals =
             crate::poses::goal_poses(&vehicle, &sc, LANDING_ENTRY_STEPS, LANDING_HEADING_STEPS);
 
-        for landing in landings(from, &vehicle, &sc, &field, None) {
+        for landing in landings(from, &vehicle, &sc, &field, None, true) {
             let last = *landing.poses.last().expect("a landing has poses");
             let matched = goals.iter().any(|g| {
                 (g.x - last.x).abs() < 1e-6
@@ -247,7 +408,7 @@ mod tests {
         let (vehicle, sc) = (lbx(), scene(5.0));
         let field = ClearanceField::new(&sc, &vehicle);
         let from = Pose::new(-4.0, -3.0, Radians::default());
-        for landing in landings(from, &vehicle, &sc, &field, None) {
+        for landing in landings(from, &vehicle, &sc, &field, None, true) {
             let first = *landing.poses.first().expect("a landing has poses");
             assert!((first.x - from.x).abs() < 1e-9);
             assert!((first.y - from.y).abs() < 1e-9);
@@ -259,7 +420,7 @@ mod tests {
         let (vehicle, sc) = (lbx(), scene(5.0));
         let field = ClearanceField::new(&sc, &vehicle);
         let from = Pose::new(-4.0, -3.0, Radians::default());
-        for landing in landings(from, &vehicle, &sc, &field, None) {
+        for landing in landings(from, &vehicle, &sc, &field, None, true) {
             for pose in &landing.poses {
                 assert_ne!(field.at(*pose), swept_core::clearance::Clearance::Collision);
             }
@@ -299,7 +460,7 @@ mod tests {
         let field = ClearanceField::new(&sc, &vehicle);
         // Already pointing into the yard, just short of the wall.
         let from = Pose::new(0.0, -2.0, Radians::from_degrees(90.0));
-        let landing = landings(from, &vehicle, &sc, &field, None)
+        let landing = landings(from, &vehicle, &sc, &field, None, true)
             .into_iter()
             .next()
             .expect("a clear run in");
@@ -312,7 +473,7 @@ mod tests {
         let (vehicle, sc) = (lbx(), scene(5.0));
         let field = ClearanceField::new(&sc, &vehicle);
         let from = Pose::new(0.0, -2.0, Radians::from_degrees(90.0));
-        if let Some(landing) = landings(from, &vehicle, &sc, &field, Some(Direction::Reverse))
+        if let Some(landing) = landings(from, &vehicle, &sc, &field, Some(Direction::Reverse), true)
             .into_iter()
             .next()
         {
@@ -326,6 +487,6 @@ mod tests {
         let field = ClearanceField::new(&sc, &vehicle);
         // Pointing along the road, far off to the side.
         let from = Pose::new(-6.0, -3.0, Radians::default());
-        assert!(landings(from, &vehicle, &sc, &field, None).is_empty());
+        assert!(landings(from, &vehicle, &sc, &field, None, true).is_empty());
     }
 }
