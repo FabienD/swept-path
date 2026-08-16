@@ -69,6 +69,23 @@ pub const START_X_M: f64 = -6.5;
 /// ARBITRARY — carried over from the prototype (`index.html:472`).
 pub const START_POSITIONS: u8 = 10;
 
+/// How often an analytic landing is attempted, in expanded nodes.
+///
+/// **Without this the planner is unusable.** A landing now enumerates
+/// closed-form curves to a grid of goal poses, samples each and walks it
+/// against every obstacle. That is the right answer per attempt and far too
+/// expensive to make at every node: the suite ran past ten minutes before this
+/// bound existed, where it took seconds.
+///
+/// Spacing the attempts is the standard remedy for hybrid A\* — the analytic
+/// expansion is tried periodically rather than always, because a landing that
+/// exists is still found a few nodes later, and a landing that does not exist
+/// costs the same either way.
+///
+/// ARBITRARY in magnitude, and the figure to lower first if plans come back
+/// worse than the batch before.
+pub const ANALYTIC_EVERY: u32 = 20;
+
 /// Distance from the opening centre within which a landing is attempted.
 ///
 /// ARBITRARY — carried over from the prototype (`index.html:490`).
@@ -169,6 +186,7 @@ fn assemble(
     arena: &[Node],
     goal_index: usize,
     landing: &Landing,
+    vehicle: &Vehicle,
     field: &ClearanceField,
     exhausted: bool,
     moves: u8,
@@ -208,6 +226,17 @@ fn assemble(
             Some(acc.map_or(m, |a| a.min(m)))
         })
         .unwrap_or(landing.min_clearance);
+
+    // Reduce, then **re-measure**. The reduction can only improve the room —
+    // it takes a shortcut solely when one leaves at least as much — but
+    // reporting the figure from before would describe a path that is no longer
+    // the one returned, which is exactly the failure this project corrects
+    // elsewhere. The move count is recounted for the same reason.
+    let poses = crate::shortcut::reduce(&poses, vehicle, field);
+    let min_clearance = crate::shortcut::tightest(&poses, field).max(min_clearance);
+    let moves = u8::try_from(crate::shortcut::reversal_count(&poses) + 1)
+        .unwrap_or(u8::MAX)
+        .min(moves);
 
     Maneuver {
         poses,
@@ -373,12 +402,19 @@ pub fn plan(
         let heading_error = (FRAC_PI_2 - pose.heading.get())
             .abs()
             .min((-FRAC_PI_2 - pose.heading.get()).abs());
-        if pose.x.abs() < LANDING_TRIGGER_X_M && heading_error < LANDING_TRIGGER_HEADING_RAD {
+        if pose.x.abs() < LANDING_TRIGGER_X_M
+            && heading_error < LANDING_TRIGGER_HEADING_RAD
+            && expanded.is_multiple_of(ANALYTIC_EVERY)
+        {
             // Each landing is filed under what it actually costs: turning
             // round to back in is a move, and a roomier landing that spends
             // one is not the same answer as a tighter one that does not.
             for landing in landings(pose, vehicle, scene, &field, allowed) {
-                let total = moves + u8::from(landing.direction != direction);
+                // Every shunt the curve makes counts, not just its final
+                // gear. The old landing was one arc and a straight run and
+                // could not shunt at all; a closed-form curve can, and a plan
+                // claiming two moves while driving four is worse than useless.
+                let total = moves + landing.moves(direction);
                 let Some(slot) = best.get_mut(usize::from(total)) else {
                     continue;
                 };
@@ -442,13 +478,14 @@ pub fn plan(
         }
     }
 
-    collect(&arena, &best, &field, exhausted)
+    collect(&arena, &best, vehicle, &field, exhausted)
 }
 
 /// Turns the best landing of each move count into an outcome.
 fn collect(
     arena: &[Node],
     best: &[Option<(usize, Landing)>],
+    vehicle: &Vehicle,
     field: &ClearanceField,
     exhausted: bool,
 ) -> Outcome {
@@ -462,12 +499,25 @@ fn collect(
                 arena,
                 *index,
                 landing,
+                vehicle,
                 field,
                 exhausted,
                 total as u8,
             ))
         })
         .collect();
+
+    // Reduction can drop a shunt, so two plans filed under different depths
+    // may come back with the same move count. Keep the roomiest of each, which
+    // is the same rule the alternatives filter applies downstream: only what
+    // buys room survives.
+    let mut found = found;
+    found.sort_by(|a, b| {
+        a.moves
+            .cmp(&b.moves)
+            .then_with(|| b.min_clearance.total_cmp(&a.min_clearance))
+    });
+    found.dedup_by_key(|m| m.moves);
 
     if found.is_empty() {
         return Outcome::NotFound {

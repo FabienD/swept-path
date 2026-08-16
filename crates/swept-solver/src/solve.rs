@@ -126,7 +126,7 @@ mod tests {
         }
     }
 
-    fn scene(opening: f64) -> Scene {
+    pub(super) fn scene(opening: f64) -> Scene {
         Scene {
             left_post: Post {
                 inner_edge_x: -opening / 2.0,
@@ -147,7 +147,7 @@ mod tests {
         }
     }
 
-    fn lbx() -> Vehicle {
+    pub(super) fn lbx() -> Vehicle {
         Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).expect("valid vehicle")
     }
 

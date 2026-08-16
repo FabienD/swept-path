@@ -22,4 +22,5 @@ pub mod multi;
 pub mod path;
 pub mod poses;
 pub mod result;
+pub mod shortcut;
 pub mod solve;
