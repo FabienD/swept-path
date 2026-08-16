@@ -48,17 +48,90 @@
         </div>
 
         <form id="params" class="mt-5 grid gap-3">
-          <label class="grid gap-1">
-            <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="field.vehicle"></span>
+          <!-- One field, not two. What you type filters the list; a name it
+               does not know is not an error but your own vehicle, whose
+               measurements you then enter yourself. -->
+          <div class="relative grid gap-1">
+            <label
+              class="text-[0.65rem] tracking-[0.13em] text-dim uppercase"
+              for="vehicle-name"
+              data-i18n="field.vehicle"
+            ></label>
             <input
-              id="preset-search"
-              type="search"
+              id="vehicle-name"
+              type="text"
+              role="combobox"
+              autocomplete="off"
+              aria-expanded="false"
+              aria-controls="vehicle-list"
+              aria-autocomplete="list"
               data-i18n-placeholder="field.vehicleFilter"
               class="rounded border border-line bg-plan px-2 py-1.5 text-sm"
             />
-            <select id="preset" class="rounded border border-line bg-plan px-2 py-1.5 text-sm"></select>
+            <ul
+              id="vehicle-list"
+              role="listbox"
+              hidden
+              class="absolute top-full right-0 left-0 z-10 mt-1 max-h-64 overflow-y-auto rounded border border-line bg-panel py-1 text-sm shadow-lg"
+            ></ul>
             <span id="preset-note" class="text-xs text-dim"></span>
-          </label>
+          </div>
+
+          <!-- The measurements of the vehicle itself. Folded away once they
+               are all filled, and opened by `openWhatIsMissing` whenever one
+               is not — including for a listed vehicle whose figure the table
+               does not have. -->
+          <details id="vehicle-box" class="border-t border-line pt-3">
+            <summary class="cursor-pointer text-xs text-dim marker:text-accent">
+              <span data-i18n="group.vehicleSizes"></span>
+              <span id="vehicle-missing" class="text-band-tight"></span>
+            </summary>
+            <div class="mt-3 grid grid-cols-2 gap-2.5">
+              <label class="col-span-2 grid gap-1">
+                <span class="text-xs text-dim" data-i18n="field.mirrors"></span>
+                <select id="mirrors-state" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
+                  <option value="out" data-i18n="mirrors.out"></option>
+                  <option value="folded" data-i18n="mirrors.folded"></option>
+                </select>
+              </label>
+              <label class="grid gap-1">
+                <span class="text-xs text-dim">
+                  <span data-i18n="field.radius"></span> <span id="radius-note" class="text-dim"></span>
+                </span>
+                <input id="radius" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+              </label>
+              <label class="grid gap-1">
+                <span class="text-xs text-dim"><span data-i18n="field.wheelbase"></span> <span data-unit="dimension"></span></span>
+                <input id="wheelbase" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+              </label>
+              <label class="grid gap-1">
+                <span class="text-xs text-dim"><span data-i18n="field.length"></span> <span data-unit="dimension"></span></span>
+                <input id="length" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+              </label>
+              <label class="grid gap-1">
+                <span class="text-xs text-dim"><span data-i18n="field.frontOverhang"></span> <span data-unit="dimension"></span></span>
+                <input id="front-overhang" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+              </label>
+              <label class="grid gap-1">
+                <span class="text-xs text-dim"><span data-i18n="field.bodyWidth"></span> <span data-unit="dimension"></span></span>
+                <input id="body-width" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+              </label>
+              <label class="grid gap-1">
+                <span class="text-xs text-dim"><span data-i18n="field.groundClearance"></span> <span data-unit="dimension"></span></span>
+                <input id="ground-clearance" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+              </label>
+              <label class="grid gap-1">
+                <span class="text-xs text-dim"><span data-i18n="field.mirrorWidth"></span> <span data-unit="dimension"></span></span>
+                <input id="mirror-width" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+              </label>
+              <label class="grid gap-1">
+                <span class="text-xs text-dim"><span data-i18n="field.mirrorWidthFolded"></span> <span data-unit="dimension"></span></span>
+                <input id="mirror-width-folded" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
+              </label>
+            </fieldset>
+
+            </div>
+          </details>
 
           <div class="grid grid-cols-2 gap-2.5">
             <label class="grid gap-1">
@@ -156,51 +229,6 @@
                 </label>
               </fieldset>
 
-              <fieldset class="grid grid-cols-2 gap-2.5">
-                <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="group.vehicle"></legend>
-                <label class="col-span-2 grid gap-1">
-                  <span class="text-xs text-dim" data-i18n="field.mirrors"></span>
-                  <select id="mirrors-state" class="rounded border border-line bg-plan px-2 py-1.5 text-sm">
-                    <option value="out" data-i18n="mirrors.out"></option>
-                    <option value="folded" data-i18n="mirrors.folded"></option>
-                  </select>
-                </label>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim">
-                    <span data-i18n="field.radius"></span> <span id="radius-note" class="text-dim"></span>
-                  </span>
-                  <input id="radius" data-magnitude="dimension" type="number" min="0" step="0.001" value="3.59" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim"><span data-i18n="field.wheelbase"></span> <span data-unit="dimension"></span></span>
-                  <input id="wheelbase" data-magnitude="dimension" type="number" min="0" step="0.001" value="2.580" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim"><span data-i18n="field.length"></span> <span data-unit="dimension"></span></span>
-                  <input id="length" data-magnitude="dimension" type="number" min="0" step="0.001" value="4.190" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim"><span data-i18n="field.frontOverhang"></span> <span data-unit="dimension"></span></span>
-                  <input id="front-overhang" data-magnitude="dimension" type="number" min="0" step="0.001" value="0.850" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim"><span data-i18n="field.bodyWidth"></span> <span data-unit="dimension"></span></span>
-                  <input id="body-width" data-magnitude="dimension" type="number" min="0" step="0.001" value="1.825" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim"><span data-i18n="field.groundClearance"></span> <span data-unit="dimension"></span></span>
-                  <input id="ground-clearance" data-magnitude="dimension" type="number" min="0" step="0.001" value="0.180" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim"><span data-i18n="field.mirrorWidth"></span> <span data-unit="dimension"></span></span>
-                  <input id="mirror-width" data-magnitude="dimension" type="number" min="0" step="0.001" value="2.029" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-                <label class="grid gap-1">
-                  <span class="text-xs text-dim"><span data-i18n="field.mirrorWidthFolded"></span> <span data-unit="dimension"></span></span>
-                  <input id="mirror-width-folded" data-magnitude="dimension" type="number" min="0" step="0.001" value="1.865" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                </label>
-              </fieldset>
-
               <fieldset class="grid gap-2.5">
                 <legend class="mb-1.5 text-[0.65rem] tracking-[0.13em] text-dim uppercase" data-i18n="group.search"></legend>
                 <label class="grid gap-1">
@@ -212,8 +240,7 @@
                   </select>
                 </label>
                 <button id="run-min-road" type="button" class="rounded border border-line px-3 py-1.5 text-xs text-dim" data-i18n="action.minRoad"></button>
-              </fieldset>
-            </div>
+              </div>
           </details>
         </form>
       </aside>

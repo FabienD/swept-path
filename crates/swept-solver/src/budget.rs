@@ -126,9 +126,15 @@ impl Default for SearchBudget {
 /// This is an output port: the solver knows nothing about workers or
 /// messages, it only says how far it has got.
 pub trait Progress {
-    /// Called periodically with the depth being searched and the number of
-    /// nodes expanded so far.
-    fn nodes_expanded(&mut self, moves: u8, expanded: u32);
+    /// Called periodically with the deepest plan the search may reach and the
+    /// number of nodes expanded so far.
+    ///
+    /// `max_moves` is a ceiling, not the depth being worked on: the planner
+    /// explores one tree and keeps the roomiest landing at every depth, so
+    /// there is no such thing as the depth it is currently searching. An
+    /// interface that reports it as one leaves people waiting for an answer
+    /// at that depth which was never coming.
+    fn nodes_expanded(&mut self, max_moves: u8, expanded: u32);
 }
 
 /// A [`Progress`] that discards everything, for callers that do not care.
@@ -136,7 +142,7 @@ pub trait Progress {
 pub struct Silent;
 
 impl Progress for Silent {
-    fn nodes_expanded(&mut self, _moves: u8, _expanded: u32) {}
+    fn nodes_expanded(&mut self, _max_moves: u8, _expanded: u32) {}
 }
 
 #[cfg(test)]

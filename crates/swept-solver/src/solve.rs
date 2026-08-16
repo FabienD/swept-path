@@ -151,6 +151,56 @@ mod tests {
         Vehicle::new(2.580, 4.190, 0.850, 1.825, 2.029, 0.18, 5.2).expect("valid vehicle")
     }
 
+    /// Which way the vehicle is going as it crosses into the yard.
+    ///
+    /// The last pose, not the first: asking to enter in reverse is a claim
+    /// about how the gateway is crossed, not about how the street is driven.
+    fn arrives_in(maneuver: &Maneuver) -> Direction {
+        maneuver.poses.last().expect("a path has poses").direction
+    }
+
+    #[test]
+    fn asking_to_enter_in_reverse_never_answers_with_a_forward_entry() {
+        // Reported: a run restricted to reverse came back with a one-move
+        // forward entry. A wide opening is the case that catches it, because
+        // both directions succeed there and the forward sweep runs first.
+        let outcome = alternatives(
+            &lbx(),
+            &scene(5.0),
+            SearchBudget::default(),
+            &mut Silent,
+            Some(Direction::Reverse),
+        );
+        let Outcome::Found(list) = outcome else {
+            panic!("5 m admits a reverse entry");
+        };
+        for maneuver in &list {
+            assert_eq!(
+                arrives_in(maneuver),
+                Direction::Reverse,
+                "a {}-move answer entered forwards",
+                maneuver.moves
+            );
+        }
+    }
+
+    #[test]
+    fn asking_to_enter_forwards_never_answers_with_a_reverse_entry() {
+        let outcome = alternatives(
+            &lbx(),
+            &scene(5.0),
+            SearchBudget::default(),
+            &mut Silent,
+            Some(Direction::Forward),
+        );
+        let Outcome::Found(list) = outcome else {
+            panic!("5 m admits a forward entry");
+        };
+        for maneuver in &list {
+            assert_eq!(arrives_in(maneuver), Direction::Forward);
+        }
+    }
+
     #[test]
     fn a_one_move_entry_is_returned_exactly() {
         let outcome = alternatives(

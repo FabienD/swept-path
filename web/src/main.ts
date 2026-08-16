@@ -14,7 +14,9 @@ import {
   verdictNuance,
 } from "./domain/labels";
 import type { ErrorDto, ManeuverDto, SceneDto, VehicleDto } from "./domain/types";
+import type { VehiclePreset } from "./domain/vehicles";
 import { VEHICLES, searchVehicles, vehicleById } from "./domain/vehicles";
+import { NONE, commit, nextHighlight } from "./ui/combobox";
 import type { Verdict } from "./domain/verdict";
 import {
   clearanceCeiling,
@@ -627,6 +629,41 @@ function flagMissing(): number {
   return missing;
 }
 
+/**
+ * Opens any disclosure holding a measurement that is still missing.
+ *
+ * The rule the fold has to obey: a required field that is empty is never
+ * hidden. It is not only about starting from a blank form — several listed
+ * vehicles have figures the table does not carry, and folding those away
+ * would hide exactly the fields that stop the search from running.
+ *
+ * Opening is not flagging. A field is marked red when a search was asked for
+ * and could not run; this only makes sure it can be seen.
+ */
+function openWhatIsMissing(): void {
+  const missing = new Set<HTMLElement>();
+  let count = 0;
+  for (const id of REQUIRED_INPUTS) {
+    const input = byId<HTMLInputElement>(id);
+    if (!input || !Number.isNaN(input.valueAsNumber)) continue;
+    count += 1;
+    const holder = input.closest("details");
+    if (holder) missing.add(holder);
+  }
+  for (const holder of missing) holder.setAttribute("open", "");
+
+  const note = byId("vehicle-missing");
+  if (note) {
+    const { locale } = store.get().preferences;
+    note.textContent =
+      count === 0
+        ? ""
+        : locale === "en"
+          ? ` — ${count} still to fill in`
+          : ` — ${count} à renseigner`;
+  }
+}
+
 function applyPreset(id: string): void {
   const preset = vehicleById(id);
   if (!preset) return;
@@ -661,47 +698,151 @@ function applyPreset(id: string): void {
   clearResult();
 }
 
+/**
+ * The vehicle field: type to filter, arrows to choose, or just type a name.
+ *
+ * One control rather than a search box beside a dropdown. A name the table
+ * does not know is not rejected — it is someone's own vehicle, and they fill
+ * in its measurements themselves, which is why nothing is selected at the
+ * start.
+ *
+ * The awkward decisions — where an arrow lands at the ends, what Enter
+ * settles on — are in `ui/combobox.ts`, pure and tested. What is left here is
+ * listeners and attributes.
+ */
 function fillPresets(): void {
-  const select = byId<HTMLSelectElement>("preset");
-  if (!select) return;
+  const field = byId<HTMLInputElement>("vehicle-name");
+  const list = byId<HTMLUListElement>("vehicle-list");
+  if (!field || !list) return;
 
-  const render = (query: string) => {
-    const matches = searchVehicles(query);
-    select.innerHTML = matches
-      .map((v) => `<option value="${v.id}">${v.label}</option>`)
-      .join("");
-    select.disabled = matches.length === 0;
-    const note = byId("preset-note");
-    if (note) {
-      // Saying so beats an empty dropdown, which reads as a broken page
-      // rather than as a filter that matched nothing.
-      note.textContent =
-        matches.length === 0
-          ? "Aucun modèle ne correspond."
-          : matches.length < VEHICLES.length
-            ? `${matches.length} sur ${VEHICLES.length} modèles`
-            : "";
-    }
-    const first = matches[0];
-    if (first) applyPreset(first.id);
+  let matches: readonly VehiclePreset[] = [];
+  let highlighted = NONE;
+
+  const close = (): void => {
+    list.hidden = true;
+    field.setAttribute("aria-expanded", "false");
+    field.removeAttribute("aria-activedescendant");
+    highlighted = NONE;
   };
 
-  render("");
-  select.addEventListener("change", () => {
-    applyPreset(select.value);
+  const paint = (): void => {
+    list.innerHTML = matches
+      .map(
+        (vehicle, i) =>
+          `<li id="vehicle-option-${i}" role="option" data-index="${i}"
+             aria-selected="${i === highlighted}"
+             class="cursor-pointer px-2 py-1 ${
+               i === highlighted ? "bg-accent text-ink" : "text-fg"
+             }">${vehicle.label}</li>`,
+      )
+      .join("");
+    if (highlighted !== NONE) {
+      field.setAttribute("aria-activedescendant", `vehicle-option-${highlighted}`);
+      // Keyboard navigation is useless if the highlight scrolls out of sight.
+      list.children[highlighted]?.scrollIntoView({ block: "nearest" });
+    } else {
+      field.removeAttribute("aria-activedescendant");
+    }
+  };
+
+  const open = (query: string): void => {
+    matches = searchVehicles(query);
+    highlighted = NONE;
+    list.hidden = matches.length === 0;
+    field.setAttribute("aria-expanded", String(matches.length > 0));
+    paint();
+
+    const note = byId("preset-note");
+    if (note) {
+      const { locale } = store.get().preferences;
+      // Saying so beats an empty list, which reads as a broken page rather
+      // than as a filter that matched nothing.
+      note.textContent =
+        query !== "" && matches.length === 0
+          ? locale === "en"
+            ? "No model matches — enter your own measurements below."
+            : "Aucun modèle ne correspond — saisis tes propres mesures ci-dessous."
+          : "";
+    }
+  };
+
+  /** Applies a vehicle, or leaves the fields alone for an unknown name. */
+  const settle = (): void => {
+    const typed = field.value.trim().toLocaleLowerCase();
+    const exact = VEHICLES.find((v) => v.label.toLocaleLowerCase() === typed);
+    const chosen = commit(matches, highlighted, exact);
+    close();
+    if (!chosen) return;
+    field.value = chosen.label;
+    applyPreset(chosen.id);
+    clearResult();
+    draw();
+  };
+
+  field.addEventListener("input", () => {
+    open(field.value);
   });
+  field.addEventListener("focus", () => {
+    open(field.value);
+  });
+  field.addEventListener("keydown", (event) => {
+    switch (event.key) {
+      case "ArrowDown":
+      case "ArrowUp":
+        event.preventDefault();
+        if (list.hidden) open(field.value);
+        highlighted = nextHighlight(
+          highlighted,
+          matches.length,
+          event.key === "ArrowDown" ? 1 : -1,
+        );
+        paint();
+        break;
+      case "Enter":
+        // Only when the list is open: otherwise Enter belongs to the form,
+        // and swallowing it would break submitting from the keyboard.
+        if (!list.hidden) {
+          event.preventDefault();
+          settle();
+        }
+        break;
+      case "Escape":
+        close();
+        break;
+      case "Tab":
+        settle();
+        break;
+      default:
+        break;
+    }
+  });
+
+  list.addEventListener("mousedown", (event) => {
+    // mousedown, not click: the field loses focus first, and a blur handler
+    // would have closed the list before the click ever landed.
+    const option = (event.target as HTMLElement).closest("li");
+    if (!option) return;
+    event.preventDefault();
+    highlighted = Number(option.dataset["index"]);
+    settle();
+  });
+
+  field.addEventListener("blur", () => {
+    // Deferred, so a click on an option is still on its way.
+    setTimeout(close, 120);
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target !== field && !list.contains(event.target as Node)) close();
+  });
+
   for (const id of REQUIRED_INPUTS) {
     byId<HTMLInputElement>(id)?.addEventListener("input", () => {
       const input = byId<HTMLInputElement>(id);
       flag(id, !input || Number.isNaN(input.valueAsNumber));
     });
   }
-  byId<HTMLInputElement>("preset-search")?.addEventListener("input", (event) => {
-    render((event.target as HTMLInputElement).value);
-  });
 }
 
-/** Shows the leaf controls only when they apply. */
 function syncGateControls(): void {
   const swinging = byId<HTMLSelectElement>("gate-kind")?.value === "swinging";
   const box = byId("leaf-box");
@@ -752,6 +893,7 @@ form?.addEventListener("input", (event) => {
     const shown = byId("angle-value");
     if (shown) shown.textContent = target.value;
   }
+  openWhatIsMissing();
   clearResult();
   draw();
 });
@@ -895,10 +1037,10 @@ form?.addEventListener("submit", async (event) => {
   try {
     const response = await client.solve(
       readRequest(store.get().preferences.units),
-      (moveCount, expanded, budget) => {
+      (maxMoves, expanded, budget) => {
         store.set({
           progress: searchProgress(
-            moveCount,
+            maxMoves,
             expanded,
             budget,
             store.get().preferences.locale,

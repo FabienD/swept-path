@@ -92,7 +92,7 @@ export class SolverClient {
   /** Runs a search, reporting planner progress if a watcher is given. */
   solve(
     request: SolveRequest,
-    onProgress?: (moves: number, expanded: number, budget: number) => void,
+    onProgress?: (maxMoves: number, expanded: number, budget: number) => void,
   ): Promise<SolveResponse> {
     return this.#exchange(
       (id) => ({ kind: "solve", id, request }),

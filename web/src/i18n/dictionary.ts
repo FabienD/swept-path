@@ -57,7 +57,7 @@ export interface Texts {
   "side.fromLeft": string;
   "side.fromRight": string;
 
-  "group.vehicle": string;
+  "group.vehicleSizes": string;
   "field.mirrors": string;
   "mirrors.out": string;
   "mirrors.folded": string;
@@ -150,7 +150,7 @@ const FR: Texts = {
   "side.fromLeft": "Par la gauche",
   "side.fromRight": "Par la droite",
 
-  "group.vehicle": "Le véhicule",
+  "group.vehicleSizes": "Cotes du véhicule",
   "field.mirrors": "Rétroviseurs",
   "mirrors.out": "Déployés",
   "mirrors.folded": "Rabattus",
@@ -241,7 +241,7 @@ const EN: Texts = {
   "side.fromLeft": "From the left",
   "side.fromRight": "From the right",
 
-  "group.vehicle": "The vehicle",
+  "group.vehicleSizes": "Vehicle measurements",
   "field.mirrors": "Mirrors",
   "mirrors.out": "Extended",
   "mirrors.folded": "Folded",
