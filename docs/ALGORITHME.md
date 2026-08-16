@@ -296,6 +296,81 @@ Ce module ne fait encore rien d'autre qu'exister. Le lot 2c-2 le branchera dans
 le planificateur comme expansion analytique, et s'en servira pour la réduction
 par raccourcis.
 
+## 6 ter. L'expansion analytique, et ce qu'elle a coûté
+
+Le dernier mouvement d'un plan — l'atterrissage — se construisait par une forme
+figée : un arc à rayon choisi, puis une droite. Elle visait une *profondeur* et
+non une pose, exactement le défaut que le lot 2b avait corrigé côté recherche
+exhaustive.
+
+Reeds-Shepp relie deux poses **exactement**. À chaque nœud proche de
+l'ouverture, le planificateur tente désormais une connexion en forme close vers
+une pose d'arrivée, et retient la plus dégagée.
+
+### Les deux formes cohabitent, et il le faut
+
+| ouverture | avant le lot 2b | après le coût | après l'expansion |
+|---|---|---|---|
+| 2,20 m | 11 mm, 4 manœuvres | 42 mm, 4 | 42 mm, 4 |
+| 2,60 m | 24 mm, 3 manœuvres | 21 mm, 2 | **33 mm**, 2 |
+| 3,00 m | 41 mm, 1 manœuvre | 41 mm, 1 | **62 mm**, 1 |
+| 4,00 m | 26 mm, 1 manœuvre | 49 mm, 1 | **385 mm**, 1 |
+
+Sur une ouverture de 4 m, la marge est multipliée par près de huit. Mais la
+première version de ce lot, qui avait remplacé la forme figée au lieu de s'y
+ajouter, **ne trouvait plus rien du tout à 2,20 m**.
+
+La raison tient à ce que chacune sait faire. Une courbe optimale arrive à la
+pose voulue mais souvent **en tournant encore**, ce qu'un passage laissant huit
+centimètres de jeu n'autorise pas. La forme figée, elle, finit toujours par une
+droite : maladroite là où il y a de la place, et seule à franchir un passage
+serré. Mesuré : sous 2,60 m, la connexion en forme close ne trouve aucun
+atterrissage là où la forme figée en trouve.
+
+Les deux sont donc essayées et la plus dégagée gagne — la règle que ce projet
+applique partout ailleurs.
+
+### Le coût, et pourquoi les tentatives sont espacées
+
+Une connexion en forme close énumère une grille de poses d'arrivée, jusqu'à
+quarante-huit courbes chacune, échantillonne chacune et la promène contre tous
+les obstacles : **dix-neuf millions de tests point-obstacle par nœud**, mesuré.
+La suite de tests est passée de douze secondes à plus de dix minutes.
+
+Espacer les tentatives est le remède standard de l'A\* hybride. Mais l'espacement
+ne vaut que pour la partie chère : appliquer le même intervalle à la forme
+figée, bon marché, est précisément ce qui vidait le passage le plus serré.
+
+### Une faiblesse du modèle que ces courbes ont révélée
+
+Sur une ouverture de 1,60 m, infranchissable pour ce véhicule, le solveur a
+rendu un « atterrissage » de **175 mètres** qui contournait le mur par son
+extrémité — la scène s'arrête à dix-huit mètres de part et d'autre — en
+annonçant vingt-sept centimètres de marge. Le calcul était juste sur la
+géométrie fournie ; c'est le modèle qui a des bords, et la forme figée était
+trop courte pour les atteindre. Une borne de longueur sur l'atterrissage
+rétablit cette propriété.
+
+## 6 quater. La réduction par raccourcis
+
+Un A\* hybride ne peut pas atterrir exactement sur sa grille, alors il comble
+l'écart par de petites manœuvres qui n'achètent rien.
+
+Le critère n'est pas une longueur — une marche arrière de trente centimètres
+pour se dégager d'un pilier est exactement ce qu'un conducteur fait :
+
+> Un tronçon est superflu lorsqu'une courbe de Reeds-Shepp relie la pose qui le
+> précède à celle qui le suit sans collision, avec au plus autant d'inversions,
+> et en laissant au moins autant de marge.
+
+Directement vérifiable, puisque Reeds-Shepp donne cette connexion en forme
+close. C'est la règle du filtre d'alternatives — *ne garder que ce qui achète
+de la place* — appliquée au tronçon plutôt qu'au trajet.
+
+Après réduction, la marge est **remesurée sur le trajet rendu** et les
+manœuvres recomptées : reporter un chiffre qui ne décrit plus le trajet affiché
+serait le défaut que ce projet corrige ailleurs.
+
 ## 7. Pourquoi il n'y a pas d'horloge
 
 Le prototype bornait sa recherche par un plafond de nœuds **et** une échéance
