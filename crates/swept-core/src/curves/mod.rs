@@ -39,6 +39,7 @@
 use crate::kinematics::{Direction, Pose, sample_arc};
 
 pub mod dubins;
+pub mod reeds_shepp;
 
 /// Which way the steering is held over a segment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

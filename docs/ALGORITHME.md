@@ -237,6 +237,65 @@ commence*, et la fenêtre où un virage retombe droit dans un passage étroit fa
 quelques centimètres de large. Il a donc reçu le budget dont les trois autres
 n'avaient pas besoin.
 
+## 6 bis. Les courbes de Reeds-Shepp
+
+Reeds et Shepp (1990) étendent Dubins au véhicule qui peut reculer. Le plus
+court chemin entre deux poses à courbure bornée est alors l'un de quarante-huit
+mots, bâtis sur douze familles fondamentales — toutes en forme close.
+
+Deux choses les distinguent de Dubins, et les deux comptent ici.
+
+**Elles atteignent tout.** Dubins peut échouer à relier deux poses proches et
+mal orientées ; en reculant, Reeds-Shepp y arrive toujours. C'est ce qui en
+fait le bon outil pour un portail étroit, où le véhicule est précisément proche
+et mal orienté.
+
+**Elles minimisent aussi le nombre de changements de sens** — la grandeur que
+ce projet appelle une manœuvre et que l'utilisateur compte. Le mot le plus
+court et le mot le plus lisse ne sont pas le même : le noyau expose donc les
+deux, `shortest` et `fewest_reversals`, en plus de `all`.
+
+### Douze fonctions, pas huit
+
+Le plan de ce lot annonçait huit fonctions de base, en supposant que les douze
+familles s'y réduisaient par les involutions. **C'était faux**, et trois formes
+manquaient : une troisième lecture à trois arcs, et les lectures inversées des
+deux formes arc-arc-droite-arc. Elles ne se déduisent d'aucune autre.
+
+Les involutions restent nécessaires — le retournement du temps, qui parcourt le
+chemin à l'envers, et la réflexion, qui échange gauche et droite. Quatre
+lectures pour chacune des douze fonctions, et le compte de quarante-huit y est.
+
+### Une garde de domaine n'est pas une garde de signe
+
+La première version refusait une famille dès qu'une de ses longueurs sortait
+négative. C'est un contresens : une longueur négative **est** un segment en
+marche arrière, ce qui est toute la raison d'être de Reeds-Shepp. Une famille
+ne se refuse que lorsque sa formule quitte un domaine — une racine de nombre
+négatif, un `acos` hors de `[-1, 1]`.
+
+### Ce qui les vérifie, et ce qui ne suffit pas
+
+Chaque famille est validée en intégrant son résultat par le modèle cinématique
+et en regardant où il tombe. Ce test ne dépend d'aucune publication et tranche
+tout désaccord — il a d'ailleurs attrapé une erreur de signe qui faisait
+atterrir les trois arcs à 2,96 radians du but.
+
+**Mais il ne voit pas ce qui manque.** Une famille écartée à tort ne produit
+pas un chemin faux, elle produit un chemin absent : les tests d'atterrissage
+n'examinent que les mots rendus, et les propriétés ne demandent qu'un chemin,
+pas le meilleur. Il a fallu une transcription indépendante — la crate
+`reeds_shepp` en dépendance de développement — pour trouver un chemin de
+15,718 m là où nous rendions 15,722 m. C'est ainsi que les trois familles
+manquantes sont apparues.
+
+Le noyau garde ses zéro dépendances de production : l'oracle ne sert qu'aux
+tests, et `cargo tree --edges normal` le vérifie.
+
+Ce module ne fait encore rien d'autre qu'exister. Le lot 2c-2 le branchera dans
+le planificateur comme expansion analytique, et s'en servira pour la réduction
+par raccourcis.
+
 ## 7. Pourquoi il n'y a pas d'horloge
 
 Le prototype bornait sa recherche par un plafond de nœuds **et** une échéance
