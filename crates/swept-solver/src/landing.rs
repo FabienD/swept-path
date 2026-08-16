@@ -134,17 +134,23 @@ impl Landing {
 /// vehicle with 8.5 cm to spare, so a goal 90 cm off centre is inside a post.
 /// Aiming there wastes every attempt, and the planner came back empty on the
 /// tightest opening it used to solve.
-fn landing_goals(vehicle: &Vehicle, scene: &Scene) -> Vec<Pose> {
+fn landing_goals(vehicle: &Vehicle, scene: &Scene, arriving: Direction) -> Vec<Pose> {
     let room = (scene.opening_width() - vehicle.mirror_width) / 2.0;
     if room <= 0.0 {
         return Vec::new();
     }
-    let mut goals = goal_poses(vehicle, scene, LANDING_ENTRY_STEPS, LANDING_HEADING_STEPS);
+    let mut goals = goal_poses(
+        vehicle,
+        scene,
+        LANDING_ENTRY_STEPS,
+        LANDING_HEADING_STEPS,
+        arriving,
+    );
     goals.retain(|g| g.x.abs() <= room);
     if goals.is_empty() {
         // Nothing within reach off centre: aim dead centre, which is where a
         // tight opening is threaded anyway.
-        goals = goal_poses(vehicle, scene, 0, LANDING_HEADING_STEPS);
+        goals = goal_poses(vehicle, scene, 0, LANDING_HEADING_STEPS, arriving);
     }
     goals
 }
@@ -311,7 +317,16 @@ fn curved_landings(
     field: &ClearanceField,
     allowed: Option<Direction>,
 ) -> Vec<Landing> {
-    let goals = landing_goals(vehicle, scene);
+    // Goals for each gear that is still allowed. Which way the vehicle ends up
+    // pointing *is* the difference between driving in and reversing in, so a
+    // single set of goals can only ever produce one of the two.
+    let mut goals = Vec::new();
+    for arriving in [Direction::Forward, Direction::Reverse] {
+        if allowed.is_some_and(|only| only != arriving) {
+            continue;
+        }
+        goals.extend(landing_goals(vehicle, scene, arriving));
+    }
     let mut best: [Option<Landing>; 2] = [None, None];
 
     for goal in goals {
@@ -389,8 +404,13 @@ mod tests {
         let (vehicle, sc) = (lbx(), scene(5.0));
         let field = ClearanceField::new(&sc, &vehicle);
         let from = Pose::new(-4.0, -3.0, Radians::default());
-        let goals =
-            crate::poses::goal_poses(&vehicle, &sc, LANDING_ENTRY_STEPS, LANDING_HEADING_STEPS);
+        let goals = crate::poses::goal_poses(
+            &vehicle,
+            &sc,
+            LANDING_ENTRY_STEPS,
+            LANDING_HEADING_STEPS,
+            Direction::Forward,
+        );
 
         for landing in landings(from, &vehicle, &sc, &field, None, true) {
             let last = *landing.poses.last().expect("a landing has poses");
