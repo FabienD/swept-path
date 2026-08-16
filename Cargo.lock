@@ -344,6 +344,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "reeds_shepp"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9da1a5fbdf442305cf7a02bf1e2089d0f725863dac774788b48a5a65bc2a576c"
+
+[[package]]
 name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -460,6 +466,7 @@ name = "swept-core"
 version = "0.1.0"
 dependencies = [
  "proptest",
+ "reeds_shepp",
 ]
 
 [[package]]

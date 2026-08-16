@@ -25,6 +25,16 @@
 //! everything — the alternative being forty-eight transcriptions, each its own
 //! chance of a sign error.
 //!
+//! # Domain guards, not sign guards
+//!
+//! A family is refused only when its formula leaves a domain — a negative
+//! under a square root, an `acos` argument outside `[-1, 1]`. It is **never**
+//! refused for producing a negative length: a negative length is a reverse
+//! segment, which is the whole point of Reeds-Shepp. Guarding on sign, as an
+//! early draft of this module did, silently discards valid paths — the oracle
+//! test caught exactly that, finding a 15.718 m answer where we returned
+//! 15.722 m.
+//!
 //! # On the formulas
 //!
 //! Taken from Reeds & Shepp, *Optimal paths for a car that goes both forwards
@@ -189,10 +199,9 @@ const VARIANTS: [Variant; 4] = [
 /// Reading it: the goal's turning centre sits at `(x − sin φ, y − 1 + cos φ)`
 /// relative to the start's own centre. The polar form of that offset gives the
 /// straight run directly, and its bearing gives the first arc.
-fn lp_sp_lp(f: Frame) -> Option<(f64, f64, f64)> {
+fn lp_sp_lp(f: Frame) -> (f64, f64, f64) {
     let (u, t) = polar(f.x - f.phi.sin(), f.y - 1.0 + f.phi.cos());
-    let v = wrap_pi(f.phi - t);
-    (t >= 0.0 && v >= 0.0).then_some((t, u, v))
+    (t, u, wrap_pi(f.phi - t))
 }
 
 /// `L⁺S⁺R⁺` — two arcs opposite ways, joined by a straight run.
@@ -209,7 +218,7 @@ fn lp_sp_rp(f: Frame) -> Option<(f64, f64, f64)> {
     let u = squared.sqrt();
     let t = wrap_pi(t1 + 2.0_f64.atan2(u));
     let v = wrap_pi(t - f.phi);
-    (t >= 0.0 && v >= 0.0).then_some((t, u, v))
+    Some((t, u, v))
 }
 
 /// Every arc-straight-arc word between the frame's two poses.
@@ -227,7 +236,8 @@ pub fn csc(frame: Frame) -> Vec<Word> {
         let sign = if flip { -1.0 } else { 1.0 };
 
         let same = if mirror { Right } else { Left };
-        if let Some((t, u, v)) = lp_sp_lp(f) {
+        {
+            let (t, u, v) = lp_sp_lp(f);
             out.push(Word(vec![
                 Element {
                     steering: same,
@@ -290,6 +300,26 @@ fn lp_rm_lm(f: Frame) -> Option<(f64, f64, f64)> {
     Some((t, -u, v))
 }
 
+/// `L⁺R⁺L⁻` — the third three-arc reading, with the last arc reversing.
+///
+/// Not a variant of [`lp_rm_lm`] under either involution: the middle arc is
+/// taken forward here, which puts the solution on a different branch of the
+/// same geometry. Leaving it out costs paths — the oracle test found one
+/// 4.4 mm shorter than anything the other two produce.
+fn lp_rp_lm(f: Frame) -> Option<(f64, f64, f64)> {
+    let xi = f.x - f.phi.sin();
+    let eta = f.y - 1.0 + f.phi.cos();
+    let (rho, theta) = polar(xi, eta);
+    if rho > 4.0 {
+        return None;
+    }
+    let u = rho.mul_add(-rho / 8.0, 1.0).acos();
+    let inner = (2.0 * u.sin() / rho).asin();
+    let t = wrap_pi(theta + PI / 2.0 - inner);
+    let v = wrap_pi(t - u - f.phi);
+    Some((t, u, -v))
+}
+
 /// Every three-arc word between the frame's two poses.
 #[must_use]
 pub fn ccc(frame: Frame) -> Vec<Word> {
@@ -340,6 +370,23 @@ pub fn ccc(frame: Frame) -> Vec<Word> {
                 Element {
                     steering: a,
                     length: sign * t,
+                },
+            ]));
+        }
+
+        if let Some((t, u, v)) = lp_rp_lm(f) {
+            out.push(Word(vec![
+                Element {
+                    steering: a,
+                    length: sign * t,
+                },
+                Element {
+                    steering: b,
+                    length: sign * u,
+                },
+                Element {
+                    steering: a,
+                    length: sign * v,
                 },
             ]));
         }
@@ -448,7 +495,7 @@ fn lp_rm_sm_lm(f: Frame) -> Option<(f64, f64, f64)> {
     let u = 2.0 - leg;
     let t = wrap_pi(theta + leg.atan2(-2.0));
     let v = wrap_pi(f.phi - PI / 2.0 - t);
-    (t >= 0.0 && u <= 0.0 && v <= 0.0).then_some((t, u, v))
+    Some((t, u, v))
 }
 
 /// `L⁺R⁻S⁻R⁻` — the straight run leaves the second arc on the other side.
@@ -462,7 +509,39 @@ fn lp_rm_sm_rm(f: Frame) -> Option<(f64, f64, f64)> {
     let t = theta;
     let u = 2.0 - rho;
     let v = wrap_pi(t + PI / 2.0 - f.phi);
-    (t >= 0.0 && u <= 0.0 && v <= 0.0).then_some((t, u, v))
+    Some((t, u, v))
+}
+
+/// `L⁺S⁺R⁺L⁻` — the straight run comes first, the quarter turn second.
+///
+/// The mirror image in time of [`lp_rm_sm_lm`]: the same geometry read from
+/// the goal rather than the start, which is a different word.
+fn lp_sp_rp_lm(f: Frame) -> Option<(f64, f64, f64)> {
+    let xi = f.x - f.phi.sin();
+    let eta = f.y - 1.0 + f.phi.cos();
+    let (rho, theta) = polar(xi, eta);
+    if rho < 2.0 {
+        return None;
+    }
+    let leg = rho.mul_add(rho, -4.0).sqrt();
+    let u = leg - 2.0;
+    let t = wrap_pi(theta + PI / 2.0 - leg.atan2(2.0));
+    let v = wrap_pi(t - f.phi - PI / 2.0);
+    Some((t, u, -v))
+}
+
+/// `L⁺S⁺L⁺R⁻` — the other reversed reading, turning the same way throughout.
+fn lp_sp_lp_rm(f: Frame) -> Option<(f64, f64, f64)> {
+    let xi = f.x + f.phi.sin();
+    let eta = f.y - 1.0 - f.phi.cos();
+    let (rho, theta) = polar(xi, eta);
+    if rho < 2.0 {
+        return None;
+    }
+    let t = wrap_pi(theta);
+    let u = rho - 2.0;
+    let v = wrap_pi(f.phi - t - PI / 2.0);
+    Some((t, u, -v))
 }
 
 /// Every arc-arc-straight-arc word between the frame's two poses.
@@ -520,6 +599,49 @@ pub fn ccsc(frame: Frame) -> Vec<Word> {
                 },
             ]));
         }
+
+        // The same two shapes read from the goal: straight run first, quarter
+        // turn second. Distinct words, not variants of the two above.
+        if let Some((t, u, v)) = lp_sp_rp_lm(f) {
+            out.push(Word(vec![
+                Element {
+                    steering: a,
+                    length: sign * t,
+                },
+                Element {
+                    steering: Straight,
+                    length: sign * u,
+                },
+                Element {
+                    steering: b,
+                    length: sign * (PI / 2.0),
+                },
+                Element {
+                    steering: a,
+                    length: sign * v,
+                },
+            ]));
+        }
+        if let Some((t, u, v)) = lp_sp_lp_rm(f) {
+            out.push(Word(vec![
+                Element {
+                    steering: a,
+                    length: sign * t,
+                },
+                Element {
+                    steering: Straight,
+                    length: sign * u,
+                },
+                Element {
+                    steering: a,
+                    length: sign * (PI / 2.0),
+                },
+                Element {
+                    steering: b,
+                    length: sign * v,
+                },
+            ]));
+        }
     }
     out.retain(Word::is_valid);
     out
@@ -534,16 +656,13 @@ fn lp_rm_sm_lm_rp(f: Frame) -> Option<(f64, f64, f64)> {
         return None;
     }
     let u = 4.0 - rho.mul_add(rho, -4.0).sqrt();
-    if u > 0.0 {
-        return None;
-    }
     let t = wrap_pi(
         (4.0 - u)
             .mul_add(xi, -(2.0 * eta))
             .atan2((-2.0f64).mul_add(xi, (u - 4.0) * eta)),
     );
     let v = wrap_pi(t - f.phi);
-    (t >= 0.0 && v >= 0.0).then_some((t, u, v))
+    Some((t, u, v))
 }
 
 /// Every five-element word between the frame's two poses.
@@ -663,6 +782,32 @@ mod tests {
     }
 
     #[test]
+    fn the_pose_pair_that_exposed_three_missing_families() {
+        // Frozen because the cause is not obvious. This module first shipped
+        // eight base functions on the belief that the twelve families reduced
+        // to that many under the involutions. They do not: three shapes are
+        // genuinely separate — a third three-arc reading, and the reversed
+        // readings of the two arc-arc-straight-arc shapes.
+        //
+        // Nothing caught it. The landing tests only examine the words that
+        // come back, and the property tests only ask that some path exists. It
+        // took an independent transcription, which found a path 4.4 mm shorter
+        // than anything we produced: 15.718 m against our 15.722 m.
+        let from = Pose::new(
+            0.0,
+            -5.438_089_125_433_469,
+            Radians::new(1.636_554_813_880_354_3),
+        );
+        let to = Pose::new(0.0, 9.678_115_556_532_553, Radians::new(0.0));
+        let best = shortest(from, to, 1.0).expect("some family applies");
+        assert!(
+            best.length() < 15.719,
+            "back to {} m — a family is being discarded again",
+            best.length()
+        );
+    }
+
+    #[test]
     fn all_returns_paths_that_land_on_the_goal() {
         let from = Pose::new(-2.0, 1.0, Radians::new(0.3));
         let to = Pose::new(3.0, 2.5, Radians::new(1.9));
@@ -728,13 +873,16 @@ mod tests {
     }
 
     #[test]
-    fn the_five_element_family_is_absent_when_the_goal_is_close() {
+    fn the_five_element_family_still_lands_when_the_goal_is_close() {
         let frame = Frame {
             x: 0.1,
             y: 0.1,
             phi: 0.0,
         };
-        assert!(ccscc(frame).is_empty());
+        for word in &ccscc(frame) {
+            let error = landing_error(word, frame);
+            assert!(error < 1e-9, "{word:?} misses by {error}");
+        }
     }
 
     #[test]
@@ -748,13 +896,20 @@ mod tests {
     }
 
     #[test]
-    fn arc_arc_straight_arc_is_absent_when_the_goal_is_too_close() {
+    fn arc_arc_straight_arc_still_lands_when_the_goal_is_very_close() {
+        // This once asserted the family was absent here, which was an
+        // artefact of a sign guard that discarded valid paths. What must hold
+        // is not that the family stays away but that whatever it returns
+        // lands.
         let frame = Frame {
             x: 0.05,
             y: 0.02,
             phi: 0.01,
         };
-        assert!(ccsc(frame).is_empty());
+        for word in &ccsc(frame) {
+            let error = landing_error(word, frame);
+            assert!(error < 1e-9, "{word:?} misses by {error}");
+        }
     }
 
     #[test]
