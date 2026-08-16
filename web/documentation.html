@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Comment ça marche — swept-path</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="min-h-dvh bg-ink text-fg">
+    <div class="hazard-band"></div>
+
+    <main class="mx-auto max-w-3xl px-6 py-8">
+      <div class="mb-8 flex items-baseline justify-between gap-4">
+        <a href="/" class="text-xs text-accent hover:underline" data-i18n="nav.back"></a>
+        <select
+          id="locale"
+          data-i18n-aria="settings.language"
+          class="rounded border border-line bg-transparent px-1.5 py-1 text-xs text-dim hover:text-fg"
+        >
+          <option value="fr">Français</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+
+      <h1 class="text-3xl font-extrabold tracking-tight" data-i18n="doc.title"></h1>
+      <p class="mt-3 leading-relaxed text-dim" data-i18n="doc.lede"></p>
+
+      <section class="mt-8">
+        <h2 class="text-lg font-bold tracking-tight" data-i18n="doc.width.title"></h2>
+        <p class="mt-2 leading-relaxed text-dim" data-i18n="doc.width.body"></p>
+        <figure class="mt-4">
+          <div class="overflow-hidden rounded-lg border border-line bg-plan">
+            <svg id="figure-ceiling" class="w-full" role="img" aria-hidden="true"></svg>
+          </div>
+          <figcaption class="mt-2 text-xs text-dim" data-i18n="doc.width.figure"></figcaption>
+        </figure>
+      </section>
+
+      <section class="mt-8">
+        <h2 class="text-lg font-bold tracking-tight" data-i18n="doc.angle.title"></h2>
+        <p class="mt-2 leading-relaxed text-dim" data-i18n="doc.angle.body"></p>
+        <figure class="mt-4">
+          <div class="overflow-hidden rounded-lg border border-line bg-plan">
+            <svg id="figure-askew" class="w-full" role="img" aria-hidden="true"></svg>
+          </div>
+          <figcaption class="mt-2 text-xs text-dim" data-i18n="doc.angle.figure"></figcaption>
+        </figure>
+      </section>
+
+      <section class="mt-8">
+        <h2 class="text-lg font-bold tracking-tight" data-i18n="doc.mirrors.title"></h2>
+        <p class="mt-2 leading-relaxed text-dim" data-i18n="doc.mirrors.body"></p>
+      </section>
+
+      <section class="mt-8">
+        <h2 class="text-lg font-bold tracking-tight" data-i18n="doc.search.title"></h2>
+        <p class="mt-2 leading-relaxed text-dim" data-i18n="doc.search.body"></p>
+        <ul class="mt-3 grid gap-3">
+          <li class="border-l-2 border-accent pl-3 leading-relaxed text-dim" data-i18n="doc.search.exact"></li>
+          <li class="border-l-2 border-line pl-3 leading-relaxed text-dim" data-i18n="doc.search.planner"></li>
+          <li class="border-l-2 border-line pl-3 leading-relaxed text-dim" data-i18n="doc.search.minroad"></li>
+        </ul>
+      </section>
+
+      <section class="mt-8">
+        <h2 class="text-lg font-bold tracking-tight" data-i18n="doc.proof.title"></h2>
+        <p class="mt-2 leading-relaxed text-dim" data-i18n="doc.proof.body"></p>
+      </section>
+
+      <section class="mt-8">
+        <h2 class="text-lg font-bold tracking-tight" data-i18n="doc.bands.title"></h2>
+        <p class="mt-2 leading-relaxed text-dim" data-i18n="doc.bands.body"></p>
+        <figure class="mt-4">
+          <div class="overflow-hidden rounded-lg border border-line bg-plan">
+            <svg id="figure-bands" class="w-full" role="img" aria-hidden="true"></svg>
+          </div>
+          <figcaption class="mt-2 text-xs text-dim" data-i18n="doc.bands.figure"></figcaption>
+        </figure>
+      </section>
+
+      <section class="mt-8">
+        <h2 class="text-lg font-bold tracking-tight" data-i18n="doc.curb.title"></h2>
+        <p class="mt-2 leading-relaxed text-dim" data-i18n="doc.curb.body"></p>
+      </section>
+
+      <section class="mt-8">
+        <h2 class="text-lg font-bold tracking-tight" data-i18n="doc.limits.title"></h2>
+        <p class="mt-2 leading-relaxed text-dim" data-i18n="doc.limits.body"></p>
+      </section>
+
+      <section class="mt-8 border-t border-line pt-6">
+        <h2 class="text-lg font-bold tracking-tight" data-i18n="doc.source.title"></h2>
+        <p class="mt-2 leading-relaxed text-dim" data-i18n="doc.source.body"></p>
+        <p class="mt-2">
+          <a
+            href="https://github.com/FabienD/swept-path"
+            class="text-accent hover:underline"
+            rel="noreferrer"
+            data-i18n="doc.source.link"
+          ></a>
+        </p>
+      </section>
+    </main>
+
+    <footer class="mx-auto max-w-3xl border-t border-line px-6 py-6 text-xs text-dim">
+      <nav class="flex flex-wrap gap-x-6 gap-y-2">
+        <a href="/" class="hover:text-fg" data-i18n="nav.simulator"></a>
+        <a href="/documentation.html" class="hover:text-fg" data-i18n="nav.documentation"></a>
+        <a href="/disclaimer.html" class="hover:text-fg" data-i18n="nav.disclaimer"></a>
+        <a
+          href="https://github.com/FabienD/swept-path"
+          class="ml-auto hover:text-fg"
+          rel="noreferrer"
+          >GitHub</a
+        >
+      </nav>
+    </footer>
+    <script type="module" src="/src/pages.ts"></script>
+  </body>
+</html>

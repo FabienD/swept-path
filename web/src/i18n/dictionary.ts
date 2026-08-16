@@ -10,10 +10,19 @@
  * French is the reference: the project is French and its author writes the
  * French first. English follows it.
  */
+import type { PageTexts } from "./pages";
+import { PAGE_TEXTS } from "./pages";
 import type { Locale } from "./preferences";
 
-/** The keys, and therefore what a complete translation must supply. */
-export interface Texts {
+/**
+ * The interface's own labels.
+ *
+ * The pages' prose lives in `pages.ts` and is merged in below: paragraphs and
+ * labels change for different reasons, and a hundred lines of prose in here
+ * would bury the labels. One dictionary comes out of it, so the same
+ * `data-i18n` markup and the same completeness test cover both.
+ */
+interface UiTexts {
   "app.name": string;
   "app.nameAccent": string;
   "app.tagline": string;
@@ -109,9 +118,10 @@ export interface Texts {
   "msg.minRoadSearching": string;
 }
 
+export type Texts = UiTexts & PageTexts;
 export type TextKey = keyof Texts;
 
-const FR: Texts = {
+const FR: UiTexts = {
   "app.name": "Épure",
   "app.nameAccent": "de giration",
   "app.tagline": "Ce véhicule franchit-il ce passage, et en combien de manœuvres.",
@@ -207,7 +217,7 @@ const FR: Texts = {
   "msg.minRoadSearching": "Recherche de la chaussée minimale…",
 };
 
-const EN: Texts = {
+const EN: UiTexts = {
   "app.name": "Swept",
   "app.nameAccent": "path",
   "app.tagline": "Does this vehicle clear this opening, and in how many moves.",
@@ -303,7 +313,10 @@ const EN: Texts = {
   "msg.minRoadSearching": "Looking for the narrowest roadway…",
 };
 
-const DICTIONARIES: Record<Locale, Texts> = { fr: FR, en: EN };
+const DICTIONARIES: Record<Locale, Texts> = {
+  fr: { ...FR, ...PAGE_TEXTS.fr },
+  en: { ...EN, ...PAGE_TEXTS.en },
+};
 
 /** One fixed string, in one language. */
 export function text(locale: Locale, key: TextKey): string {
@@ -311,4 +324,4 @@ export function text(locale: Locale, key: TextKey): string {
 }
 
 /** Every key, so the page can be walked and a translation checked complete. */
-export const TEXT_KEYS = Object.keys(FR) as TextKey[];
+export const TEXT_KEYS = Object.keys(DICTIONARIES.fr) as TextKey[];

@@ -39,11 +39,12 @@ import { createStore } from "./state/store";
 import { arrivesFromTheRight, readRequest, readScene } from "./ui/form";
 import { CANCELLED, SolverClient } from "./worker/client";
 import { text } from "./i18n/dictionary";
+import { applyLanguage } from "./i18n/apply";
 import type { TextKey } from "./i18n/dictionary";
 import type { Preferences } from "./i18n/preferences";
 import { loadPreferences, savePreferences } from "./i18n/preferences";
 import type { Magnitude, UnitSystem } from "./domain/units";
-import { fromDisplay, stepFor, toDisplay, unitOf } from "./domain/units";
+import { fromDisplay, stepFor, toDisplay } from "./domain/units";
 
 const VIEWPORT = { width: 1000, height: 600 };
 const client = new SolverClient();
@@ -98,29 +99,6 @@ function measuredFields(): { input: HTMLInputElement; magnitude: Magnitude }[] {
   return [...document.querySelectorAll<HTMLInputElement>("input[data-magnitude]")].map(
     (input) => ({ input, magnitude: input.dataset["magnitude"] as Magnitude }),
   );
-}
-
-/** Puts the page into one language: labels, placeholders, and the units. */
-function applyLanguage(preferences: Preferences): void {
-  const { locale, units } = preferences;
-
-  for (const node of document.querySelectorAll<HTMLElement>("[data-i18n]")) {
-    node.textContent = text(locale, node.dataset["i18n"] as TextKey);
-  }
-  for (const node of document.querySelectorAll<HTMLElement>("[data-i18n-placeholder]")) {
-    node.setAttribute(
-      "placeholder",
-      text(locale, node.dataset["i18nPlaceholder"] as TextKey),
-    );
-  }
-  for (const node of document.querySelectorAll<HTMLElement>("[data-i18n-aria]")) {
-    node.setAttribute("aria-label", text(locale, node.dataset["i18nAria"] as TextKey));
-  }
-  for (const node of document.querySelectorAll<HTMLElement>("[data-unit]")) {
-    node.textContent = unitOf(node.dataset["unit"] as Magnitude, units);
-  }
-
-  document.documentElement.lang = locale;
 }
 
 /**
