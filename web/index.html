@@ -101,7 +101,13 @@
                   <span data-unit="dimension"></span>
                 </span>
                 <input id="radius" data-magnitude="dimension" type="number" min="0" step="0.001" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
-                <span id="radius-note" class="text-xs text-dim"></span>
+                <!-- Which circle is meant stays visible, out of the label: a
+                     wall-to-wall figure is larger, and entering one here
+                     would make every verdict optimistic. Two elements, since
+                     one is fixed prose and the other is written per vehicle —
+                     sharing them would have applyLanguage wipe the warning. -->
+                <span class="text-xs text-dim opacity-70" data-i18n="field.radiusKind"></span>
+                <span id="radius-note" class="text-xs text-band-tight"></span>
               </label>
 
               <div class="col-span-2 flex items-baseline justify-between">

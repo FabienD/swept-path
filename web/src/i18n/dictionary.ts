@@ -75,6 +75,7 @@ interface UiTexts {
   "mirrors.folded": string;
   "field.radius": string;
   "field.pivot": string;
+  "field.radiusKind": string;
   "field.wheelbase": string;
   "field.length": string;
   "field.frontOverhang": string;
@@ -173,8 +174,9 @@ const FR: UiTexts = {
   "side.fromRight": "Par la droite",
 
   "mirrors.folded": "Rétroviseurs rabattus",
-  "field.radius": "Rayon de braquage, entre trottoirs",
+  "field.radius": "Rayon de braquage",
   "field.pivot": "Rayon de pivot",
+  "field.radiusKind": "entre trottoirs, pas entre murs",
   "field.wheelbase": "Empattement",
   "field.length": "Longueur totale",
   "field.frontOverhang": "Porte-à-faux avant",
@@ -270,8 +272,9 @@ const EN: UiTexts = {
   "side.fromRight": "From the right",
 
   "mirrors.folded": "Mirrors folded",
-  "field.radius": "Turning radius, curb to curb",
+  "field.radius": "Turning radius",
   "field.pivot": "Pivot radius",
+  "field.radiusKind": "curb to curb, not wall to wall",
   "field.wheelbase": "Wheelbase",
   "field.length": "Overall length",
   "field.frontOverhang": "Front overhang",
