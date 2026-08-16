@@ -81,7 +81,7 @@
                are all filled, and opened by `openWhatIsMissing` whenever one
                is not — including for a listed vehicle whose figure the table
                does not have. -->
-          <details id="vehicle-box" class="border-t border-line pt-3">
+          <details id="vehicle-box">
             <summary class="cursor-pointer text-xs text-dim marker:text-accent">
               <span data-i18n="group.vehicleSizes"></span>
               <span id="vehicle-missing" class="text-band-tight"></span>
@@ -151,7 +151,7 @@
             </div>
           </details>
 
-          <div class="grid grid-cols-2 gap-2.5">
+          <div class="grid grid-cols-2 gap-2.5 border-t border-line pt-4">
             <label class="grid gap-1">
               <span class="text-[0.65rem] tracking-[0.13em] text-dim uppercase"><span data-i18n="field.opening"></span> <span data-unit="dimension"></span></span>
               <input id="opening" data-magnitude="dimension" type="number" min="0" step="0.01" value="2.40" class="w-full rounded border border-line bg-plan px-2 py-1.5 text-sm tabular-nums" />
