@@ -2,6 +2,7 @@ import { bandOf } from "../domain/bands";
 import { poseAt, timelineOf } from "./playback";
 import type { ManeuverDto, PoseDto, VehicleDto } from "../domain/types";
 import type { Point, Primitive, Role } from "./primitives";
+import { trackOf } from "../domain/track";
 
 const BAND_ROLES: readonly Role[] = [
   "band-clear",
@@ -47,32 +48,173 @@ function localToWorld(pose: PoseDto, lx: number, ly: number): Point {
   return { x: pose.x + lx * cos - ly * sin, y: pose.y + lx * sin + ly * cos };
 }
 
-/** The vehicle outline, its mirrors and its nose, at one pose. */
+/**
+ * The curvature of the path at pose `index`, in 1/m.
+ *
+ * Signed the way the kinematic model signs it, so that a positive value is
+ * the wheels turned left whichever gear the stretch was driven in.
+ */
+export function curvatureAt(poses: readonly PoseDto[], index: number): number {
+  // The segment arriving at the pose, or — on the first one, which none
+  // arrives at — the one leaving it. Either says where the wheels point.
+  const across = (from?: PoseDto, to?: PoseDto): number | null => {
+    if (!from || !to) return null;
+    // A segment is a circular arc, whose chord is `2R·sin(Δθ/2)`. Reading the
+    // chord as the arc would inflate the curvature — a tenth of a degree of
+    // steering on a 20 cm step, which is visible on a drawn wheel.
+    //
+    // Signed by the gear: `ds < 0` in reverse, so the same steering turns the
+    // heading the other way. Dividing by the signed step gives the wheels back.
+    const chord = Math.hypot(to.x - from.x, to.y - from.y);
+    // A gear change can emit the same pose twice. Dividing by that chord puts
+    // an infinity into a coordinate and blanks the whole plan.
+    if (chord < 1e-9) return null;
+    const sign = to.reverse ? -1 : 1;
+    return (2 * Math.sin((to.heading - from.heading) / 2)) / (chord * sign);
+  };
+
+  return (
+    across(poses[index - 1], poses[index]) ??
+    across(poses[index], poses[index + 1]) ??
+    0
+  );
+}
+
+/** How wide a drawn tyre is, as a fraction of its length. */
+const TYRE_ASPECT = 0.35;
+
+/** The steering angle of the wheel offset `ly` from the axle centre. */
+function steerAt(vehicle: VehicleDto, curvature: number, ly: number): number {
+  // The turn centre sits `1/κ` to the left, so a wheel offset towards it sees
+  // a shorter lever and turns further — Ackermann, and the reason a pair drawn
+  // parallel reads as a toy. Written over `κ` rather than over the radius, so
+  // a straight stretch needs no special case.
+  return Math.atan((vehicle.wheelbase * curvature) / (1 - curvature * ly));
+}
+
+/**
+ * How long a drawn tyre may be, in metres.
+ *
+ * Sized off the wheelbase, so a quadricycle does not get the wheels of an
+ * estate car — then cut down to whatever fits. A steered wheel swings its
+ * corner sideways, and the plan must never show any part of the vehicle
+ * outside the envelope the solver actually tested: the widest tested point is
+ * the mirror, and at full lock a life-sized wheel would reach past it by
+ * several centimetres. Fitted here once per vehicle rather than per pose, so
+ * the wheels do not breathe as the car turns.
+ */
+function tyreLength(vehicle: VehicleDto): number {
+  const halfTrack = trackOf(vehicle.width) / 2;
+  const lock = Math.abs(
+    steerAt(vehicle, 1 / vehicle.min_turning_radius, halfTrack),
+  );
+  const room = vehicle.mirror_width / 2 - halfTrack;
+  const reach = Math.sin(lock) + TYRE_ASPECT * Math.cos(lock);
+  return Math.min(vehicle.wheelbase * 0.24, (2 * room) / reach);
+}
+
+/** A tyre footprint, centred at `(lx, ly)` and turned by `steer` radians. */
+function tyreAt(
+  pose: PoseDto,
+  vehicle: VehicleDto,
+  lx: number,
+  ly: number,
+  steer: number,
+  role: Role,
+): Primitive {
+  const half = tyreLength(vehicle) / 2;
+  const halfWidth = half * TYRE_ASPECT;
+  const cos = Math.cos(steer);
+  const sin = Math.sin(steer);
+  return {
+    type: "polygon",
+    role,
+    points: (
+      [
+        [-half, -halfWidth],
+        [half, -halfWidth],
+        [half, halfWidth],
+        [-half, halfWidth],
+      ] as const
+    ).map(([px, py]) =>
+      localToWorld(pose, lx + px * cos - py * sin, ly + px * sin + py * cos),
+    ),
+  };
+}
+
+/**
+ * The vehicle outline, its wheels and its mirrors, at one pose.
+ *
+ * `curvature` steers the front wheels. Ackermann, not a single angle: the
+ * wheel on the inside of the bend follows a tighter circle, so it turns
+ * further, and a pair drawn parallel would read as a toy.
+ */
 export function vehicleAt(
   pose: PoseDto,
   vehicle: VehicleDto,
   role: "vehicle" | "ghost",
+  curvature = 0,
 ): Primitive[] {
   const halfMirrors = vehicle.mirror_width / 2;
   const out: Primitive[] = [
     { type: "polygon", role, points: bodyAt(pose, vehicle) },
   ];
+
+  // The nose, drawn inside the rectangle rather than bitten out of it: a
+  // chamfered polygon would show a car smaller than the one tested. Two lines,
+  // which is cheap enough that the ghosts can afford them — and a trail of
+  // outlines that says nothing about which way it was travelling is half a
+  // drawing.
+  const front = vehicle.wheelbase + vehicle.front_overhang;
+  const halfBody = vehicle.width / 2;
+  const cut = vehicle.width / 6;
+  for (const side of [1, -1]) {
+    out.push({
+      type: "polyline",
+      role: role === "vehicle" ? "chamfer" : "ghost",
+      points: [
+        localToWorld(pose, front - cut, side * halfBody),
+        localToWorld(pose, front, side * (halfBody - cut)),
+      ],
+    });
+  }
   if (role === "vehicle") {
-    // The mirrors are almost always what touches first, so they are marked.
-    for (const side of [halfMirrors, -halfMirrors]) {
+    // The mirrors, at the size they are rather than as a marker. They are the
+    // widest thing on the car and almost always the first to touch a pillar,
+    // and `swept_core::vehicle::envelope` samples them: a silhouette stopping
+    // at the body would draw a narrower car than the one that was answered
+    // about. Level with the front axle, which is where the core puts them.
+    const beyondBody = halfMirrors - halfBody;
+    // Half the housing, fore and aft of the axle. A mirror is about a hand
+    // long whatever the car; scaled off the wheelbase so it stays in
+    // proportion rather than dominating a small one.
+    const housing = vehicle.wheelbase * 0.04;
+    for (const side of [1, -1]) {
       out.push({
-        type: "circle",
+        type: "polygon",
         role: "mirror",
-        centre: localToWorld(pose, vehicle.wheelbase, side),
-        radius: 3,
+        points: (
+          [
+            [-housing, halfBody],
+            [housing, halfBody],
+            [housing, halfBody + beyondBody],
+            [-housing, halfBody + beyondBody],
+          ] as const
+        ).map(([lx, ly]) =>
+          localToWorld(pose, vehicle.wheelbase + lx, side * ly),
+        ),
       });
     }
-    out.push({
-      type: "circle",
-      role: "nose",
-      centre: localToWorld(pose, vehicle.wheelbase + vehicle.front_overhang, 0),
-      radius: 2.5,
-    });
+
+    const halfTrack = trackOf(vehicle.width) / 2;
+    for (const side of [halfTrack, -halfTrack]) {
+      out.push(tyreAt(pose, vehicle, 0, side, 0, "wheel-rear"));
+    }
+    for (const side of [halfTrack, -halfTrack]) {
+      const steer = steerAt(vehicle, curvature, side);
+      out.push(tyreAt(pose, vehicle, vehicle.wheelbase, side, steer, "wheel-front"));
+    }
+
   }
   return out;
 }
@@ -153,7 +295,9 @@ export function pathToPrimitives(
     out.push(...vehicleAt(poses[poseAt(timeline, fraction)]!, vehicle, "ghost"));
   }
 
-  out.push(...vehicleAt(poses[reached]!, vehicle, "vehicle"));
+  out.push(
+    ...vehicleAt(poses[reached]!, vehicle, "vehicle", curvatureAt(poses, reached)),
+  );
 
   return out;
 }
