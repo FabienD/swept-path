@@ -144,3 +144,22 @@ export function positionAt(timeline: Timeline, elapsed: number): number {
   const driven = elapsed - paused * REVERSAL_PAUSE_S;
   return Math.min(Math.max(driven / duration, 0), 1);
 }
+
+/**
+ * The moment playback reaches `position` — the inverse of [`positionAt`].
+ *
+ * What lets a paused playback resume where it stopped instead of starting
+ * over, which is the difference between pausing to look at something and
+ * losing your place.
+ */
+export function elapsedFor(timeline: Timeline, position: number): number {
+  const clamped = Math.min(Math.max(position, 0), 1);
+  // Only the pauses already served count. A position sitting exactly on a
+  // reversal lands at the start of its pause, not the end of it.
+  let paused = 0;
+  for (const fraction of timeline.reversals) {
+    if (fraction >= clamped) break;
+    paused += 1;
+  }
+  return clamped * playbackDuration(timeline.length) + paused * REVERSAL_PAUSE_S;
+}

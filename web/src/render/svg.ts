@@ -34,6 +34,10 @@ const STYLE: Record<Role, { fill?: string; stroke?: string; width?: number; opac
   "band-close": { stroke: "var(--color-band-close)", width: 3 },
   "band-tight": { stroke: "var(--color-band-tight)", width: 3 },
   overhang: { stroke: "var(--color-overhang)", width: 3 },
+  // Where the trip goes, drawn once under everything else. Quiet enough not
+  // to be mistaken for a proximity band, present enough that the destination
+  // is visible before playback reaches it.
+  upcoming: { stroke: "var(--color-ghost)", width: 1.5, opacity: 0.55 },
   annotation: { fill: "var(--color-annotation)" },
 };
 

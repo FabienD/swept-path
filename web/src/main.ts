@@ -14,6 +14,13 @@ import { VEHICLES, searchVehicles, vehicleById } from "./domain/vehicles";
 import type { Verdict } from "./domain/verdict";
 import { clearanceCeiling, gaugeFraction, verdictOf } from "./domain/verdict";
 import { pathToPrimitives } from "./render/path";
+import {
+  elapsedFor,
+  poseAt,
+  positionAt,
+  timelineOf,
+  totalDuration,
+} from "./render/playback";
 import { projectionFor } from "./render/projection";
 import { boundsFor, sceneToPrimitives } from "./render/scene";
 import { renderSvg } from "./render/svg";
@@ -45,11 +52,72 @@ const store = createStore({
   alternatives: [] as ManeuverDto[],
   selected: 0,
   position: 1,
+  playing: false,
   maxAngleDegrees: null as number | null,
 });
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
   document.getElementById(id) as T | null;
+
+/* -------------------------------------------------------------- playback */
+
+/**
+ * The clock. Everything it does is push `position` into the store; the plan
+ * redraws from that, exactly as it does when the scrubber is dragged.
+ *
+ * The arithmetic — how long a trip takes, where the pauses fall, which pose
+ * sits at a position — belongs to `render/playback.ts`, which is pure and
+ * tested. This is only the part that needs a browser.
+ */
+let frame = 0;
+
+/** True when the visitor has asked their system for less movement. */
+const stillnessWanted = (): boolean =>
+  globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
+/** The path being shown, measured, or null when there is none. */
+function currentTimeline() {
+  const { alternatives, selected } = store.get();
+  const current = alternatives[selected];
+  return current ? timelineOf(current.poses) : null;
+}
+
+function stopPlaying(): void {
+  if (frame) cancelAnimationFrame(frame);
+  frame = 0;
+  store.set({ playing: false });
+}
+
+function startPlaying(): void {
+  const timeline = currentTimeline();
+  if (!timeline || timeline.length === 0) return;
+
+  // Asked for stillness: show the finished épure rather than refuse. The
+  // figure is the point; the animation is only how it gets drawn.
+  if (stillnessWanted()) {
+    store.set({ position: 1 });
+    return;
+  }
+
+  // A finished playback replays from the start; a paused one carries on from
+  // where it stopped, so pausing to look at something does not cost your place.
+  const from = store.get().position >= 1 ? 0 : store.get().position;
+  const total = totalDuration(timeline);
+  const offset = elapsedFor(timeline, from);
+  const began = performance.now() - offset;
+
+  store.set({ playing: true, position: from });
+  const tick = (now: number): void => {
+    const elapsed = now - began;
+    store.set({ position: positionAt(timeline, elapsed / 1000) });
+    if (elapsed / 1000 >= total) {
+      stopPlaying();
+      return;
+    }
+    frame = requestAnimationFrame(tick);
+  };
+  frame = requestAnimationFrame(tick);
+}
 
 /* ------------------------------------------------------------------ draw */
 
@@ -224,8 +292,19 @@ function renderAlternatives(): void {
   }
 }
 
+/**
+ * What the last rebuild of the choice-dependent parts was for.
+ *
+ * Measured, in case this looks like premature caution: recomputing the
+ * timeline itself costs 15 µs a frame — 0.09 % of one — and is left alone.
+ * It is the DOM rebuilding that had to stop, not the arithmetic.
+ */
+let shownAlternatives: readonly ManeuverDto[] | null = null;
+let shownSelected = -1;
+
 store.subscribe(() => {
-  const { outcome, message, alternatives, selected, busy, progress } = store.get();
+  const { outcome, message, alternatives, selected, busy, progress, playing } =
+    store.get();
 
   // The headline answers the question; the nuance qualifies it without
   // contradicting it. A free-form message has no headline — it is not an
@@ -252,13 +331,31 @@ store.subscribe(() => {
   const run = byId("run");
   if (run) run.textContent = busy ? "Arrêter" : "Calculer";
 
-  renderAlternatives();
   const current = alternatives[selected];
+
+  // Which manoeuvre is on screen changes rarely; where the vehicle sits along
+  // it changes sixty times a second. Rebuilding the alternatives on every
+  // frame would re-create their nodes and re-attach their listeners under the
+  // pointer — a click landing on a button that has just been replaced does
+  // nothing at all. So the parts that depend only on the choice are rebuilt
+  // only when the choice changes.
+  if (alternatives !== shownAlternatives || selected !== shownSelected) {
+    shownAlternatives = alternatives;
+    shownSelected = selected;
+    renderAlternatives();
+    renderLegend(Boolean(current));
+    if (current) renderStats(current);
+    else byId("stats")?.replaceChildren();
+  }
+
   const scrub = byId<HTMLInputElement>("scrub");
-  if (scrub) scrub.disabled = !current;
-  renderLegend(Boolean(current));
-  if (current) renderStats(current);
-  else byId("stats")?.replaceChildren();
+  if (scrub) {
+    scrub.disabled = !current;
+    // The clock owns the scrubber while it runs, so the handle tracks the
+    // vehicle instead of sitting where it was last dropped.
+    if (playing) scrub.value = String(Math.round(store.get().position * 100));
+  }
+  renderPlayback();
 
   draw();
 });
@@ -269,6 +366,9 @@ function clearResult(): void {
   // Whatever is running answers a question that has just changed, so it is
   // abandoned rather than left to overwrite the screen with a stale verdict.
   client.cancel();
+  // Including the playback: it would go on animating a path that no longer
+  // matches the measurements on screen.
+  stopPlaying();
   store.set({
     alternatives: [],
     selected: 0,
@@ -315,6 +415,55 @@ const FIELD_INPUTS: Record<string, string> = {
   ground_clearance: "ground-clearance",
   min_turning_radius: "radius",
 };
+
+/**
+ * The playback bar: the button, which gear, and the clearance right here.
+ *
+ * The live clearance is what ties the animation to the verdict — the figure
+ * shown at the top is the smallest this one ever gets, and watching it fall
+ * to that value is what makes it mean something.
+ */
+function renderPlayback(): void {
+  const { alternatives, selected, position, playing } = store.get();
+  const current = alternatives[selected];
+
+  const button = byId<HTMLButtonElement>("play");
+  if (button) button.disabled = !current;
+  const glyph = byId("play-glyph");
+  const label = byId("play-label");
+  if (glyph) glyph.textContent = playing ? "❚❚" : "▶";
+  if (label) {
+    label.textContent = playing
+      ? "Pause"
+      : stillnessWanted()
+        ? "Montrer l'épure"
+        : "Lire la manœuvre";
+  }
+
+  const percent = byId("scrub-label");
+  if (percent) percent.textContent = `${Math.round(position * 100)} %`;
+
+  const gear = byId("gear");
+  const live = byId("live-clearance");
+  if (!current || current.poses.length === 0) {
+    gear?.classList.add("hidden");
+    if (live) live.textContent = "";
+    return;
+  }
+
+  const pose = current.poses[poseAt(timelineOf(current.poses), position)]!;
+  if (gear) {
+    gear.classList.remove("hidden");
+    gear.textContent = pose.reverse ? "ARRIÈRE" : "AVANT";
+    // Reverse wears white, from the vehicle's own reversing lamps; forward
+    // wears the accent. The trace keeps the proximity colours, so the gear is
+    // read on the vehicle and here, never on the path.
+    gear.classList.toggle("bg-fg", pose.reverse);
+    gear.classList.toggle("bg-accent", !pose.reverse);
+    gear.classList.add("text-ink");
+  }
+  if (live) live.textContent = centimetres(pose.clearance);
+}
 
 /** Marks or clears one input as needing attention. */
 function flag(id: string, missing: boolean): void {
@@ -483,15 +632,21 @@ form?.addEventListener("change", () => {
   draw();
 });
 
+byId("play")?.addEventListener("click", () => {
+  if (store.get().playing) stopPlaying();
+  else startPlaying();
+});
+
 // The scrubber redraws on the display's rhythm rather than on every input
 // event: a fast sweep otherwise queues far more redraws than the screen shows.
 let pending = false;
 byId<HTMLInputElement>("scrub")?.addEventListener("input", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement)) return;
+  // Taking hold of the scrubber takes over from the clock. Leaving both
+  // running would have them fight for the same value every frame.
+  if (store.get().playing) stopPlaying();
   const fraction = Number(target.value) / 100;
-  const label = byId("scrub-label");
-  if (label) label.textContent = `${target.value} %`;
   if (pending) return;
   pending = true;
   requestAnimationFrame(() => {

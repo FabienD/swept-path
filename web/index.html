@@ -244,10 +244,39 @@
             <!-- The playback bar. It is the scrubber today; the play button
                  lands with the next batch. -->
             <div class="flex flex-wrap items-center gap-3 border-t border-line bg-panel px-3 py-2">
-              <label class="flex flex-1 items-center gap-3 text-xs text-dim">
-                <span class="whitespace-nowrap">Position — <span id="scrub-label" class="tabular-nums">100 %</span></span>
-                <input id="scrub" type="range" min="0" max="100" value="100" step="1" disabled class="w-full flex-1 accent-accent" />
-              </label>
+              <button
+                id="play"
+                type="button"
+                disabled
+                class="flex items-center gap-2 rounded-full border border-accent px-3 py-1 text-xs font-bold whitespace-nowrap text-accent disabled:border-line disabled:text-dim"
+              >
+                <span id="play-glyph" aria-hidden="true">▶</span>
+                <span id="play-label">Lire la manœuvre</span>
+              </button>
+
+              <!-- Which gear, doubled in words. The vehicle already lights its
+                   reversing lamps, but that reading should not be the only one. -->
+              <span
+                id="gear"
+                class="hidden rounded px-2 py-0.5 text-[0.7rem] font-extrabold tracking-wider"
+              ></span>
+
+              <input
+                id="scrub"
+                type="range"
+                min="0"
+                max="100"
+                value="100"
+                step="1"
+                disabled
+                aria-label="Position sur le trajet"
+                class="min-w-24 flex-1 accent-accent"
+              />
+
+              <span class="text-xs whitespace-nowrap text-dim tabular-nums">
+                <span id="scrub-label">100 %</span>
+                <span id="live-clearance" class="ml-2 text-fg"></span>
+              </span>
             </div>
           </div>
           <figcaption id="legend" class="mt-2 flex flex-wrap gap-4 text-xs text-dim"></figcaption>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PoseDto } from "../domain/types";
 import {
   MAX_DURATION_S,
+  elapsedFor,
   MIN_DURATION_S,
   REVERSAL_PAUSE_S,
   playbackDuration,
@@ -154,5 +155,31 @@ describe("where playback has got to at a given moment", () => {
     const half = positionAt(plain, duration / 2);
     expect(quarter).toBeCloseTo(0.25, 9);
     expect(half).toBeCloseTo(0.5, 9);
+  });
+});
+
+describe("resuming where playback stopped", () => {
+  const timeline = timelineOf([at(0), at(1), at(2), at(3, true), at(4, true)]);
+
+  it("finds the moment a position was reached", () => {
+    for (const position of [0, 0.2, 0.5, 0.75, 0.9, 1]) {
+      expect(positionAt(timeline, elapsedFor(timeline, position))).toBeCloseTo(
+        position,
+        9,
+      );
+    }
+  });
+
+  it("counts only the pauses already served", () => {
+    // Half way is before the reversal at 3/4, so no pause has been paid yet.
+    const duration = playbackDuration(timeline.length);
+    expect(elapsedFor(timeline, 0.5)).toBeCloseTo(0.5 * duration, 9);
+    // Past it, the pause is part of the time elapsed.
+    expect(elapsedFor(timeline, 1)).toBeCloseTo(duration + REVERSAL_PAUSE_S, 9);
+  });
+
+  it("starts at zero and ends at the full duration", () => {
+    expect(elapsedFor(timeline, 0)).toBe(0);
+    expect(elapsedFor(timeline, 1)).toBeCloseTo(totalDuration(timeline), 9);
   });
 });
